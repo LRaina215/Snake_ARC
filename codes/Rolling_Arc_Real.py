@@ -360,6 +360,11 @@ class RollingArcController:
                 if abs(self.pending_phase) < 1e-10:
                     step_finished = True
         goal = joint_angles_deg(self.phase, self.amplitude, self.first, self.last)
+        if len(goal) != NUM_JOINTS or any(not math.isfinite(angle) for angle in goal):
+            raise ValueError('步态公式必须返回 20 个有限角度值（单位：度）')
+        for i, active in enumerate(self.enabled):
+            if active:
+                angle_to_raw(i, goal[i])  # 修改公式后也先检查最终目标，不能靠截断掩盖越界
         if self.mode == 'hold' and not self.forming:
             goal = self.targets.copy()  # hold 立即冻结已发目标，未到位的形成过程也可以中断
         rate = FORM_RATE_DEG_S if self.forming else MAX_TARGET_RATE_DEG_S

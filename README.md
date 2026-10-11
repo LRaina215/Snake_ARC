@@ -46,6 +46,13 @@ py -3.12 validation/render_step1.py
 
 # 本轮不连接硬件；仅预览原设备档案对应的目标与使能报文
 py -3.12 codes/Rolling_Arc_Real_Preview.py --phase 0.5 --output validation/results/hardware_preview.json
+
+# 实机单文件入口：真实串口，Ctrl+字母热键/控制台，不使用外部可视化程序
+py -3.12 -m pip install -r requirements-real.txt
+py -3.12 codes/Rolling_Arc_Real.py --port COM9 --log logs/rolling_arc_real.jsonl
+
+# 同一实机控制流程的离线演练，不连接机器人
+py -3.12 codes/Rolling_Arc_Real.py --dry-run
 ```
 
 默认参数在 [configs/step1.json](configs/step1.json)，关节编号从 1 开始。需要调整方向时将 `direction` 改为 `-1`；默认幅值 60°，角频率 0.6 rad/s，初始相位 0。当前自动搭管初始化按相位 0 的圆弧构型设计；更改初始相位或窗口/幅值组合后需要重新检查初始构型与碰撞，不能直接沿用本次验收结论。
@@ -64,10 +71,14 @@ py -3.12 codes/Rolling_Arc_Real_Preview.py --phase 0.5 --output validation/resul
 | `validation/step1_experiment.py` | 动力学验收、对照和实际状态存档 |
 | `validation/reports/step1/` | 已提交的结果、原始状态、截图和指标图 |
 | `codes/Rolling_Arc_Real_Preview.py` | 原设备档案对应的离线报文预览 |
+| `codes/Rolling_Arc_Real.py` | 独立实机串口入口，参数/公式集中，Ctrl 热键和控制台调试 |
+| `docs/实机调试代码说明.md` | 真实运行、调试键位、常改位置、反馈与验证边界 |
 | `docs/Step1设计说明.md` | 步态公式、失能含义、初始化及验证边界 |
 | `docs/复用来源.md` | 源仓库文件与修改说明 |
 | `交接记录.md` | 当前完成内容、命令、未完成部分和后续接口 |
 
 本机实际状态回放视频位于 `validation/results/videos/`，Git 保存对应的完整状态文件和生成脚本，视频本身不入库。生成视频需安装 `requirements-media.txt`，执行 `py -3.12 validation/render_step1.py --video`，默认四倍速回放。
 
-按本轮任务澄清，验证在仿真中完成；实机仅复用档案并核对离线映射，未开展实机跨管实验。当前原 EXE 协议没有逐关节使能接口，接入实机时需要补充该接口；保持 EXE 为串口唯一所有者。
+实机代码已补齐：一份 Python 文件直接连接真实舵机，按 Ctrl+U 形成局部圆弧，Ctrl+J/H 正反单步，Ctrl+G 连续/暂停，Ctrl+X 全部失能；不使用 F 键。代码顶部可直接改参数，`joint_angles_deg()` 可直接改公式，运行中也可输入 `amplitude=58 omega=0.5 delta=0.05`。详见 [实机调试说明](docs/实机调试代码说明.md)。
+
+三类管道已完成的是动力学仿真验证。实机程序完成了离线串口检查和 Windows 热键监听启动/退出检查，真实机器人通过实验尚未执行。运行实机入口时，由该脚本直接占用串口，原 EXE 等其他串口程序应关闭。

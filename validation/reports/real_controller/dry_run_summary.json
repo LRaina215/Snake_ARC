@@ -1,0 +1,22 @@
+{
+  "execution": "in_memory_serial_only",
+  "physical_robot_connected": false,
+  "sample_count": 107,
+  "first_sample_time_s": 0.0,
+  "last_sample_time_s": 11.959999999999834,
+  "first_formed_sample_time_s": 4.040000000000002,
+  "first_rolling_sample_time_s": 6.079999999999958,
+  "final_sample_phase_rad": 3.5880000000000027,
+  "enabled_joint_indices": [
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+  ],
+  "mask_constant_over_samples": true,
+  "feedback_source": "position command echoed by memory serial, not physical measurement",
+  "verification": "13 unit checks passed; Windows global listener started/stopped; normal exit confirmed zero torque-enable mask",
+  "command": "py -3.12 -X utf8 codes/Rolling_Arc_Real.py --dry-run --no-hotkeys --no-console --auto --fast --duration 12 --log validation/results/real_controller/dry_run.jsonl"
+}
