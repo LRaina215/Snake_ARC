@@ -1,0 +1,3 @@
+# Single-file real robot controller; MuJoCo is not required.
+pyserial==3.5
+pynput>=1.7.6,<2
