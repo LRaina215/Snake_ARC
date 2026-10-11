@@ -1,14 +1,16 @@
 # Snake_ARC
 
-圆弧滚动管外运动研究。当前已完成 Step1 基础圆弧与 Step2 局部滑动窗口顺应性的仿真开发，并移植到单文件实机串口程序；真实机器人效果待用户实验确认。
+圆弧滚动管外运动研究。已实现 Step1 基础步态和首版 Step2 局部滑动窗口顺应性，并移植到单文件实机串口程序。Step2 复盘发现大角度包绕，尚未通过开放圆弧形态验收；真实机器人效果尚未验证。
 
 参考 `Snake_Robot_Gait` 的目录结构：`codes/` 为入口，`snake_control/` 为共享控制模块，`mujoco_model/` 为模型，`tools/` 为模型构建工具，`validation/` 为验证，`configs/` 为参数，`docs/` 为交接和复用说明。
 
-Step1 默认 20 关节、固定使能 J8–J13。Step2 根据实际支撑段接管和迁移局部窗口，并从实测角调整滚动幅值；窗口外关闭主动驱动并保留机械阻尼。弯管全程保持圆弧滚动，没有步态转换或根部位姿牵引。
+Step1 默认 20 关节、固定使能 J8–J13。首版 Step2 根据支撑观测接管和迁移局部窗口，并从实测角调整滚动幅值；窗口外关闭主动驱动并保留机械阻尼。弯管仍使用同一滚动公式，没有步态转换或根部位姿牵引，但部分变径案例的实际形态偏离了开放圆弧目标。
 
 ## Step2 当前结果与运行
 
-10 个仿真案例通过：直管、柔弯、连续急弯、变径直管/弯管、前后偏置搭管、非零相位接入和已有不对称姿态接管。原始状态、窗口与支撑曲线见 [Step2 实验记录](validation/reports/step2/README.md)，方法与实机估计边界见 [设计说明](docs/Step2设计说明.md)。普通管道推进量与同口径 Step1 相差小于 1.8%。基线也能通过当前变径场景，未证明通过率或效率优势；变径弯管机械正功增加约 27.46%。
+10 个仿真案例通过旧的推进/支撑/失能/限矩检查；该检查遗漏开放形态。前部变径弯管末态包绕角约 295°，因此不能视为完整 Step2 通过。复盘与原始状态见 [Step2 实验记录](validation/reports/step2/README.md)，修正幅值反馈、窗口协调及分阶段实验安排见 [设计说明](docs/Step2设计说明.md)。普通管道推进量与同口径 Step1 相差小于 1.8%。基线也能通过当前变径场景，未证明通过率或效率优势；变径弯管机械正功增加约 27.46%。
+
+场景兼容 ID `taper_bend90` 实际为复用的 **45°变径弯管**，此前 90°标注有误；普通 `bend90` 仍为 90°。下图记录首版原型的实际状态，不表示开放形态验收已通过。
 
 ![Step2 实际运动](validation/reports/step2/actual_motion.png)
 
@@ -18,7 +20,7 @@ py -3.12 codes/Rolling_Arc_Adaptive_Mujoco.py --scene taper_bend90 --duration 90
 py -3.12 codes/Rolling_Arc_Adaptive_Mujoco.py --scene taper_bend90 --window 4:9 --duration 90
 # 从已保存的非标准搭管姿态接管
 py -3.12 codes/Rolling_Arc_Adaptive_Mujoco.py --scene taper_bend90 --initial-state validation/reports/step2/pose_initial_state.npz --duration 65
-# 10 个正式案例与 5 个固定窗口对照；详细命令见实验记录
+# 历史 10 个案例与 5 个固定窗口对照；旧检查不包含开放形态
 py -3.12 -X utf8 validation/step2_experiment.py
 py -3.12 -X utf8 validation/step2_experiment.py --baseline --cases straight bend90 elbow90 taper_straight taper_bend90
 ```

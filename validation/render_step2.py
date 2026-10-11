@@ -18,7 +18,8 @@ def main():
     parser.add_argument('--input',type=Path,default=ROOT/'validation/reports/step2')
     parser.add_argument('--video',action='store_true')
     args=parser.parse_args();path=args.input
-    labels={'taper_straight':'Tapered straight pipe','taper_bend90':'Taper + 90 degree bend',
+    # Legacy scene ID taper_bend90 reuses a 45-degree source bend.
+    labels={'taper_straight':'Tapered straight pipe','taper_bend90':'Taper + 45 degree bend',
             'front_taper_bend90':'Front placement + sliding window'}
     fig,axes=plt.subplots(3,3,figsize=(14,9),constrained_layout=True)
     for row,(name,label) in enumerate(labels.items()):
