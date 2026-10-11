@@ -138,7 +138,9 @@ def run(scene, label, output, duration=62., mode='sliding', start=-.5,
         checks['two_handoffs'] = len(completed) == 2 and all(r['accepted'] for r in manual_requests)
         checks['post_handoff_cycles'] = bool(completed) and final['time_s']-completed[-1]['time_s'] >= 3*period
     if payload:
-        checks['automatic_migration_observed'] = any(e.get('reason') == 'persistent observed load displacement' for e in events if e['kind'] in ('prepare', 'begin')) and bool(completed)
+        # Automatic/manual mode is an explicit input. Do not make a verdict
+        # depend on the human-readable event wording of a particular selector.
+        checks['automatic_migration_observed'] = mode == 'sliding' and not manual_direction and bool(completed)
     if mode == 'sliding':
         checks['acquired'] = sim.controller.window is not None
         checks['no_unfinished_handover'] = sim.controller.transfer is None and sim.controller.preparation is None

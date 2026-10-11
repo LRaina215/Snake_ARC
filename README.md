@@ -1,12 +1,33 @@
 # Snake_ARC
 
-圆弧滚动管外运动研究。当前新增固定窗口的实际形状截面顺应控制，仅用于仿真。已完成有限实验计划，直管、两类变径和柔弯/变径弯保持开放并通过；连续90°急弯完成运动通过，但拐角处单截面包绕角不可观测，保留未完整验收。实机代码仍为旧版本，等待用户验收后再移植。
+圆弧滚动管外运动研究。当前新增局部实际形状截面顺应与滑动窗口仿真：固定6关节、整周期承重定位、卸载相位交接，其余关节主动失能。已完成有限实验计划，包含110→210 mm连续90°急弯变径，全身通过且观察内未累计收紧。急弯严格管轴覆盖、4 N载荷触发迁移仍有未通过项，详见逐轮报告。实机代码仍为旧版本，等待用户验收后再移植。
 
 参考 `Snake_Robot_Gait` 的目录结构：`codes/` 为入口，`snake_control/` 为共享控制模块，`mujoco_model/` 为模型，`tools/` 为模型构建工具，`validation/` 为验证，`configs/` 为参数，`docs/` 为交接和复用说明。
 
 Step1 默认 20 关节、固定使能 J8–J13。首版 Step2 根据支撑观测接管和迁移局部窗口，并从实测角调整滚动幅值；窗口外关闭主动驱动并保留机械阻尼。弯管仍使用同一滚动公式，没有步态转换或根部位姿牵引，但部分变径案例的实际形态偏离了开放圆弧目标。
 
-## 固定窗口截面顺应：当前入口（2026-10-12）
+## 滑动窗口截面顺应：当前入口（2026-10-12）
+
+实际关节角重建局部截面并反馈顺应；窗口依据实际形态和MuJoCo向上接触承重选取，迁移在同奇偶族接近零且实际卸载后进行，任一时刻只使能6关节。按整周期F·dφ定位排除正常滚动中的承重点摆动；控制器不读取管道半径、中心线。等待卸载会暂时停相位，物理和顺应继续，没有改变步态或牵引根位姿。
+
+本轮共17次动力学运行：初始11次＋交接修复3次＋出口实际周期计时修复1次＋周期定位修复/回归2次。失败完整保留，每轮审查全采样、全程时序侧/端视和最差状态。固定6关节在210 mm出口仍保持承重与开放，未触发永久扩窗；临时6→5→6交接尝试失败，最终采用6→6卸载交接。
+
+最终大变径急弯只发生1次自动交接，出口后三个实际周期不再往返切窗，身体转角160.93–186.97°。拐角管轴包绕最低142.84°且有47个不可观测采样，完整验收仍未通过。4 N实际载荷回归保持承重/形态但未触发迁移，原测试项保留未覆盖。基础对照也完成运动与开放，尚无性能优势证据；大管径持续触及限矩。最终周期定位器只运行上述2例，早期其余病例不是最终定位器的全矩阵回归。
+
+[实验复盘和视频](validation/reports/sliding_section/README.md) · [全部17次结果](validation/reports/sliding_section/结果总表.md) · [设计与参数](docs/滑动窗口截面顺应设计.md) · [冻结计划与增加测试的原因](docs/滑动窗口实验计划.md)
+
+```powershell
+# 空格保持/恢复相位，A/D向头/尾交接，U切换自动定位，R反向；不使用F键
+py -3.12 -X utf8 codes/Rolling_Arc_Sliding_Section_Mujoco.py --scene elbow90_taper110_210 --start-x -.25 --duration 150
+# 单次实验，出口后观察3个实际周期；独立目录避免覆盖归档
+py -3.12 -X utf8 validation/sliding_section_experiment.py --scene elbow90_taper110_210 --label my_sliding --start -.25 --duration 150 --exit-cycles 3 --output validation/results/my_sliding
+# 仅重放保存状态，不跑新动力学
+py -3.12 -X utf8 validation/render_sliding_section.py --labels s4_sliding_cyclemean --video
+```
+
+![110→210 mm连续90°急弯真实运动](validation/reports/sliding_section/s4_sliding_cyclemean_overview.png)
+
+## 固定窗口截面顺应：前阶段入口（2026-10-12）
 
 使用关节实测角在Python中完成正运动学、局部平面/截面投影、连续线圆弧和Yamada积分；不依赖可视化EXE，也不把接触或管径真值送入控制器。J8–J13固定使能，其余关节主动力矩为零。取消原D规则的强制内弯，并用参考形态校准和总转角/开口约束防止累计收紧。
 
@@ -108,6 +129,12 @@ py -3.12 codes/Rolling_Arc_Real.py --dry-run
 | `codes/Rolling_Arc_Mujoco.py` | 可视化及无窗口仿真入口 |
 | `snake_control/rolling_arc.py` | 共享圆弧目标、固定使能窗口、限矩驱动 |
 | `snake_control/simulation.py` | 初始搭管、物理步进与实际状态测量 |
+| `codes/Rolling_Arc_Sliding_Section_Mujoco.py` | 当前滑动窗口截面顺应交互入口，仅MuJoCo |
+| `snake_control/sliding_section_compliance.py` | 选窗、整周期承重定位、卸载相位交接、单半圆预算 |
+| `snake_control/sliding_section_simulation.py` | 实际管道接触/主动矩观测、局部驱动与相位保持 |
+| `tools/build_sliding_section_scene.py` | 110→210 mm连续90°急弯变径模型构建 |
+| `validation/sliding_section_experiment.py` | 单次动力学运行、实际状态存档及分项判定 |
+| `validation/reports/sliding_section/` | 当前17次运行证据、全时程、视频与复盘 |
 | `codes/Rolling_Arc_Adaptive_Mujoco.py` | Step2 交互/无窗口仿真、已有姿态接管入口 |
 | `snake_control/arc_compliance.py` | 导出实机文件中的同一顺应性核心，避免双份公式 |
 | `snake_control/adaptive_simulation.py` | 管道接触支撑提取、动态驱动掩码与相位推进 |

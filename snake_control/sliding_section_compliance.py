@@ -6,6 +6,7 @@ The geometric feedback is delegated to FixedSectionCompliance unchanged.
 Joint numbers in bounds are one-based; arrays use zero-based indices.
 """
 from dataclasses import dataclass, replace, asdict
+from collections import deque
 import math
 import numpy as np
 from .fixed_section_compliance import FixedSectionCompliance, SectionOptions
@@ -74,6 +75,50 @@ class SlidingSectionCompliance:
         self.next_command_audit_s = 0.
         self.phase_hold = False
         self.last_measured = None
+        self.load_history = deque()
+        self.load_phase_span = 0.
+        self.phase_load_sum = np.zeros(parameters.joints)
+        self.last_load_phase = None
+
+    def _reset_phase_load(self, phase=None):
+        # A completed transfer changes the physical shape. Do not mix load
+        # distributions measured under two different enable masks.
+        self.load_history.clear()
+        self.load_phase_span = 0.
+        self.phase_load_sum[:] = 0.
+        self.last_load_phase = phase
+
+    def _observe_phase_load(self, phase):
+        """Integrate support over the last 2π of rolling, excluding holds.
+
+        Contact location oscillates within a normal rolling cycle. A short
+        time filter alone mistakes that oscillation for window migration.
+        Phase weighting also prevents a long unloading hold from dominating
+        the average. Each deque item is [phase increment, weighted load].
+        """
+        if self.last_load_phase is None:
+            self.last_load_phase = phase
+            return
+        increment = abs(phase-self.last_load_phase)
+        self.last_load_phase = phase
+        if increment <= 1e-12:
+            return
+        weighted = self.raw_support*increment
+        self.load_history.append([increment, weighted])
+        self.phase_load_sum += weighted
+        self.load_phase_span += increment
+        excess = self.load_phase_span-2*math.pi
+        while excess > 1e-12:
+            span, load = self.load_history[0]
+            removed = min(span, excess)
+            fraction = removed/span
+            self.phase_load_sum -= fraction*load
+            self.load_phase_span -= removed
+            if fraction >= 1-1e-12:
+                self.load_history.popleft()
+            else:
+                self.load_history[0] = [span-removed, load*(1-fraction)]
+            excess = self.load_phase_span-2*math.pi
 
     def _mask(self, window):
         indices = np.arange(1, self.p.joints+1)
@@ -193,11 +238,18 @@ class SlidingSectionCompliance:
         if self.support.sum() < self.options.minimum_support_n:
             self.pending = None
             return
-        center = float(self.support @ np.arange(1, self.p.joints+1)/self.support.sum())
+        if self.load_phase_span < 2*math.pi-1e-8:
+            self.pending = None
+            self.selection_reason = 'retain: collecting one rolling cycle of load'
+            return
+        if self.phase_load_sum.sum() <= 1e-12:
+            self.pending = None
+            return
+        center = float(self.phase_load_sum @ np.arange(1, self.p.joints+1)/self.phase_load_sum.sum())
         offset = center-np.mean(self.window)
         if abs(offset) <= self.options.boundary_offset_joints:
             self.pending = None
-            self.selection_reason = 'retain: support remains inside window deadband'
+            self.selection_reason = 'retain: cycle-averaged support remains inside window deadband'
             return
         direction = 1 if offset > 0 else -1
         candidate = (self.window[0]+direction, self.window[1]+direction)
@@ -209,7 +261,7 @@ class SlidingSectionCompliance:
             self.pending, self.pending_since = candidate, time_s
             self.selection_reason = 'waiting for persistent boundary load displacement'
         elif time_s-self.pending_since >= self.options.persistence_s:
-            self.request(candidate, measured, phase, time_s, 'persistent observed load displacement')
+            self.request(candidate, measured, phase, time_s, 'persistent cycle-averaged load displacement')
 
     def _advance_transfer(self, measured, phase, time_s):
         t = self.transfer
@@ -306,6 +358,7 @@ class SlidingSectionCompliance:
                 self.preparation = None
                 self.phase_hold = False
                 self.cooldown_until = time_s+self.options.cooldown_s
+                self._reset_phase_load(phase)
         if self.preparation is not None and time_s-preparation['start_s'] >= 20:
             self.events.append(dict(time_s=time_s, kind='reject', to=list(new),
                                     reason='unloaded phase gate timed out'))
@@ -327,6 +380,7 @@ class SlidingSectionCompliance:
             if not self._acquire(measured, time_s):
                 self.target = measured.copy()
                 return self.target.copy(), self.weights.copy()
+        self._observe_phase_load(phase)
         if time_s+1e-10 >= self.next_selection_s:
             self.next_selection_s = time_s+self.section_options.geometry_period_s
             self._select(measured, phase, time_s)
@@ -367,6 +421,10 @@ class SlidingSectionCompliance:
         result.update(selected_window=None if self.window is None else list(self.window),
                       weights=self.weights.tolist(), support_up_n=self.raw_support.tolist(),
                       filtered_support_n=self.support.tolist(), selection_reason=self.selection_reason,
+                      load_observation_phase_rad=self.load_phase_span,
+                      cycle_support_center_joint=(None if self.load_phase_span < 2*math.pi-1e-8 or
+                                                  self.phase_load_sum.sum() <= 1e-12 else
+                          float(self.phase_load_sum @ np.arange(1, self.p.joints+1)/self.phase_load_sum.sum())),
                       sent_geometry=self.sent_geometry, sent_constraint_violations=self.sent_constraint_violations,
                       window_options=asdict(self.options))
         result['preparation'] = self.preparation

@@ -1,0 +1,41 @@
+{
+  "label": "s4_sliding_cyclemean",
+  "full_saved_samples": 697,
+  "enabled_counts": [
+    6
+  ],
+  "inactive_force_max_nm": 0.0,
+  "mask_matches_weights": true,
+  "phase_continuous": true,
+  "post_event_cycles": [
+    {
+      "start_s": 38.00000000000214,
+      "start_phase_rad": 19.1579999999999,
+      "body_peak_deg": 166.18185642943826,
+      "pipe_peak_deg": 155.95793058135342,
+      "gap_min": 0.6638515482689178
+    },
+    {
+      "start_s": 48.49999999997767,
+      "start_phase_rad": 25.441185307179488,
+      "body_peak_deg": 166.12400632454862,
+      "pipe_peak_deg": 156.05869108310964,
+      "gap_min": 0.6638565069032604
+    },
+    {
+      "start_s": 58.9999999999532,
+      "start_phase_rad": 31.724370614359074,
+      "body_peak_deg": 166.31981564852936,
+      "pipe_peak_deg": 155.87529398790966,
+      "gap_min": 0.6636922273532113
+    }
+  ],
+  "post_event_phase_cycles": 3.0080284244298117,
+  "maximum_body_turn_at_s": 8.10000000000095,
+  "minimum_body_turn_at_s": 68.79999999996446,
+  "minimum_gap_at_s": 7.700000000000906,
+  "body_failed_samples": 0,
+  "pipe_failed_samples": 18,
+  "pipe_unobservable_samples": 47,
+  "sent_failed_samples": 0
+}

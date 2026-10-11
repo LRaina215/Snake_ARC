@@ -1,0 +1,420 @@
+[
+  {
+    "label": "s1_head",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": false,
+    "failed_checks": [
+      "sent_target_open",
+      "online_sent_target_open",
+      "actual_pipe_open"
+    ],
+    "duration_s": 61.999999999946205,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      179.15922976067782,
+      208.66344544590757
+    ],
+    "pipe_wrap_range_deg": [
+      207.19955370286698,
+      242.0991764925242
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 100,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 2
+  },
+  {
+    "label": "s1_head_repair",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": false,
+    "failed_checks": [
+      "actual_pipe_open"
+    ],
+    "duration_s": 65.79999999995013,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      153.14664018001184,
+      190.20084501763267
+    ],
+    "pipe_wrap_range_deg": [
+      197.50326061098644,
+      227.14350500673072
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 103,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 2
+  },
+  {
+    "label": "s1_head_contract",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": false,
+    "failed_checks": [
+      "body_open",
+      "actual_pipe_open"
+    ],
+    "duration_s": 68.69999999996398,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      142.90227783666055,
+      186.91902967783741
+    ],
+    "pipe_wrap_range_deg": [
+      172.69863900627126,
+      227.01195377646798
+    ],
+    "body_failed_samples": 31,
+    "pipe_failed_samples": 22,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 2
+  },
+  {
+    "label": "s1_head_phase",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": true,
+    "failed_checks": [],
+    "duration_s": 59.49999999995203,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      178.37911313339748,
+      187.82609569632217
+    ],
+    "pipe_wrap_range_deg": [
+      207.19942779842378,
+      216.6102679992113
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 2
+  },
+  {
+    "label": "s1_tail",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": true,
+    "failed_checks": [],
+    "duration_s": 61.79999999994667,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      179.20867683822874,
+      187.64787261696802
+    ],
+    "pipe_wrap_range_deg": [
+      203.30343748717573,
+      216.260076389011
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 2
+  },
+  {
+    "label": "s2_front",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": true,
+    "failed_checks": [],
+    "duration_s": 61.999999999946205,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      171.84419060298148,
+      185.75815016058678
+    ],
+    "pipe_wrap_range_deg": [
+      190.83001508093034,
+      214.79159296049332
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 2
+  },
+  {
+    "label": "s2_middle_payload",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": true,
+    "failed_checks": [],
+    "duration_s": 61.999999999946205,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      179.9640292619335,
+      187.30774317686226
+    ],
+    "pipe_wrap_range_deg": [
+      203.2301608909663,
+      216.23597337490338
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 1
+  },
+  {
+    "label": "s2_rear",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": true,
+    "failed_checks": [],
+    "duration_s": 61.999999999946205,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      177.59300721460832,
+      187.24086760398137
+    ],
+    "pipe_wrap_range_deg": [
+      206.51670750087334,
+      213.94784313905856
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 0
+  },
+  {
+    "label": "s3_taper",
+    "scene": "taper_straight",
+    "mode": "sliding",
+    "complete_verdict": true,
+    "failed_checks": [],
+    "duration_s": 58.79999999995366,
+    "exit_time_s": 27.30000000001038,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      179.9885861527282,
+      186.90765415321147
+    ],
+    "pipe_wrap_range_deg": [
+      185.50299627164247,
+      215.3227685300469
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 0
+  },
+  {
+    "label": "s3_taper90",
+    "scene": "taper_true90",
+    "mode": "sliding",
+    "complete_verdict": false,
+    "failed_checks": [
+      "post_exit_cycles"
+    ],
+    "duration_s": 70.799999999974,
+    "exit_time_s": 39.29999999999911,
+    "post_exit_phase_cycles": 2.7459957261239256,
+    "body_turn_range_deg": [
+      177.26576625855589,
+      187.19527028554091
+    ],
+    "pipe_wrap_range_deg": [
+      184.12942983341316,
+      215.35738706654357
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 1
+  },
+  {
+    "label": "s3_elbow90",
+    "scene": "elbow90_section_exit",
+    "mode": "sliding",
+    "complete_verdict": false,
+    "failed_checks": [
+      "shape_observable"
+    ],
+    "duration_s": 61.299999999947836,
+    "exit_time_s": 29.800000000013437,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      164.87554391140839,
+      187.4425683697089
+    ],
+    "pipe_wrap_range_deg": [
+      208.29563969676295,
+      216.08305282839436
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 106,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 0
+  },
+  {
+    "label": "s3_taper90_cycles",
+    "scene": "taper_true90",
+    "mode": "sliding",
+    "complete_verdict": true,
+    "failed_checks": [],
+    "duration_s": 73.4999999999869,
+    "exit_time_s": 39.29999999999911,
+    "post_exit_phase_cycles": 3.003826733932195,
+    "body_turn_range_deg": [
+      177.26576625855589,
+      187.19527028554091
+    ],
+    "pipe_wrap_range_deg": [
+      184.12942983341316,
+      215.35738706654357
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 1
+  },
+  {
+    "label": "s4_baseline",
+    "scene": "elbow90_taper110_210",
+    "mode": "baseline",
+    "complete_verdict": false,
+    "failed_checks": [
+      "shape_observable",
+      "actual_pipe_open"
+    ],
+    "duration_s": 64.09999999994201,
+    "exit_time_s": 32.600000000014724,
+    "post_exit_phase_cycles": 3.008028424429878,
+    "body_turn_range_deg": [
+      161.42635454443746,
+      180.36319892333583
+    ],
+    "pipe_wrap_range_deg": [
+      130.91029105895421,
+      214.09912579634852
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 9,
+    "pipe_unobservable_samples": 45,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 0
+  },
+  {
+    "label": "s4_fixed",
+    "scene": "elbow90_taper110_210",
+    "mode": "fixed",
+    "complete_verdict": false,
+    "failed_checks": [
+      "shape_observable",
+      "actual_pipe_open"
+    ],
+    "duration_s": 64.39999999994345,
+    "exit_time_s": 32.900000000014025,
+    "post_exit_phase_cycles": 3.0080284244300812,
+    "body_turn_range_deg": [
+      160.38489119032423,
+      186.96643117113132
+    ],
+    "pipe_wrap_range_deg": [
+      125.55414369690362,
+      216.2593004655463
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 13,
+    "pipe_unobservable_samples": 46,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 0
+  },
+  {
+    "label": "s4_sliding",
+    "scene": "elbow90_taper110_210",
+    "mode": "sliding",
+    "complete_verdict": false,
+    "failed_checks": [
+      "shape_observable",
+      "actual_pipe_open"
+    ],
+    "duration_s": 87.30000000005279,
+    "exit_time_s": 45.69999999998419,
+    "post_exit_phase_cycles": 3.003158283171211,
+    "body_turn_range_deg": [
+      159.00986380898604,
+      187.19945183796904
+    ],
+    "pipe_wrap_range_deg": [
+      126.0661141612997,
+      216.25931315726461
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 7,
+    "pipe_unobservable_samples": 35,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 4
+  },
+  {
+    "label": "s4_sliding_cyclemean",
+    "scene": "elbow90_taper110_210",
+    "mode": "sliding",
+    "complete_verdict": false,
+    "failed_checks": [
+      "shape_observable",
+      "actual_pipe_open"
+    ],
+    "duration_s": 69.4999999999678,
+    "exit_time_s": 38.00000000000214,
+    "post_exit_phase_cycles": 3.0080284244298117,
+    "body_turn_range_deg": [
+      160.93416460631997,
+      186.96827695430818
+    ],
+    "pipe_wrap_range_deg": [
+      142.83567569545482,
+      216.25931315726461
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 18,
+    "pipe_unobservable_samples": 47,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 1
+  },
+  {
+    "label": "s2_middle_cyclemean",
+    "scene": "straight",
+    "mode": "sliding",
+    "complete_verdict": false,
+    "failed_checks": [
+      "automatic_migration_observed"
+    ],
+    "duration_s": 90.00000000006568,
+    "exit_time_s": null,
+    "post_exit_phase_cycles": null,
+    "body_turn_range_deg": [
+      179.9640292619335,
+      186.90625351205546
+    ],
+    "pipe_wrap_range_deg": [
+      203.2301608909663,
+      215.320450850491
+    ],
+    "body_failed_samples": 0,
+    "pipe_failed_samples": 0,
+    "pipe_unobservable_samples": 0,
+    "inactive_force_max_nm": 0.0,
+    "handovers": 0
+  }
+]

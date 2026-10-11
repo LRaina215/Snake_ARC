@@ -1,0 +1,76 @@
+{
+  "label": "s2_middle_cyclemean",
+  "full_saved_samples": 902,
+  "enabled_counts": [
+    6
+  ],
+  "inactive_force_max_nm": 0.0,
+  "mask_matches_weights": true,
+  "phase_continuous": true,
+  "post_event_cycles": [
+    {
+      "start_s": 3.0999999999997696,
+      "start_phase_rad": 0.6594000000000059,
+      "body_peak_deg": 186.90625351205546,
+      "pipe_peak_deg": 215.320450850491,
+      "gap_min": 0.5539704357520537
+    },
+    {
+      "start_s": 13.599999999997902,
+      "start_phase_rad": 6.942585307179592,
+      "body_peak_deg": 186.55339284596815,
+      "pipe_peak_deg": 215.29761178132563,
+      "gap_min": 0.5564318349549001
+    },
+    {
+      "start_s": 24.10000000000647,
+      "start_phase_rad": 13.225770614359178,
+      "body_peak_deg": 186.2638127195837,
+      "pipe_peak_deg": 212.93280320750642,
+      "gap_min": 0.558598799418489
+    },
+    {
+      "start_s": 34.60000000001006,
+      "start_phase_rad": 19.508955921538764,
+      "body_peak_deg": 186.22122510135324,
+      "pipe_peak_deg": 211.72481958234582,
+      "gap_min": 0.5612875154917851
+    },
+    {
+      "start_s": 44.999999999985825,
+      "start_phase_rad": 25.79214122871835,
+      "body_peak_deg": 186.20174292738292,
+      "pipe_peak_deg": 211.77716697842013,
+      "gap_min": 0.5616524701460066
+    },
+    {
+      "start_s": 55.499999999961354,
+      "start_phase_rad": 32.075326535897936,
+      "body_peak_deg": 186.20447904463185,
+      "pipe_peak_deg": 211.73592317950175,
+      "gap_min": 0.5617779837230131
+    },
+    {
+      "start_s": 65.99999999995109,
+      "start_phase_rad": 38.35851184307752,
+      "body_peak_deg": 186.20860504257553,
+      "pipe_peak_deg": 211.7995254155798,
+      "gap_min": 0.5616789881177415
+    },
+    {
+      "start_s": 76.50000000000122,
+      "start_phase_rad": 44.64169715025711,
+      "body_peak_deg": 186.20116291879893,
+      "pipe_peak_deg": 211.843170958533,
+      "gap_min": 0.5616869094475347
+    }
+  ],
+  "post_event_phase_cycles": 8.298338732798928,
+  "maximum_body_turn_at_s": 8.10000000000095,
+  "minimum_body_turn_at_s": 27.800000000010993,
+  "minimum_gap_at_s": 7.700000000000906,
+  "body_failed_samples": 0,
+  "pipe_failed_samples": 0,
+  "pipe_unobservable_samples": 0,
+  "sent_failed_samples": 0
+}

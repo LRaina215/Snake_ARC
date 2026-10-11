@@ -1,0 +1,90 @@
+{
+  "label": "s4_baseline",
+  "scene": "elbow90_taper110_210",
+  "mode": "baseline",
+  "parameters": {
+    "joints": 20,
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5
+  },
+  "options": {
+    "gain": 0.02,
+    "yielding": 0.7,
+    "geometry_period_s": 0.05,
+    "target_rate_deg_s": 45.0,
+    "target_filter_s": 0.15,
+    "maximum_section_turn_deg": 190.0,
+    "minimum_gap_fraction": 0.4
+  },
+  "start_x": -0.25,
+  "initial_window": null,
+  "payload": false,
+  "manual_direction": 0,
+  "manual_requests": [],
+  "passed": false,
+  "motion_and_body_passed": true,
+  "checks": {
+    "passive_zero": true,
+    "torque_bounded": true,
+    "no_ground_support": true,
+    "support_retained": true,
+    "limits": true,
+    "solver_stable": true,
+    "body_open": true,
+    "opening": true,
+    "near_planar": true,
+    "sent_target_open": true,
+    "progress": true,
+    "whole_body_beyond_feature": true,
+    "post_exit_cycles": true
+  },
+  "pipe_checks": {
+    "shape_observable": false,
+    "actual_pipe_open": false
+  },
+  "duration_s": 64.09999999994201,
+  "maximum_duration_s": 150.0,
+  "exit_time_s": 32.600000000014724,
+  "post_exit_s": 31.49999999992729,
+  "post_exit_phase_cycles": 3.008028424429878,
+  "progress_m": 1.1281916326752084,
+  "minimum_wrap_deg": 130.91029105895421,
+  "maximum_wrap_deg": 214.09912579634852,
+  "unobservable_samples": 45,
+  "maximum_body_turn_deg": 180.36319892333583,
+  "minimum_body_turn_deg": 161.42635454443746,
+  "minimum_gap_fraction": 0.5752214597084482,
+  "maximum_fit_rms_m": 0.008190823638868448,
+  "maximum_sent_turn_deg": 179.99999743874875,
+  "passive_max_nm": 0.0,
+  "maximum_torque_nm": 2.355,
+  "maximum_unsupported_s": 0.0,
+  "positive_work_j": 144.21602789770012,
+  "saturated_s": 51.81999999996993,
+  "events": [],
+  "final_geometry": {},
+  "wall_s": 11.578000000008615,
+  "acceptance": {
+    "body_turn_deg": [
+      150,
+      218
+    ],
+    "pipe_wrap_deg": [
+      150,
+      218
+    ],
+    "gap_min": 0.4,
+    "plane_rms_max_m": 0.015,
+    "sent_turn_max_deg": 190.0,
+    "command_audit_period_s": 0.02
+  }
+}

@@ -65,6 +65,23 @@ def main():
     overlap = gate._mask((8, 12))
     assert np.max(abs(target[overlap]-before[overlap])) <= math.radians(45)*.001+1e-10
     assert abs(target[6]-measured[6]) <= math.radians(45)*.001+1e-10
+    # Alternating contacts and a long phase hold must not manufacture a
+    # persistent load displacement. Cover trimming beyond the first cycle.
+    observer = SlidingSectionCompliance(p, lengths)
+    for phase in np.linspace(0., 4*math.pi, 1601):
+        observer.raw_support[:] = 0.
+        observer.raw_support[7] = 20*(1+math.sin(phase))
+        observer.raw_support[13] = 20*(1-math.sin(phase))
+        observer._observe_phase_load(phase)
+    center = observer.phase_load_sum @ np.arange(1, 21)/observer.phase_load_sum.sum()
+    assert abs(center-11) < 1e-8 and abs(observer.load_phase_span-2*math.pi) < 1e-8
+    before = observer.phase_load_sum.copy()
+    observer.raw_support[:] = 1000.
+    for _ in range(100):
+        observer._observe_phase_load(4*math.pi)
+    assert np.array_equal(before, observer.phase_load_sum)
+    observer._reset_phase_load(4*math.pi)
+    assert observer.load_phase_span == 0 and not observer.load_history
     print(f'All union FK samples: maximum turn {maximum:.6f} deg, minimum gap {minimum_gap:.6f}; phase continuous.')
 
 
