@@ -1,0 +1,38 @@
+[
+  {
+    "scene": "straight",
+    "source": "Snake_Robot_o20_single_horizontal_pipe_long.xml",
+    "feature_span": [
+      0.0,
+      0.0
+    ],
+    "pipe_radius_m": 0.0565,
+    "robot_joints": 20,
+    "shell_radius_m": 0.029,
+    "link_length_m": 0.0645
+  },
+  {
+    "scene": "bend90",
+    "source": "Snake_Robot_o20_Pipe_bend90.xml",
+    "feature_span": [
+      1.0,
+      1.471238898038469
+    ],
+    "pipe_radius_m": 0.0565,
+    "robot_joints": 20,
+    "shell_radius_m": 0.029,
+    "link_length_m": 0.0645
+  },
+  {
+    "scene": "elbow90",
+    "source": "Snake_Robot_o20_Pipe_elbow90_horizontal.xml",
+    "feature_span": [
+      1.1,
+      1.1
+    ],
+    "pipe_radius_m": 0.0565,
+    "robot_joints": 20,
+    "shell_radius_m": 0.029,
+    "link_length_m": 0.0645
+  }
+]

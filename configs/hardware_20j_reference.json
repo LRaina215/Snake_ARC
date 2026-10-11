@@ -1,0 +1,208 @@
+{
+  "Name": "20关节实机档案",
+  "Port": "COM9",
+  "BaudRate": 115200,
+  "HeadLength": 64.5,
+  "Joints": [
+    {
+      "Index": 1,
+      "ServoId": 1,
+      "AxisType": 0,
+      "Zero": 2027,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 2,
+      "ServoId": 2,
+      "AxisType": 1,
+      "Zero": 1953,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 3,
+      "ServoId": 3,
+      "AxisType": 0,
+      "Zero": 2013,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 4,
+      "ServoId": 4,
+      "AxisType": 1,
+      "Zero": 2088,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 5,
+      "ServoId": 5,
+      "AxisType": 0,
+      "Zero": 2057,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 6,
+      "ServoId": 6,
+      "AxisType": 1,
+      "Zero": 1985,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 7,
+      "ServoId": 7,
+      "AxisType": 0,
+      "Zero": 2022,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 8,
+      "ServoId": 8,
+      "AxisType": 1,
+      "Zero": 2111,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 9,
+      "ServoId": 9,
+      "AxisType": 0,
+      "Zero": 2068,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 10,
+      "ServoId": 10,
+      "AxisType": 1,
+      "Zero": 2027,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 11,
+      "ServoId": 11,
+      "AxisType": 0,
+      "Zero": 2089,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 12,
+      "ServoId": 12,
+      "AxisType": 1,
+      "Zero": 2103,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 13,
+      "ServoId": 13,
+      "AxisType": 0,
+      "Zero": 1990,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 14,
+      "ServoId": 14,
+      "AxisType": 1,
+      "Zero": 2031,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 15,
+      "ServoId": 15,
+      "AxisType": 0,
+      "Zero": 2073,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 16,
+      "ServoId": 16,
+      "AxisType": 1,
+      "Zero": 2021,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 17,
+      "ServoId": 17,
+      "AxisType": 0,
+      "Zero": 2095,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 18,
+      "ServoId": 18,
+      "AxisType": 1,
+      "Zero": 2062,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 19,
+      "ServoId": 19,
+      "AxisType": 0,
+      "Zero": 2057,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    },
+    {
+      "Index": 20,
+      "ServoId": 20,
+      "AxisType": 1,
+      "Zero": 2070,
+      "Direction": 1,
+      "LinkLength": 64.5,
+      "MinimumAngle": -90,
+      "MaximumAngle": 90
+    }
+  ]
+}

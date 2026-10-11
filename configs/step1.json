@@ -1,0 +1,14 @@
+{
+  "joints": 20,
+  "first_joint": 8,
+  "last_joint": 13,
+  "amplitude_deg": 60.0,
+  "omega_rad_s": 0.6,
+  "direction": 1,
+  "initial_phase_rad": 0.0,
+  "settle_s": 2.0,
+  "kp": 127.0,
+  "kd": 1.0,
+  "torque_limit_nm": 2.355,
+  "passive_damping": 0.05
+}
