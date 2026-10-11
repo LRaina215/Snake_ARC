@@ -1,0 +1,20 @@
+[
+  {
+    "scene": "taper_straight",
+    "source": "Snake_Robot_o20_Pipe_taper_horizontal.xml",
+    "radii_m": [
+      0.0565,
+      0.0815
+    ],
+    "feature_span_m": "0.95 0.966583123952"
+  },
+  {
+    "scene": "taper_bend90",
+    "source": "Snake_Robot_o20_Pipe_taper_bend.xml",
+    "radii_m": [
+      0.0565,
+      0.0815
+    ],
+    "feature_span_m": "0.95 1.55220257297"
+  }
+]

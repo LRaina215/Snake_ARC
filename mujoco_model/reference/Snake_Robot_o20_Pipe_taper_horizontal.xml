@@ -1,0 +1,148 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="real-snake20-taper_horizontal">
+  <option timestep="0.001" iterations="100" tolerance="1e-8" solver="Newton" cone="elliptic" />
+  <asset>
+    <texture name="texplane" type="2d" builtin="checker" rgb1=".8 .8 .8" rgb2=".1 .15 .2" width="512" height="512" mark="cross" markrgb=".8 .8 .8" />
+    <material name="matplane" reflectance="0.3" texture="texplane" texrepeat="2 2" texuniform="true" />
+    <material name="pipe_rubber" rgba=".16 .18 .20 1" specular="0.05" shininess="0.1" reflectance="0" />
+    <mesh name="h_link" file="./asset/c_link_H.stl" scale="1.0394265233 1.0394265233 0.941605839416" />
+    <mesh name="v_link" file="./asset/c_link_V.stl" scale="1.0394265233 1.0394265233 0.941605839416" />
+    <mesh name="pipe_taper_02" vertex="-0.0565 1.92445885616e-18 -0.00829156197589 -0.056227937057 -0.00553796842862 -0.00829156197589 -0.0554143683428 -0.0110226031939 -0.00829156197589 -0.0540671289689 -0.0164010842649 -0.00829156197589 -0.0521991935869 -0.0216216139286 -0.00829156197589 -0.0498285514357 -0.0266339156307 -0.00829156197589 -0.0469780330951 -0.0313897181656 -0.00829156197589 -0.043675090615 -0.0358432205552 -0.00829156197589 -0.039951533137 -0.039951533137 -0.00829156197589 -0.0358432205552 -0.043675090615 -0.00829156197589 -0.0313897181656 -0.0469780330951 -0.00829156197589 -0.0266339156307 -0.0498285514357 -0.00829156197589 -0.0216216139286 -0.0521991935869 -0.00829156197589 -0.0164010842649 -0.0540671289689 -0.00829156197589 -0.0110226031939 -0.0554143683428 -0.00829156197589 -0.00553796842862 -0.056227937057 -0.00829156197589 -7.47117524579e-18 -0.0565 -0.00829156197589 0.00553796842862 -0.056227937057 -0.00829156197589 0.0110226031939 -0.0554143683428 -0.00829156197589 0.0164010842649 -0.0540671289689 -0.00829156197589 0.0216216139286 -0.0521991935869 -0.00829156197589 0.0266339156307 -0.0498285514357 -0.00829156197589 0.0313897181656 -0.0469780330951 -0.00829156197589 0.0358432205552 -0.043675090615 -0.00829156197589 0.039951533137 -0.039951533137 -0.00829156197589 0.043675090615 -0.0358432205552 -0.00829156197589 0.0469780330951 -0.0313897181656 -0.00829156197589 0.0498285514357 -0.0266339156307 -0.00829156197589 0.0521991935869 -0.0216216139286 -0.00829156197589 0.0540671289689 -0.0164010842649 -0.00829156197589 0.0554143683428 -0.0110226031939 -0.00829156197589 0.056227937057 -0.00553796842862 -0.00829156197589 0.0565 -4.99479555902e-18 -0.00829156197589 0.056227937057 0.00553796842862 -0.00829156197589 0.0554143683428 0.0110226031939 -0.00829156197589 0.0540671289689 0.0164010842649 -0.00829156197589 0.0521991935869 0.0216216139286 -0.00829156197589 0.0498285514357 0.0266339156307 -0.00829156197589 0.0469780330951 0.0313897181656 -0.00829156197589 0.043675090615 0.0358432205552 -0.00829156197589 0.039951533137 0.039951533137 -0.00829156197589 0.0358432205552 0.043675090615 -0.00829156197589 0.0313897181656 0.0469780330951 -0.00829156197589 0.0266339156307 0.0498285514357 -0.00829156197589 0.0216216139286 0.0521991935869 -0.00829156197589 0.0164010842649 0.0540671289689 -0.00829156197589 0.0110226031939 0.0554143683428 -0.00829156197589 0.00553796842862 0.056227937057 -0.00829156197589 6.36733358458e-18 0.0565 -0.00829156197589 -0.00553796842862 0.056227937057 -0.00829156197589 -0.0110226031939 0.0554143683428 -0.00829156197589 -0.0164010842649 0.0540671289689 -0.00829156197589 -0.0216216139286 0.0521991935869 -0.00829156197589 -0.0266339156307 0.0498285514357 -0.00829156197589 -0.0313897181656 0.0469780330951 -0.00829156197589 -0.0358432205552 0.043675090615 -0.00829156197589 -0.039951533137 0.039951533137 -0.00829156197589 -0.043675090615 0.0358432205552 -0.00829156197589 -0.0469780330951 0.0313897181656 -0.00829156197589 -0.0498285514357 0.0266339156307 -0.00829156197589 -0.0521991935869 0.0216216139286 -0.00829156197589 -0.0540671289689 0.0164010842649 -0.00829156197589 -0.0554143683428 0.0110226031939 -0.00829156197589 -0.056227937057 0.00553796842862 -0.00829156197589 -0.0815 1.92445885616e-18 0.00829156197589 -0.0811075552238 -0.00798839693686 0.00829156197589 -0.0799340003529 -0.0158998612443 0.00829156197589 -0.0779906373622 -0.0236582011962 0.00829156197589 -0.0752961818997 -0.0311886997378 0.00829156197589 -0.0718765830444 -0.0384188340513 0.00829156197589 -0.0677647734027 -0.0452789739911 0.00829156197589 -0.0630003519491 -0.0517030526593 0.00829156197589 -0.0576292026667 -0.0576292026667 0.00829156197589 -0.0517030526593 -0.0630003519491 0.00829156197589 -0.0452789739911 -0.0677647734027 0.00829156197589 -0.0384188340513 -0.0718765830444 0.00829156197589 -0.0311886997378 -0.0752961818997 0.00829156197589 -0.0236582011962 -0.0779906373622 0.00829156197589 -0.0158998612443 -0.0799340003529 0.00829156197589 -0.00798839693686 -0.0811075552238 0.00829156197589 -9.00198374472e-18 -0.0815 0.00829156197589 0.00798839693686 -0.0811075552238 0.00829156197589 0.0158998612443 -0.0799340003529 0.00829156197589 0.0236582011962 -0.0779906373622 0.00829156197589 0.0311886997378 -0.0752961818997 0.00829156197589 0.0384188340513 -0.0718765830444 0.00829156197589 0.0452789739911 -0.0677647734027 0.00829156197589 0.0517030526593 -0.0630003519491 0.00829156197589 0.0576292026667 -0.0576292026667 0.00829156197589 0.0630003519491 -0.0517030526593 0.00829156197589 0.0677647734027 -0.0452789739911 0.00829156197589 0.0718765830444 -0.0384188340513 0.00829156197589 0.0752961818997 -0.0311886997378 0.00829156197589 0.0779906373622 -0.0236582011962 0.00829156197589 0.0799340003529 -0.0158998612443 0.00829156197589 0.0811075552238 -0.00798839693686 0.00829156197589 0.0815 -8.05641255689e-18 0.00829156197589 0.0811075552238 0.00798839693686 0.00829156197589 0.0799340003529 0.0158998612443 0.00829156197589 0.0779906373622 0.0236582011962 0.00829156197589 0.0752961818997 0.0311886997378 0.00829156197589 0.0718765830444 0.0384188340513 0.00829156197589 0.0677647734027 0.0452789739911 0.00829156197589 0.0630003519491 0.0517030526593 0.00829156197589 0.0576292026667 0.0576292026667 0.00829156197589 0.0517030526593 0.0630003519491 0.00829156197589 0.0452789739911 0.0677647734027 0.00829156197589 0.0384188340513 0.0718765830444 0.00829156197589 0.0311886997378 0.0752961818997 0.00829156197589 0.0236582011962 0.0779906373622 0.00829156197589 0.0158998612443 0.0799340003529 0.00829156197589 0.00798839693686 0.0811075552238 0.00829156197589 1.09597590814e-17 0.0815 0.00829156197589 -0.00798839693686 0.0811075552238 0.00829156197589 -0.0158998612443 0.0799340003529 0.00829156197589 -0.0236582011962 0.0779906373622 0.00829156197589 -0.0311886997378 0.0752961818997 0.00829156197589 -0.0384188340513 0.0718765830444 0.00829156197589 -0.0452789739911 0.0677647734027 0.00829156197589 -0.0517030526593 0.0630003519491 0.00829156197589 -0.0576292026667 0.0576292026667 0.00829156197589 -0.0630003519491 0.0517030526593 0.00829156197589 -0.0677647734027 0.0452789739911 0.00829156197589 -0.0718765830444 0.0384188340513 0.00829156197589 -0.0752961818997 0.0311886997378 0.00829156197589 -0.0779906373622 0.0236582011962 0.00829156197589 -0.0799340003529 0.0158998612443 0.00829156197589 -0.0811075552238 0.00798839693686 0.00829156197589" />
+  </asset>
+  <worldbody>
+    <geom name="floor" type="plane" size="0 0 .25" material="matplane" condim="6" friction="0.25 0.1 0.01" />
+    <light directional="false" diffuse="1 1 1" specular="0 0 0" pos="0 0 15" dir="0 0 -1" castshadow="false" />
+    <body name="pipe_network" quat="0.5 0.5 0.5 0.5" pos="0 0 1">
+      <geom name="pipe_straight_01" type="cylinder" size="0.0565" fromto="-0 -0 -0.2 0 0 0.95" friction="2 0.005 0.002" condim="6" group="1" material="pipe_rubber" rgba=".16 .18 .20 1" />
+      <geom name="pipe_taper_02" type="mesh" mesh="pipe_taper_02" pos="4.0115480382e-18 -1.92445885616e-18 0.958291561976" friction="2 0.005 0.002" condim="6" group="1" material="pipe_rubber" rgba=".16 .18 .20 1" />
+      <geom name="pipe_straight_03" type="cylinder" size="0.0815" fromto="0 0 0.966583123952 0 0 2.16658312395" friction="2 0.005 0.002" condim="6" group="1" material="pipe_rubber" rgba=".16 .18 .20 1" />
+    </body>
+    <site name="feature_00" type="sphere" size=".008" pos="0.95 0 0.9255" rgba="1 .65 .1 1" />
+    <site name="feature_01" type="sphere" size=".008" pos="0.966583123952 0 0.9005" rgba="1 .65 .1 1" />
+    <body name="head" pos="0 0 .1" euler="0 90 -90">
+      <freejoint name="root" />
+      <site name="s_head" pos="0 0 0.0645" />
+      <geom name="head_shell" type="cylinder" size="0.029 0.03225" pos="0 0 0.03225" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".15 .15 .15 1" />
+      <body name="link1" pos="0 0 -0.0645" euler="0 0 -180">
+        <joint name="joint1" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+        <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+        <body name="link2" pos="0 0 -0.0645" euler="0 0 -180">
+          <joint name="joint2" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+          <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+          <body name="link3" pos="0 0 -0.0645" euler="0 0 -180">
+            <joint name="joint3" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+            <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+            <body name="link4" pos="0 0 -0.0645" euler="0 0 -180">
+              <joint name="joint4" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+              <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+              <body name="link5" pos="0 0 -0.0645" euler="0 0 -180">
+                <joint name="joint5" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                <body name="link6" pos="0 0 -0.0645" euler="0 0 -180">
+                  <joint name="joint6" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                  <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                  <body name="link7" pos="0 0 -0.0645" euler="0 0 -180">
+                    <joint name="joint7" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                    <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                    <body name="link8" pos="0 0 -0.0645" euler="0 0 -180">
+                      <joint name="joint8" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                      <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                      <body name="link9" pos="0 0 -0.0645" euler="0 0 -180">
+                        <joint name="joint9" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                        <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                        <body name="link10" pos="0 0 -0.0645" euler="0 0 -180">
+                          <joint name="joint10" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                          <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                          <body name="link11" pos="0 0 -0.0645" euler="0 0 -180">
+                            <joint name="joint11" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                            <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                            <body name="link12" pos="0 0 -0.0645" euler="0 0 -180">
+                              <joint name="joint12" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                              <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                              <body name="link13" pos="0 0 -0.0645" euler="0 0 -180">
+                                <joint name="joint13" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                                <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                                <body name="link14" pos="0 0 -0.0645" euler="0 0 -180">
+                                  <joint name="joint14" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                                  <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                                  <body name="link15" pos="0 0 -0.0645" euler="0 0 -180">
+                                    <joint name="joint15" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                                    <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                                    <body name="link16" pos="0 0 -0.0645" euler="0 0 -180">
+                                      <joint name="joint16" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                                      <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                                      <body name="link17" pos="0 0 -0.0645" euler="0 0 -180">
+                                        <joint name="joint17" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                                        <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                                        <body name="link18" pos="0 0 -0.0645" euler="0 0 -180">
+                                          <joint name="joint18" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                                          <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                                          <body name="link19" pos="0 0 -0.0645" euler="0 0 -180">
+                                            <joint name="joint19" type="hinge" pos="0 0 0.0645" axis="1 0 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                                            <geom type="mesh" mesh="h_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                                            <body name="tail" pos="0 0 -0.0645" euler="0 0 -180">
+                                              <joint name="joint20" type="hinge" pos="0 0 0.0645" axis="0 -1 0" limited="true" range="-90 90" damping="1.5" armature="0.01" />
+                                              <geom type="mesh" mesh="v_link" mass="0.136" condim="6" friction="1 0.005 0.002" rgba=".2 .2 .2 1" />
+                                              <site name="s_tail" pos="0 0 0" />
+                                            </body>
+                                          </body>
+                                        </body>
+                                      </body>
+                                    </body>
+                                  </body>
+                                </body>
+                              </body>
+                            </body>
+                          </body>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <position name="servo_1" joint="joint1" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_2" joint="joint2" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_3" joint="joint3" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_4" joint="joint4" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_5" joint="joint5" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_6" joint="joint6" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_7" joint="joint7" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_8" joint="joint8" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_9" joint="joint9" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_10" joint="joint10" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_11" joint="joint11" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_12" joint="joint12" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_13" joint="joint13" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_14" joint="joint14" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_15" joint="joint15" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_16" joint="joint16" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_17" joint="joint17" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_18" joint="joint18" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_19" joint="joint19" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+    <position name="servo_20" joint="joint20" kp="127" gear="1" ctrllimited="true" ctrlrange="-1.5708 1.5708" forcelimited="true" forcerange="-2.355 2.355" />
+  </actuator>
+  <visual>
+    <global offwidth="1280" offheight="960" azimuth="135" elevation="-15" />
+    <headlight ambient=".35 .35 .35" diffuse=".7 .7 .7" />
+  </visual>
+  <statistic center="1.08329156198 0 1" extent="2.16658" />
+  <custom>
+    <numeric name="experiment_helix_mm" data="81.5 220" />
+    <numeric name="experiment_inside" data="0" />
+    <numeric name="experiment_compliance_gain" data="0.01 0.02" />
+    <numeric name="pipe_rubber_thickness_m" data="0.0015" />
+    <numeric name="pipe_centerline" data="-2.77555756156e-17 0 1 0.0565 0.05 0 1 0.0565 0.1 0 1 0.0565 0.15 0 1 0.0565 0.2 0 1 0.0565 0.25 0 1 0.0565 0.3 0 1 0.0565 0.35 0 1 0.0565 0.4 0 1 0.0565 0.45 0 1 0.0565 0.5 0 1 0.0565 0.55 0 1 0.0565 0.6 0 1 0.0565 0.65 0 1 0.0565 0.7 0 1 0.0565 0.75 0 1 0.0565 0.8 0 1 0.0565 0.85 0 1 0.0565 0.9 0 1 0.0565 0.95 0 1 0.0565 0.966583123952 0 1 0.0815 1.01458312395 0 1 0.0815 1.06258312395 0 1 0.0815 1.11058312395 0 1 0.0815 1.15858312395 0 1 0.0815 1.20658312395 0 1 0.0815 1.25458312395 0 1 0.0815 1.30258312395 0 1 0.0815 1.35058312395 0 1 0.0815 1.39858312395 0 1 0.0815 1.44658312395 0 1 0.0815 1.49458312395 0 1 0.0815 1.54258312395 0 1 0.0815 1.59058312395 0 1 0.0815 1.63858312395 0 1 0.0815 1.68658312395 0 1 0.0815 1.73458312395 0 1 0.0815 1.78258312395 0 1 0.0815 1.83058312395 0 1 0.0815 1.87858312395 0 1 0.0815 1.92658312395 0 1 0.0815 1.97458312395 0 1 0.0815 2.02258312395 0 1 0.0815 2.07058312395 0 1 0.0815 2.11858312395 0 1 0.0815 2.16658312395 0 1 0.0815" />
+    <numeric name="feature_span" data="0.95 0.966583123952" />
+    <numeric name="experiment_scene_unvalidated" data="1" />
+  </custom>
+  <keyframe>
+    <key name="experiment_start" qpos="0.799575330031 -0.00874837996187 0.909468565845 0.530287600486 -0.31040337801 0.656874587895 0.436990365419 -0.285090666344 -0.845598416341 -0.763874603437 -0.413087092985 -0.997767502146 0.151856080689 -0.911785491325 0.668115618178 -0.53349359777 0.970183550447 0.0158313430172 0.961219729569 0.560080903614 0.644097872502 0.924773775916 0.120484274371 0.992992843179 -0.441755452874 0.742867711825 -0.862372522318" />
+  </keyframe>
+</mujoco>

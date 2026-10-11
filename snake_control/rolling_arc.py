@@ -73,6 +73,13 @@ class LocalMotorDrive:
 
     def apply(self, data, phase):
         target = self.p.targets(phase)
+        return self.apply_targets(data, target, self.p.enabled)
+
+    def apply_targets(self, data, target, enabled):
+        """Step2 also uses this explicit angle/mask interface; inactive torque is zero."""
+        target, enabled = np.asarray(target, float), np.asarray(enabled, bool)
+        if target.shape != (self.p.joints,) or enabled.shape != target.shape or not np.isfinite(target).all():
+            raise ValueError('Invalid joint command')
         torque = self.p.kp * (target - data.qpos[self.qadr]) - self.p.kd * data.qvel[self.vadr]
-        data.ctrl[:] = np.where(self.p.enabled, np.clip(torque, -self.p.torque_limit_nm, self.p.torque_limit_nm), 0.0)
+        data.ctrl[:] = np.where(enabled, np.clip(torque, -self.p.torque_limit_nm, self.p.torque_limit_nm), 0.0)
         return target
