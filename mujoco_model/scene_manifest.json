@@ -27,8 +27,8 @@
     "scene": "elbow90",
     "source": "Snake_Robot_o20_Pipe_elbow90_horizontal.xml",
     "feature_span": [
-      1.1,
-      1.1
+      0.95,
+      1.25
     ],
     "pipe_radius_m": 0.0565,
     "robot_joints": 20,

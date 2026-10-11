@@ -23,9 +23,11 @@ class ArcParameters:
     kp: float = 127.0
     kd: float = 1.0
     torque_limit_nm: float = 2.355
-    passive_damping: float = 0.05
+    passive_damping: float = 1.5
 
     def __post_init__(self):
+        if any(type(v) is not int for v in (self.joints, self.first_joint, self.last_joint, self.direction)):
+            raise ValueError('Joint counts, bounds and direction must be integers')
         if not 1 <= self.first_joint <= self.last_joint <= self.joints:
             raise ValueError('Invalid one-based active window')
         numeric = [v for v in asdict(self).values() if isinstance(v, (int, float))]
@@ -33,8 +35,10 @@ class ArcParameters:
             raise ValueError('Parameters must be finite')
         if self.direction not in (-1, 1) or not 0 < self.amplitude_deg <= 90:
             raise ValueError('direction must be ±1; amplitude must be in (0,90]')
-        if min(self.omega_rad_s, self.kp, self.torque_limit_nm) <= 0 or min(self.kd, self.settle_s, self.passive_damping) < 0:
+        if min(self.kp, self.torque_limit_nm) <= 0 or min(self.omega_rad_s, self.kd, self.settle_s, self.passive_damping) < 0:
             raise ValueError('Invalid frequency, gain or damping')
+        if self.torque_limit_nm > 2.355:
+            raise ValueError('Torque exceeds the reused model rating (2.355 Nm)')
 
     @classmethod
     def load(cls, path):
@@ -63,6 +67,9 @@ class LocalMotorDrive:
             raise ValueError('Actuator count differs from gait configuration')
         self.qadr = model.jnt_qposadr[model.actuator_trnid[:, 0]]
         self.vadr = model.jnt_dofadr[model.actuator_trnid[:, 0]]
+        expected = [model.joint(f'joint{j}').id for j in range(1, parameters.joints + 1)]
+        if not np.array_equal(model.actuator_trnid[:, 0], expected) or not np.all(model.actuator_biastype == 0):
+            raise ValueError('Expected ordered unbiased torque motors, not position servos')
 
     def apply(self, data, phase):
         target = self.p.targets(phase)

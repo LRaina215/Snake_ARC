@@ -1,0 +1,358 @@
+{
+  "environment": {
+    "python": "3.12.4",
+    "mujoco": "3.3.0",
+    "numpy": "2.1.3",
+    "platform": "Windows-11-10.0.26100-SP0"
+  },
+  "passed": true,
+  "cases": [
+    {
+      "label": "straight",
+      "scene": "straight",
+      "passed": true,
+      "checks": {
+        "passive_drive_zero": true,
+        "torque_bounded": true,
+        "no_ground_support": true,
+        "support_retained": true,
+        "joint_limits": true,
+        "no_new_solver_warnings": true,
+        "forward_progress": true
+      },
+      "simulation_duration_s": 30.00000000001368,
+      "wall_duration_s": 3.6089999999967404,
+      "parameters": {
+        "joints": 20,
+        "first_joint": 8,
+        "last_joint": 13,
+        "amplitude_deg": 60.0,
+        "omega_rad_s": 0.6,
+        "direction": 1,
+        "initial_phase_rad": 0.0,
+        "settle_s": 2.0,
+        "kp": 127.0,
+        "kd": 1.0,
+        "torque_limit_nm": 2.355,
+        "passive_damping": 1.5
+      },
+      "initial_progress_m": 0.7,
+      "final_progress_m": 1.2255570766012573,
+      "progress_delta_m": 0.5255570766012574,
+      "min_body_final_progress_m": 1.210595326303378,
+      "feature_span_m": [
+        0.0,
+        0.0
+      ],
+      "final_center_m": [
+        0.02555707660125691,
+        0.0020697765796263245,
+        1.2323210286489166
+      ],
+      "passive_actuator_force_max_nm": 0.0,
+      "max_ground_contact_force_n": 0.0,
+      "max_unsupported_s": 0.0,
+      "maximum_torque_nm": 1.622496141458753,
+      "positive_actuator_work_j": 53.998169767221356,
+      "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+    },
+    {
+      "label": "bend90",
+      "scene": "bend90",
+      "passed": true,
+      "checks": {
+        "passive_drive_zero": true,
+        "torque_bounded": true,
+        "no_ground_support": true,
+        "support_retained": true,
+        "joint_limits": true,
+        "no_new_solver_warnings": true,
+        "forward_progress": true,
+        "whole_body_beyond_bend": true
+      },
+      "simulation_duration_s": 70.00099999997019,
+      "wall_duration_s": 8.671000000002095,
+      "parameters": {
+        "joints": 20,
+        "first_joint": 8,
+        "last_joint": 13,
+        "amplitude_deg": 60.0,
+        "omega_rad_s": 0.6,
+        "direction": 1,
+        "initial_phase_rad": 0.0,
+        "settle_s": 2.0,
+        "kp": 127.0,
+        "kd": 1.0,
+        "torque_limit_nm": 2.355,
+        "passive_damping": 1.5
+      },
+      "initial_progress_m": 0.8500000000000001,
+      "final_progress_m": 2.1464047885646718,
+      "progress_delta_m": 1.2964047885646717,
+      "min_body_final_progress_m": 2.0819397473906784,
+      "feature_span_m": [
+        1.0,
+        1.471238898038469
+      ],
+      "final_center_m": [
+        0.11788610127096995,
+        0.9753154050183951,
+        1.2335415725998764
+      ],
+      "passive_actuator_force_max_nm": 0.0,
+      "max_ground_contact_force_n": 0.0,
+      "max_unsupported_s": 0.0,
+      "maximum_torque_nm": 1.7668548914795383,
+      "positive_actuator_work_j": 141.30893860300426,
+      "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+    },
+    {
+      "label": "elbow90",
+      "scene": "elbow90",
+      "passed": true,
+      "checks": {
+        "passive_drive_zero": true,
+        "torque_bounded": true,
+        "no_ground_support": true,
+        "support_retained": true,
+        "joint_limits": true,
+        "no_new_solver_warnings": true,
+        "forward_progress": true,
+        "whole_body_beyond_bend": true
+      },
+      "simulation_duration_s": 60.000999999950864,
+      "wall_duration_s": 8.093999999997322,
+      "parameters": {
+        "joints": 20,
+        "first_joint": 8,
+        "last_joint": 13,
+        "amplitude_deg": 60.0,
+        "omega_rad_s": 0.6,
+        "direction": 1,
+        "initial_phase_rad": 0.0,
+        "settle_s": 2.0,
+        "kp": 127.0,
+        "kd": 1.0,
+        "torque_limit_nm": 2.355,
+        "passive_damping": 1.5
+      },
+      "initial_progress_m": 0.8500000000000003,
+      "final_progress_m": 1.919881486830696,
+      "progress_delta_m": 1.0698814868306956,
+      "min_body_final_progress_m": 1.8729134100021014,
+      "feature_span_m": [
+        0.95,
+        1.25
+      ],
+      "final_center_m": [
+        0.021486492154880837,
+        0.8198814868306948,
+        1.233756307277194
+      ],
+      "passive_actuator_force_max_nm": 0.0,
+      "max_ground_contact_force_n": 0.0,
+      "max_unsupported_s": 0.0,
+      "maximum_torque_nm": 2.355,
+      "positive_actuator_work_j": 121.25992398097935,
+      "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+    },
+    {
+      "label": "hold",
+      "scene": "straight",
+      "passed": true,
+      "checks": {
+        "passive_drive_zero": true,
+        "torque_bounded": true,
+        "no_ground_support": true,
+        "support_retained": true,
+        "joint_limits": true,
+        "no_new_solver_warnings": true,
+        "stationary": true
+      },
+      "simulation_duration_s": 20.00000000000146,
+      "wall_duration_s": 3.437999999994645,
+      "parameters": {
+        "joints": 20,
+        "first_joint": 8,
+        "last_joint": 13,
+        "amplitude_deg": 60.0,
+        "omega_rad_s": 0.0,
+        "direction": 1,
+        "initial_phase_rad": 0.0,
+        "settle_s": 2.0,
+        "kp": 127.0,
+        "kd": 1.0,
+        "torque_limit_nm": 2.355,
+        "passive_damping": 1.5
+      },
+      "initial_progress_m": 0.7,
+      "final_progress_m": 0.699991893012461,
+      "progress_delta_m": -8.10698753894723e-06,
+      "min_body_final_progress_m": 0.6994551963451633,
+      "feature_span_m": [
+        0.0,
+        0.0
+      ],
+      "final_center_m": [
+        -0.500008106987539,
+        0.0011785858846735167,
+        1.2320482362668017
+      ],
+      "passive_actuator_force_max_nm": 0.0,
+      "max_ground_contact_force_n": 0.0,
+      "max_unsupported_s": 0.0,
+      "maximum_torque_nm": 0.9252115002687977,
+      "positive_actuator_work_j": 0.0016854686140919998,
+      "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+    },
+    {
+      "label": "reverse",
+      "scene": "straight",
+      "passed": true,
+      "checks": {
+        "passive_drive_zero": true,
+        "torque_bounded": true,
+        "no_ground_support": true,
+        "support_retained": true,
+        "joint_limits": true,
+        "no_new_solver_warnings": true,
+        "reversed_progress": true
+      },
+      "simulation_duration_s": 20.00000000000146,
+      "wall_duration_s": 3.062999999994645,
+      "parameters": {
+        "joints": 20,
+        "first_joint": 8,
+        "last_joint": 13,
+        "amplitude_deg": 60.0,
+        "omega_rad_s": 0.6,
+        "direction": -1,
+        "initial_phase_rad": 0.0,
+        "settle_s": 2.0,
+        "kp": 127.0,
+        "kd": 1.0,
+        "torque_limit_nm": 2.355,
+        "passive_damping": 1.5
+      },
+      "initial_progress_m": 0.7,
+      "final_progress_m": 0.36202223524650623,
+      "progress_delta_m": -0.3379777647534937,
+      "min_body_final_progress_m": 0.3532574287529925,
+      "feature_span_m": [
+        0.0,
+        0.0
+      ],
+      "final_center_m": [
+        -0.8379777647534937,
+        0.004373047588262937,
+        1.2323605912501656
+      ],
+      "passive_actuator_force_max_nm": 0.0,
+      "max_ground_contact_force_n": 0.0,
+      "max_unsupported_s": 0.0,
+      "maximum_torque_nm": 1.624853893444004,
+      "positive_actuator_work_j": 34.77088942890872,
+      "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+    },
+    {
+      "label": "low_damping_bend90",
+      "scene": "bend90",
+      "passed": true,
+      "checks": {
+        "passive_drive_zero": true,
+        "torque_bounded": true,
+        "no_ground_support": true,
+        "support_retained": true,
+        "joint_limits": true,
+        "no_new_solver_warnings": true,
+        "forward_progress": true,
+        "whole_body_beyond_bend": true
+      },
+      "simulation_duration_s": 70.00099999997019,
+      "wall_duration_s": 9.437000000005355,
+      "parameters": {
+        "joints": 20,
+        "first_joint": 8,
+        "last_joint": 13,
+        "amplitude_deg": 60.0,
+        "omega_rad_s": 0.6,
+        "direction": 1,
+        "initial_phase_rad": 0.0,
+        "settle_s": 2.0,
+        "kp": 127.0,
+        "kd": 1.0,
+        "torque_limit_nm": 2.355,
+        "passive_damping": 0.05
+      },
+      "initial_progress_m": 0.8500000000000001,
+      "final_progress_m": 2.0552288546975257,
+      "progress_delta_m": 1.2052288546975256,
+      "min_body_final_progress_m": 2.0276367103850967,
+      "feature_span_m": [
+        1.0,
+        1.471238898038469
+      ],
+      "final_center_m": [
+        0.15534205926830727,
+        0.884139471151249,
+        1.1987717967720548
+      ],
+      "passive_actuator_force_max_nm": 0.0,
+      "max_ground_contact_force_n": 0.0,
+      "max_unsupported_s": 0.0,
+      "maximum_torque_nm": 1.8405695434346865,
+      "positive_actuator_work_j": 39.30713817327502,
+      "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+    },
+    {
+      "label": "low_damping_elbow90",
+      "scene": "elbow90",
+      "passed": true,
+      "checks": {
+        "passive_drive_zero": true,
+        "torque_bounded": true,
+        "no_ground_support": true,
+        "support_retained": true,
+        "joint_limits": true,
+        "no_new_solver_warnings": true,
+        "forward_progress": true,
+        "whole_body_beyond_bend": true
+      },
+      "simulation_duration_s": 60.000999999950864,
+      "wall_duration_s": 9.094000000011874,
+      "parameters": {
+        "joints": 20,
+        "first_joint": 8,
+        "last_joint": 13,
+        "amplitude_deg": 60.0,
+        "omega_rad_s": 0.6,
+        "direction": 1,
+        "initial_phase_rad": 0.0,
+        "settle_s": 2.0,
+        "kp": 127.0,
+        "kd": 1.0,
+        "torque_limit_nm": 2.355,
+        "passive_damping": 0.05
+      },
+      "initial_progress_m": 0.8500000000000003,
+      "final_progress_m": 1.9058360490627395,
+      "progress_delta_m": 1.0558360490627392,
+      "min_body_final_progress_m": 1.8925435265848316,
+      "feature_span_m": [
+        0.95,
+        1.25
+      ],
+      "final_center_m": [
+        0.02354554198662105,
+        0.8058360490627383,
+        1.2324838399074378
+      ],
+      "passive_actuator_force_max_nm": 0.0,
+      "max_ground_contact_force_n": 0.0,
+      "max_unsupported_s": 0.0,
+      "maximum_torque_nm": 2.355,
+      "positive_actuator_work_j": 24.873698288388763,
+      "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+    }
+  ]
+}

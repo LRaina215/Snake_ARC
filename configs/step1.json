@@ -10,5 +10,5 @@
   "kp": 127.0,
   "kd": 1.0,
   "torque_limit_nm": 2.355,
-  "passive_damping": 0.05
+  "passive_damping": 1.5
 }

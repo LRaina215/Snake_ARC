@@ -32,7 +32,8 @@ def build(name):
         pipe.set('pos', '-1.1 0 1.2')
         route = original.copy()
         route[:, :3] += [-1.1, 0, .2]
-        feature = [1.1, 1.1]
+        # Miter collision geometry spans 0.95–1.25 m in source route coordinates.
+        feature = [.95, 1.25]
     else:
         # Use only the original straight collision geom; discard unused elbow meshes.
         for geom in list(pipe):
@@ -47,7 +48,7 @@ def build(name):
         if mesh.get('name') not in used_meshes:
             root.find('asset').remove(mesh)
     for joint in world.iter('joint'):
-        joint.set('damping', '.05')
+        joint.set('damping', '1.5')
     actuator = root.find('actuator')
     for item in list(actuator):
         joint = item.get('joint')

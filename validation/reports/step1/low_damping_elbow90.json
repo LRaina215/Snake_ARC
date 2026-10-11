@@ -1,0 +1,50 @@
+{
+  "label": "low_damping_elbow90",
+  "scene": "elbow90",
+  "passed": true,
+  "checks": {
+    "passive_drive_zero": true,
+    "torque_bounded": true,
+    "no_ground_support": true,
+    "support_retained": true,
+    "joint_limits": true,
+    "no_new_solver_warnings": true,
+    "forward_progress": true,
+    "whole_body_beyond_bend": true
+  },
+  "simulation_duration_s": 60.000999999950864,
+  "wall_duration_s": 9.094000000011874,
+  "parameters": {
+    "joints": 20,
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 0.05
+  },
+  "initial_progress_m": 0.8500000000000003,
+  "final_progress_m": 1.9058360490627395,
+  "progress_delta_m": 1.0558360490627392,
+  "min_body_final_progress_m": 1.8925435265848316,
+  "feature_span_m": [
+    0.95,
+    1.25
+  ],
+  "final_center_m": [
+    0.02354554198662105,
+    0.8058360490627383,
+    1.2324838399074378
+  ],
+  "passive_actuator_force_max_nm": 0.0,
+  "max_ground_contact_force_n": 0.0,
+  "max_unsupported_s": 0.0,
+  "maximum_torque_nm": 2.355,
+  "positive_actuator_work_j": 24.873698288388763,
+  "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+}

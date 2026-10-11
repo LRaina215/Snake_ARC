@@ -1,0 +1,49 @@
+{
+  "label": "hold",
+  "scene": "straight",
+  "passed": true,
+  "checks": {
+    "passive_drive_zero": true,
+    "torque_bounded": true,
+    "no_ground_support": true,
+    "support_retained": true,
+    "joint_limits": true,
+    "no_new_solver_warnings": true,
+    "stationary": true
+  },
+  "simulation_duration_s": 20.00000000000146,
+  "wall_duration_s": 3.437999999994645,
+  "parameters": {
+    "joints": 20,
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.0,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5
+  },
+  "initial_progress_m": 0.7,
+  "final_progress_m": 0.699991893012461,
+  "progress_delta_m": -8.10698753894723e-06,
+  "min_body_final_progress_m": 0.6994551963451633,
+  "feature_span_m": [
+    0.0,
+    0.0
+  ],
+  "final_center_m": [
+    -0.500008106987539,
+    0.0011785858846735167,
+    1.2320482362668017
+  ],
+  "passive_actuator_force_max_nm": 0.0,
+  "max_ground_contact_force_n": 0.0,
+  "max_unsupported_s": 0.0,
+  "maximum_torque_nm": 0.9252115002687977,
+  "positive_actuator_work_j": 0.0016854686140919998,
+  "note": "Work is simulated positive mechanical actuator work, not electrical energy. Contact does not feed gait."
+}

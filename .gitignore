@@ -6,6 +6,7 @@ validation/results/
 logs/
 tmp/
 .env
+/.zcodeignore
 *.mp4
 # Keep editable research sources; exported presentations/documents stay local.
 /*.pptx
