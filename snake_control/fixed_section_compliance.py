@@ -98,7 +98,7 @@ class FixedSectionCompliance:
         )
         return valid, geometry
 
-    def update(self, measured, phase, time_s, dt):
+    def update(self, measured, phase, time_s, dt, reference_targets=None):
         """Read actual shape and return one full-size angle command.
 
         Only self.enabled is driven by the adapter. Passive entries carry the
@@ -112,7 +112,10 @@ class FixedSectionCompliance:
             self.updates += 1
             geometry = local_section(measured, self.lengths, self.first, self.last, self.previous_axis)
             reference = measured.copy()
-            reference[self.enabled] = self.p.targets(phase)[self.enabled]
+            nominal_targets = self.p.targets(phase) if reference_targets is None else np.asarray(reference_targets)
+            if nominal_targets.shape != measured.shape or not np.isfinite(nominal_targets).all():
+                raise ValueError('Invalid external open-arc reference')
+            reference[self.enabled] = nominal_targets[self.enabled]
             ref_geometry = local_section(reference, self.lengths, self.first, self.last)
             self.geometry, self.reference_geometry = geometry, ref_geometry
             self.previous_axis = geometry['axis']

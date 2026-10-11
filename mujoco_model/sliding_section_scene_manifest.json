@@ -1,0 +1,17 @@
+{
+  "scene": "elbow90_taper110_210",
+  "sections": 16,
+  "radius_min_m": 0.055,
+  "radius_max_m": 0.10500000000000001,
+  "feature_span_m": [
+    0.95,
+    1.25
+  ],
+  "route_end_m": 3.499999999999999,
+  "bend_heading_deg": 90.0,
+  "corner_radius_m": 0.0,
+  "diameter_in_mm": 110.0,
+  "diameter_out_mm": 210.0,
+  "taper_length_m": 0.3,
+  "continuous_solid": true
+}
