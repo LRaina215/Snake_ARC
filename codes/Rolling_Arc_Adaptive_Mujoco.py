@@ -21,6 +21,8 @@ def main():
     parser.add_argument('--duration',type=float,default=90.)
     parser.add_argument('--headless',action='store_true')
     parser.add_argument('--output',type=Path)
+    parser.add_argument('--initial-state',type=Path,help='从 NPZ 的 qpos 一次性搭管，不重建相位零圆弧')
+    parser.add_argument('--state-index',type=int,default=0)
     args=parser.parse_args()
     if not np.isfinite([args.takeover,args.duration]).all() or args.takeover<0 or args.duration<=0:
         parser.error('duration 必须正数，takeover 必须非负')
@@ -28,6 +30,10 @@ def main():
     p=replace(ArcParameters.load(ROOT/'configs/step1.json'),first_joint=first,last_joint=last)
     start={'bend90':-.35,'elbow90':-.25}.get(args.scene,-.5)
     sim=AdaptiveArcSimulation(args.scene,p,start,SlidingArcOptions(gain=args.gain),args.takeover)
+    if args.initial_state:
+        with np.load(args.initial_state) as state:
+            q=state['qpos']
+            sim.adopt_supported_pose(q if q.ndim==1 else q[args.state_index])
     samples=[]
     def key_callback(key):
         if key==32:sim.paused=not sim.paused

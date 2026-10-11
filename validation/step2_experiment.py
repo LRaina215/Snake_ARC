@@ -26,12 +26,15 @@ CASES = [
     ('phase_taper_bend90','taper_bend90',90.,-.5,{},4.),
 ]
 
-def experiment(case, output, baseline=False):
+def experiment(case, output, baseline=False, initial_state=None):
     label,scene,duration,start,overrides,takeover=case
     p=replace(ArcParameters.load(ROOT/'configs/step1.json'),**overrides)
     options=SlidingArcOptions()
     sim=(ArcSimulation(scene,p,start) if baseline else
          AdaptiveArcSimulation(scene,p,start,options,takeover))
+    if initial_state is not None:
+        sim.adopt_supported_pose(initial_state)
+        takeover=0.
     records=[]; states=[]; velocities=[]; points=[]
     def measure():
         row=sim.measure()
@@ -91,13 +94,33 @@ def experiment(case, output, baseline=False):
                          events=len(report['window_events']),checks=checks)),flush=True)
     return report
 
+def pose_experiment(output):
+    source=output/'front_taper_bend90_trace.npz'
+    with np.load(source) as trace:
+        index=int(np.argmin(abs(trace['metrics'][:,0]-26.7)))
+        q=trace['qpos'][index].copy()
+    # Change the hanging tail posture. Neither root nor active arc is imposed
+    # again after this single initial placement; old drives all start disabled.
+    reference=AdaptiveArcSimulation('taper_bend90',ArcParameters())
+    q[reference.drive.qadr[13:]]=np.radians([12,-18,22,-12,18,-8,10])
+    report=experiment(('pose_takeover','taper_bend90',65.,-.5,{},0.),output,initial_state=q)
+    (output/'pose_initial_state.npz').parent.mkdir(parents=True,exist_ok=True)
+    np.savez_compressed(output/'pose_initial_state.npz',qpos=q,source=str(source.name),source_time_s=26.7)
+    return report
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cases',nargs='+',choices=[c[0] for c in CASES])
     parser.add_argument('--output',type=Path,default=ROOT/'validation/reports/step2')
     parser.add_argument('--baseline',action='store_true')
+    parser.add_argument('--pose-takeover',action='store_true',help='从已存前部弯管中间姿态接管，改变悬垂段角度')
     args=parser.parse_args()
+    if args.pose_takeover:
+        result=pose_experiment(args.output)
+        if not result['passed']:raise SystemExit(1)
+        return
     results=[experiment(c,args.output,args.baseline) for c in CASES if not args.cases or c[0] in args.cases]
+    if not args.cases and not args.baseline:results.append(pose_experiment(args.output))
     report=dict(environment=dict(python=platform.python_version(),mujoco=mujoco.__version__,numpy=np.__version__),
                 passed=all(r['passed'] for r in results),cases=results)
     name='baseline_summary.json' if args.baseline else 'summary.json'

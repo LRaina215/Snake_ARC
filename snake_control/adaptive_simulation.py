@@ -1,5 +1,6 @@
 """MuJoCo adapter: only measured joint angles and pipe support enter the core."""
 import math
+import statistics
 import numpy as np
 import mujoco
 from .simulation import ArcSimulation, backbone
@@ -40,6 +41,25 @@ class AdaptiveArcSimulation(ArcSimulation):
         self.paused = False
         self.compliance_enabled = True
 
+    def adopt_supported_pose(self, qpos, qvel=None):
+        """One-time experimental placement, then support-only capture and mj_step.
+
+        Use for existing supported poses rather than forming a phase-zero arc.
+        No stored actuator target or route coordinate is imported as control.
+        """
+        qpos = np.asarray(qpos,float)
+        qvel = np.zeros(self.model.nv) if qvel is None else np.asarray(qvel,float)
+        if qpos.shape!=(self.model.nq,) or qvel.shape!=(self.model.nv,) or not np.isfinite(qpos).all() or not np.isfinite(qvel).all():
+            raise ValueError('Invalid initial physical state')
+        if abs(np.linalg.norm(qpos[3:7])-1)>1e-3:
+            raise ValueError('Initial root quaternion must be normalized')
+        self.data.qpos[:]=qpos;self.data.qvel[:]=qvel;self.data.ctrl[:]=0.;self.data.time=0.
+        self.enabled=np.zeros(self.model.nu,bool)
+        self.target=self.data.qpos[self.drive.qadr].copy()
+        self.takeover_s=0.;self.controller=None;self.next_control=0.
+        self.capture_phase=True
+        mujoco.mj_forward(self.model,self.data)
+
     def step(self, phase=None):
         if self.data.time < self.takeover_s or not self.compliance_enabled:
             if not self.compliance_enabled:
@@ -67,6 +87,12 @@ class AdaptiveArcSimulation(ArcSimulation):
                 mujoco.mj_step(self.model,self.data)
                 return self.phase,self.target
             measured = np.degrees(self.data.qpos[self.drive.qadr]).tolist()
+            if getattr(self,'capture_phase',False):
+                first,last=seed
+                odd=[measured[i] for i in range(first-1,last) if i%2==0]
+                even=[measured[i] for i in range(first-1,last) if i%2==1]
+                self.phase=math.atan2(statistics.mean(even),statistics.mean(odd))
+                self.capture_phase=False
             self.controller = SlidingArcCompliance(measured,self.phase,seed,self.options,self.enabled.tolist())
             self.next_control = self.data.time
         if self.data.time + 1e-10 >= self.next_control:
