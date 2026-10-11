@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+MUJOCO_LOG.TXT
+validation/results/
+logs/
+tmp/
+.env
+*.mp4
+# Keep editable research sources; exported presentations/documents stay local.
+/*.pptx
+/*.pdf
+/*.html
+/圆弧滚动运动（Rolling Helix-Arc）研究路线.png
