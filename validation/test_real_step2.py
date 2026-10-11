@@ -79,6 +79,8 @@ class RealStep2Tests(unittest.TestCase):
         self.assertEqual(c.phase,phase)
         with patch.object(real.time,'monotonic',return_value=c.feedback_wall_s+2.):
             with self.assertRaises(TimeoutError):c.tick(.02)
+        with patch.object(c.bus,'read_states',return_value=c.states),patch.object(real.time,'monotonic',side_effect=[0.,1.]):
+            with self.assertRaisesRegex(TimeoutError,'读取过慢'):c.refresh_compliance_feedback()
         c.command('release')
         self.assertTrue(all(not port.registers[s][0x28] for s in real.SERVO_IDS))
 

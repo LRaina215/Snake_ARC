@@ -487,9 +487,13 @@ class RollingArcController:
         self.freeze_targets = False
 
     def refresh_compliance_feedback(self):
-        self.states = self.bus.read_states()
-        self.last_feedback = {i:state['angle_deg'] for i,state in self.states.items()}
-        self.feedback_wall_s = time.monotonic()
+        started = time.monotonic()
+        states = self.bus.read_states()
+        if time.monotonic()-started>MAX_FEEDBACK_AGE_S:
+            raise TimeoutError('全关节反馈读取过慢，最早样本已经过期')
+        self.states = states
+        self.last_feedback = {i:state['angle_deg'] for i,state in states.items()}
+        self.feedback_wall_s = started  # 按最早样本计龄，不把扫读结束当作同时采样
 
     def support_observations(self):
         """适配层：人工支撑段或估计量。核心不把负载当真实接触力。"""
