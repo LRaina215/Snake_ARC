@@ -1,0 +1,57 @@
+[
+  {
+    "scene": "small_taper_return",
+    "sections": 33,
+    "radius_min_m": 0.0565,
+    "radius_max_m": 0.06215,
+    "feature_span_m": [
+      1.05,
+      1.95
+    ],
+    "route_end_m": 3.2000000000000006
+  },
+  {
+    "scene": "taper_true90",
+    "sections": 28,
+    "radius_min_m": 0.0565,
+    "radius_max_m": 0.0815,
+    "feature_span_m": [
+      1.0,
+      1.471238898038469
+    ],
+    "route_end_m": 3.1711547926335757
+  },
+  {
+    "scene": "bend90_section_exit",
+    "source": "bend90",
+    "exit_extension_m": 1.2,
+    "bend_heading_deg": 90.0,
+    "feature_span_m": [
+      1.0,
+      1.471238898038469
+    ],
+    "route_end_m": 3.671089383546276
+  },
+  {
+    "scene": "elbow90_section_exit",
+    "source": "elbow90",
+    "exit_extension_m": 1.2,
+    "bend_heading_deg": 90.0,
+    "feature_span_m": [
+      0.95,
+      1.25
+    ],
+    "route_end_m": 3.499999999999999
+  },
+  {
+    "scene": "taper_bend45_section_exit",
+    "source": "taper_bend90",
+    "exit_extension_m": 1.2,
+    "bend_heading_deg": 45.0000004253995,
+    "feature_span_m": [
+      0.95,
+      1.55220257297
+    ],
+    "route_end_m": 3.7521278153564133
+  }
+]

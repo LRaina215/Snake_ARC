@@ -1,0 +1,56 @@
+[
+  {
+    "label": "r2_roll_k0",
+    "maximum_sent_target_turn_deg": 180.5865861124483,
+    "minimum_sent_target_gap_fraction": 0.5814299700545525,
+    "passed": true
+  },
+  {
+    "label": "r2_roll_k2",
+    "maximum_sent_target_turn_deg": 186.63308721651168,
+    "minimum_sent_target_gap_fraction": 0.5558956812611212,
+    "passed": true
+  },
+  {
+    "label": "r3_small_k0",
+    "maximum_sent_target_turn_deg": 180.58729767084904,
+    "minimum_sent_target_gap_fraction": 0.5813973563477031,
+    "passed": true
+  },
+  {
+    "label": "r3_small_k2",
+    "maximum_sent_target_turn_deg": 186.68168453805427,
+    "minimum_sent_target_gap_fraction": 0.555855555453465,
+    "passed": true
+  },
+  {
+    "label": "r4_large_k2",
+    "maximum_sent_target_turn_deg": 186.63462072319655,
+    "minimum_sent_target_gap_fraction": 0.5558902737555802,
+    "passed": true
+  },
+  {
+    "label": "r5_bend90",
+    "maximum_sent_target_turn_deg": 187.4465623027974,
+    "minimum_sent_target_gap_fraction": 0.5517669669899332,
+    "passed": true
+  },
+  {
+    "label": "r5_elbow90",
+    "maximum_sent_target_turn_deg": 187.33112898174454,
+    "minimum_sent_target_gap_fraction": 0.5521286741108855,
+    "passed": true
+  },
+  {
+    "label": "r5_taper45",
+    "maximum_sent_target_turn_deg": 186.63462072319655,
+    "minimum_sent_target_gap_fraction": 0.5558902737555802,
+    "passed": true
+  },
+  {
+    "label": "r5_taper90",
+    "maximum_sent_target_turn_deg": 187.04702865312342,
+    "minimum_sent_target_gap_fraction": 0.5541742909129194,
+    "passed": true
+  }
+]

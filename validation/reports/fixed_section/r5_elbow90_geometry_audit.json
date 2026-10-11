@@ -1,0 +1,75 @@
+{
+  "note": "Supplementary open-shape audit only. Original single-pipe-axis observability check remains failed; thresholds unchanged.",
+  "invalid_samples": 106,
+  "invalid_interval_s": [
+    10.000999999999896,
+    20.50000000000207
+  ],
+  "measured_section_turn_range_deg": [
+    164.89382474883962,
+    185.90347468246426
+  ],
+  "max_plane_fit_rms_mm": 8.345483122163607,
+  "min_gap_fraction": 0.5571283673677249,
+  "exit_cycle_wrap_peaks": [
+    215.1774657710656,
+    215.30471198391922,
+    215.34489568934657
+  ],
+  "axis_switch_frames": [
+    {
+      "time_s": 19.900000000001338,
+      "raw_wrap_deg": 234.76151513585327,
+      "axis_span_deg": 90.0,
+      "rms_m": 0.005618945391429352
+    },
+    {
+      "time_s": 20.00000000000146,
+      "raw_wrap_deg": 241.48815877189492,
+      "axis_span_deg": 90.0,
+      "rms_m": 0.004844399048194744
+    },
+    {
+      "time_s": 20.100000000001582,
+      "raw_wrap_deg": 249.16786248670314,
+      "axis_span_deg": 90.0,
+      "rms_m": 0.0039992437034335766
+    },
+    {
+      "time_s": 20.200000000001705,
+      "raw_wrap_deg": 257.30505721073445,
+      "axis_span_deg": 90.0,
+      "rms_m": 0.0031000452555738317
+    },
+    {
+      "time_s": 20.300000000001827,
+      "raw_wrap_deg": 266.6543582434391,
+      "axis_span_deg": 90.0,
+      "rms_m": 0.0021574233617825123
+    },
+    {
+      "time_s": 20.40000000000195,
+      "raw_wrap_deg": 276.0892617183055,
+      "axis_span_deg": 90.0,
+      "rms_m": 0.0011864568479426837
+    },
+    {
+      "time_s": 20.50000000000207,
+      "raw_wrap_deg": 285.3481694829427,
+      "axis_span_deg": 90.0,
+      "rms_m": 0.00019910275378491688
+    },
+    {
+      "time_s": 20.600000000002193,
+      "raw_wrap_deg": 212.2901675964975,
+      "axis_span_deg": 0.0,
+      "rms_m": 0.0007956133874733717
+    },
+    {
+      "time_s": 20.700000000002316,
+      "raw_wrap_deg": 212.51017303318713,
+      "axis_span_deg": 0.0,
+      "rms_m": 0.0017784010124784302
+    }
+  ]
+}

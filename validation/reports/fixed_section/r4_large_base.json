@@ -1,0 +1,92 @@
+{
+  "label": "r4_large_base",
+  "scene": "taper_straight",
+  "baseline": true,
+  "passed": true,
+  "checks": {
+    "passive_zero": true,
+    "torque_bounded": true,
+    "no_ground_support": true,
+    "support_retained": true,
+    "limits": true,
+    "solver_stable": true,
+    "actual_open": true,
+    "shape_observable": true,
+    "opening": true,
+    "progress": true,
+    "whole_body_beyond_feature": true,
+    "exit_observation": true
+  },
+  "parameters": {
+    "joints": 20,
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5
+  },
+  "options": {
+    "gain": 0.02,
+    "yielding": 0.7,
+    "geometry_period_s": 0.05,
+    "target_rate_deg_s": 45.0,
+    "target_filter_s": 0.15,
+    "maximum_section_turn_deg": 190.0,
+    "minimum_gap_fraction": 0.4
+  },
+  "duration_s": 58.60099999995413,
+  "maximum_duration_s": 70.0,
+  "exit_time_s": 27.100000000010137,
+  "post_exit_s": 31.50099999994399,
+  "requested_exit_cycles": 3,
+  "hold_phase": null,
+  "start_x": -0.5,
+  "initial_state": null,
+  "initial_index": 0,
+  "progress_m": 1.0577208251364898,
+  "whole_body_final_s": 1.6290275857683822,
+  "feature_span_m": [
+    0.95,
+    0.966583123952
+  ],
+  "maximum_wrap_deg": 212.7098874251502,
+  "minimum_wrap_deg": 182.33268668928832,
+  "worst_wrap_time_s": 12.50099999999851,
+  "cycle_max_wrap_deg": [
+    212.68784417154382,
+    212.7098874251502,
+    186.1987578078765,
+    186.05747785152022,
+    185.59496710740868
+  ],
+  "final_shape": {
+    "wrap_deg": 184.20086309531672,
+    "angular_travel_deg": 184.20086309531672,
+    "axis_spread_deg": 0.0,
+    "wrap_valid": true,
+    "pair_turn_deg": 180.21340991784015,
+    "body_turn_deg": 216.64514754858365,
+    "endpoint_gap_m": 0.23634255146166047,
+    "min_radial_m": 0.11105926063610297,
+    "max_radial_m": 0.12444349032152462,
+    "gap_fraction": 0.6107042673427919
+  },
+  "maximum_unsupported_s": 0.0,
+  "positive_work_j": 110.53036133064181,
+  "passive_max_nm": 0.0,
+  "maximum_torque_nm": 1.6678766389988593,
+  "final_geometry": {},
+  "wall_s": 6.687000000005355,
+  "acceptance": {
+    "actual_wrap_min": 150.0,
+    "actual_wrap_max": 218.0,
+    "gap_fraction_min": 0.4,
+    "target_section_turn_max_deg": 190.0
+  }
+}
