@@ -38,8 +38,7 @@ def main():
     def key_callback(key):
         if key==32:sim.paused=not sim.paused
         elif key in (69,101):
-            sim.compliance_enabled=not sim.compliance_enabled
-            if sim.compliance_enabled:sim.controller=None  # 从实测姿态重新接管，不复用旧目标
+            sim.toggle_compliance()
             print('顺应性:',sim.compliance_enabled,flush=True)
         elif key in (82,114):sim.p=replace(sim.p,direction=-sim.p.direction)
     def run(viewer=None):

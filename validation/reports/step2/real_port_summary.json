@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-11",
+  "execution": "in_memory_serial",
+  "physical_hardware_connected": false,
+  "python": "3.12.4",
+  "checks_passed": 24,
+  "step2_core_checks": 5,
+  "step2_real_checks": 6,
+  "standalone_copy_ran": true,
+  "duration_s": 14.95999999999977,
+  "log_rows": 132,
+  "compliance_rows": 75,
+  "final_mode": "run",
+  "final_window": [
+    8,
+    13
+  ],
+  "maximum_enabled_joints": 6,
+  "support_source": "manual",
+  "manual_support": [
+    9,
+    11
+  ],
+  "final_command_phase_rad": 5.375999999999953,
+  "exit_torque_disabled_readback_confirmed": true,
+  "note": "Mock position feedback echoes targets. Manual support is an asserted input. No physical movement/contact/force inference is validated by this run."
+}

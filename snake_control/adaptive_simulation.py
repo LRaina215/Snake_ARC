@@ -1,6 +1,7 @@
 """MuJoCo adapter: only measured joint angles and pipe support enter the core."""
 import math
 import statistics
+from dataclasses import replace
 import numpy as np
 import mujoco
 from .simulation import ArcSimulation, backbone
@@ -40,6 +41,18 @@ class AdaptiveArcSimulation(ArcSimulation):
         self.next_control = takeover_s
         self.paused = False
         self.compliance_enabled = True
+        self.pre_pause_s = 0.
+
+    def toggle_compliance(self):
+        self.compliance_enabled = not self.compliance_enabled
+        if self.compliance_enabled:
+            self.controller = None
+        else:
+            # The basic wave must cover the CURRENT effective window, including
+            # an unfinished handover, rather than driving its new joints to zero.
+            active = np.flatnonzero(self.enabled)
+            if len(active):
+                self.p = replace(self.p,first_joint=int(active[0])+1,last_joint=int(active[-1])+1)
 
     def adopt_supported_pose(self, qpos, qvel=None):
         """One-time experimental placement, then support-only capture and mj_step.
@@ -72,6 +85,9 @@ class AdaptiveArcSimulation(ArcSimulation):
                     self.phase += self.p.direction*self.p.omega_rad_s*self.model.opt.timestep
                 self.command_phase = self.phase
                 return self.phase,self.target
+            if phase is None:
+                if self.paused:self.pre_pause_s += self.model.opt.timestep
+                phase = self.p.phase(self.data.time-self.pre_pause_s)
             result = super().step(phase)
             self.phase, self.target = self.p.direction*result[0],result[1]
             self.command_phase = self.phase

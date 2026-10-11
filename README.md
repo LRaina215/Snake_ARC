@@ -1,10 +1,31 @@
 # Snake_ARC
 
-圆弧滚动管外运动研究。当前开发范围为研究路线 Step1：固定局部使能区域的圆弧滚动，其余关节关闭主动驱动，验证水平直管、柔弯及实体连续的 L 型急弯。
+圆弧滚动管外运动研究。当前已完成 Step1 基础圆弧与 Step2 局部滑动窗口顺应性的仿真开发，并移植到单文件实机串口程序；真实机器人效果待用户实验确认。
 
 参考 `Snake_Robot_Gait` 的目录结构：`codes/` 为入口，`snake_control/` 为共享控制模块，`mujoco_model/` 为模型，`tools/` 为模型构建工具，`validation/` 为验证，`configs/` 为参数，`docs/` 为交接和复用说明。
 
-Step1 的基础控制与三类管道动力学仿真已完成。默认 20 关节，固定使能 J8–J13，其他关节关闭主动驱动并保留机械阻尼。弯管全程使用同一圆弧滚动步态，没有步态转换或根部位姿牵引。自动接触识别、滑动窗口和顺应性属于 Step2。
+Step1 默认 20 关节、固定使能 J8–J13。Step2 根据实际支撑段接管和迁移局部窗口，并从实测角调整滚动幅值；窗口外关闭主动驱动并保留机械阻尼。弯管全程保持圆弧滚动，没有步态转换或根部位姿牵引。
+
+## Step2 当前结果与运行
+
+10 个仿真案例通过：直管、柔弯、连续急弯、变径直管/弯管、前后偏置搭管、非零相位接入和已有不对称姿态接管。原始状态、窗口与支撑曲线见 [Step2 实验记录](validation/reports/step2/README.md)，方法与实机估计边界见 [设计说明](docs/Step2设计说明.md)。普通管道推进量与同口径 Step1 相差小于 1.8%。基线也能通过当前变径场景，未证明通过率或效率优势；变径弯管机械正功增加约 27.46%。
+
+![Step2 实际运动](validation/reports/step2/actual_motion.png)
+
+```powershell
+# 3D 交互：空格冻结相位，E 顺应性开/关，R 反向
+py -3.12 codes/Rolling_Arc_Adaptive_Mujoco.py --scene taper_bend90 --duration 90
+py -3.12 codes/Rolling_Arc_Adaptive_Mujoco.py --scene taper_bend90 --window 4:9 --duration 90
+# 从已保存的非标准搭管姿态接管
+py -3.12 codes/Rolling_Arc_Adaptive_Mujoco.py --scene taper_bend90 --initial-state validation/reports/step2/pose_initial_state.npz --duration 65
+# 10 个正式案例与 5 个固定窗口对照；详细命令见实验记录
+py -3.12 -X utf8 validation/step2_experiment.py
+py -3.12 -X utf8 validation/step2_experiment.py --baseline --cases straight bend90 elbow90 taper_straight taper_bend90
+```
+
+实机仍运行 `codes/Rolling_Arc_Real.py`：Ctrl+U 基础形成，Ctrl+E 接入顺应性，Ctrl+J/H 单步，Ctrl+G 连续。输入 `gain=0.02 load=40` 调参；`support=auto` 用原始负载+姿态估计，无法保证失能区域真实接触可观测；`support=9:11` 按实物人工给定支撑。详细操作见 [实机说明](docs/实机调试代码说明.md)。代码移植和离线协议检查已完成，本轮没有连接真实机器人。
+
+## Step1 基础结果
 
 ![实际动力学运动](validation/reports/step1/actual_motion.png)
 
@@ -57,7 +78,7 @@ py -3.12 codes/Rolling_Arc_Real.py --dry-run
 
 默认参数在 [configs/step1.json](configs/step1.json)，关节编号从 1 开始。需要调整方向时将 `direction` 改为 `-1`；默认幅值 60°，角频率 0.6 rad/s，初始相位 0。当前自动搭管初始化按相位 0 的圆弧构型设计；更改初始相位或窗口/幅值组合后需要重新检查初始构型与碰撞，不能直接沿用本次验收结论。
 
-场景由参考模型派生，已随仓库保存；复建命令为 `py -3.12 tools/build_step1_scenes.py`。XML 单独载入不会自动搭管，应通过步态入口设置初始姿态并驱动电机。
+场景由参考模型派生，已随仓库保存；复建命令为 `py -3.12 tools/build_step1_scenes.py`，Step2 变径模型用 `py -3.12 tools/build_step2_scenes.py`。XML 单独载入不会自动搭管，应通过步态入口设置初始姿态并驱动电机。
 
 ## 文件位置
 
@@ -66,10 +87,15 @@ py -3.12 codes/Rolling_Arc_Real.py --dry-run
 | `codes/Rolling_Arc_Mujoco.py` | 可视化及无窗口仿真入口 |
 | `snake_control/rolling_arc.py` | 共享圆弧目标、固定使能窗口、限矩驱动 |
 | `snake_control/simulation.py` | 初始搭管、物理步进与实际状态测量 |
+| `codes/Rolling_Arc_Adaptive_Mujoco.py` | Step2 交互/无窗口仿真、已有姿态接管入口 |
+| `snake_control/arc_compliance.py` | 导出实机文件中的同一顺应性核心，避免双份公式 |
+| `snake_control/adaptive_simulation.py` | 管道接触支撑提取、动态驱动掩码与相位推进 |
 | `mujoco_model/` | 复用的 20 关节机器人、网格和三种管道 |
 | `tools/build_step1_scenes.py` | 保留原碰撞几何，生成水平管场景 |
 | `validation/step1_experiment.py` | 动力学验收、对照和实际状态存档 |
 | `validation/reports/step1/` | 已提交的结果、原始状态、截图和指标图 |
+| `validation/step2_experiment.py`、`validation/render_step2.py` | Step2 验收、基线对照、实际轨迹渲染 |
+| `validation/reports/step2/`、`docs/Step2设计说明.md` | Step2 原始证据、方法和硬件限制 |
 | `codes/Rolling_Arc_Real_Preview.py` | 原设备档案对应的离线报文预览 |
 | `codes/Rolling_Arc_Real.py` | 独立实机串口入口，参数/公式集中，Ctrl 热键和控制台调试 |
 | `docs/实机调试代码说明.md` | 真实运行、调试键位、常改位置、反馈与验证边界 |

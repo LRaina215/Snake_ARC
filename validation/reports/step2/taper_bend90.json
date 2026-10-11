@@ -1,0 +1,136 @@
+{
+  "label": "taper_bend90",
+  "scene": "taper_bend90",
+  "baseline": false,
+  "passed": true,
+  "checks": {
+    "passive_drive_zero": true,
+    "torque_bounded": true,
+    "no_ground_support": true,
+    "support_retained": true,
+    "joint_limits": true,
+    "no_new_solver_warnings": true,
+    "forward_progress": true,
+    "whole_body_beyond_feature": true,
+    "controller_entered": true
+  },
+  "parameters": {
+    "joints": 20,
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5
+  },
+  "options": {
+    "gain": 0.02,
+    "curvature_filter_s": 0.5,
+    "minimum_amplitude_deg": 25.0,
+    "maximum_amplitude_deg": 60.0,
+    "guard_joints": 2,
+    "minimum_width": 6,
+    "maximum_width": 12,
+    "contact_on_s": 0.12,
+    "contact_off_s": 0.8,
+    "window_dwell_s": 0.6,
+    "transfer_s": 0.8,
+    "target_rate_deg_s": 45.0,
+    "contact_loss_hold_s": 0.5
+  },
+  "start_x": -0.5,
+  "takeover_s": 2.0,
+  "simulation_duration_s": 90.00000000006568,
+  "wall_duration_s": 10.046999999991385,
+  "progress_delta_m": 1.6650586454176617,
+  "min_body_final_progress_m": 2.203340603083279,
+  "feature_span_m": [
+    0.95,
+    1.55220257297
+  ],
+  "passive_actuator_force_max_nm": 0.0,
+  "maximum_torque_nm": 2.355,
+  "max_ground_contact_force_n": 0.0,
+  "max_unsupported_s": 0.0,
+  "positive_actuator_work_j": 218.01156241075634,
+  "window_events": [
+    {
+      "time_s": 47.680000000001854,
+      "old": [
+        8,
+        13
+      ],
+      "new": [
+        5,
+        14
+      ],
+      "support": [
+        7,
+        9,
+        11
+      ]
+    }
+  ],
+  "final_compliance": {
+    "window": [
+      5,
+      14
+    ],
+    "weights": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "support": [
+      9,
+      10
+    ],
+    "amplitude_deg": [
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      59.99999998895041,
+      59.99999998895041,
+      59.48416581338301,
+      44.0150975614832,
+      43.50101156797369,
+      47.993710682140055,
+      48.70033128833974,
+      59.670229501919685,
+      59.93241486649775,
+      59.999998218289505,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0
+    ],
+    "phase_paused": false,
+    "unsupported_s": 0.0,
+    "transfer_remaining_s": 0.0
+  }
+}
