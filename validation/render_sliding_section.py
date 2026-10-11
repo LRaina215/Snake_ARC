@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import argparse
 import json
+import gzip
 import math
 import numpy as np
 import matplotlib
@@ -16,7 +17,12 @@ from snake_control.rolling_arc import ArcParameters
 
 def render(label, path, video=False):
     report = json.loads((path/f'{label}.json').read_text(encoding='utf-8'))
-    rows = json.loads((path/f'{label}_records.json').read_text(encoding='utf-8'))
+    saved_records = path/f'{label}_records.json.gz'
+    if saved_records.exists():
+        with gzip.open(saved_records, 'rt', encoding='utf-8') as stream:
+            rows = json.load(stream)
+    else:
+        rows = json.loads((path/f'{label}_records.json').read_text(encoding='utf-8'))
     with np.load(path/f'{label}_trace.npz') as trace:
         t = trace['time_s']
         turn = np.array([r['body_geometry']['turn_deg'] for r in rows])

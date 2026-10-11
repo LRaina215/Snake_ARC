@@ -24,7 +24,12 @@ class WindowOptions:
     tracking_tolerance_deg: float = 12.
     minimum_support_n: float = 2.
     minimum_support_coverage: float = .8
-    contract_for_handover: bool = True
+    contract_for_handover: bool = False
+    phase_gated: bool = True
+    phase_zero_tolerance: float = .015
+    switch_angle_tolerance_deg: float = 4.
+    switch_velocity_tolerance_deg_s: float = 8.
+    exit_torque_tolerance_nm: float = .2
 
 
 def open_geometry(q, lengths, window):
@@ -67,6 +72,8 @@ class SlidingSectionCompliance:
         self.sent_geometry = None
         self.sent_constraint_violations = 0
         self.next_command_audit_s = 0.
+        self.phase_hold = False
+        self.last_measured = None
 
     def _mask(self, window):
         indices = np.arange(1, self.p.joints+1)
@@ -139,6 +146,13 @@ class SlidingSectionCompliance:
         # separate operation for a later, evidence-triggered extension.
         if bounds[1]-bounds[0] != self.window[1]-self.window[0] or abs(bounds[0]-self.window[0]) != 1:
             return False
+        if self.options.phase_gated:
+            self.preparation = dict(mode='phase', new=bounds, old=self.window,
+                                    start_s=time_s, latched_s=None, reason=reason)
+            self.events.append(dict(time_s=time_s, kind='prepare', old=list(self.window),
+                                    to=list(bounds), reason=reason, strategy='unloaded phase gate'))
+            self.pending = None
+            return True
         union = (min(bounds[0], self.window[0]), max(bounds[1], self.window[1]))
         weights = self._mask(bounds).astype(float)
         reference = measured.copy()
@@ -249,13 +263,65 @@ class SlidingSectionCompliance:
             self.restore_start_s = time_s
             self.cooldown_until = time_s+self.options.cooldown_s
 
-    def update(self, measured, phase, support_up, time_s, dt):
+    def _phase_handover(self, measured, velocity, phase, motor_torque, time_s):
+        preparation = self.preparation
+        old, new = preparation['old'], preparation['new']
+        exiting = np.flatnonzero(self._mask(old) & ~self._mask(new))
+        entering = np.flatnonzero(self._mask(new) & ~self._mask(old))
+        # A one-joint shift replaces two hinges of the SAME global parity.
+        factor = math.cos(phase) if exiting[0] % 2 == 0 else math.sin(phase)
+        if abs(factor) <= self.options.phase_zero_tolerance:
+            self.phase_hold = True
+            if preparation['latched_s'] is None:
+                preparation['latched_s'] = time_s
+                self.events.append(dict(time_s=time_s, kind='phase_hold', phase_rad=phase,
+                                        exiting_joint=int(exiting[0])+1, entering_joint=int(entering[0])+1))
+        if self.phase_hold:
+            changed = np.r_[exiting, entering]
+            g = open_geometry(measured, self.lengths, new)
+            preload = self.core.targets.copy()
+            preload[entering] = measured[entering]
+            preload[~self._mask(new)] = measured[~self._mask(new)]
+            command = open_geometry(preload, self.lengths, new)
+            ready = (motor_torque is not None
+                     and np.max(abs(measured[changed])) <= math.radians(self.options.switch_angle_tolerance_deg)
+                     and np.max(abs(velocity[changed])) <= math.radians(self.options.switch_velocity_tolerance_deg_s)
+                     and np.max(abs(motor_torque[exiting])) <= self.options.exit_torque_tolerance_nm
+                     and self.support.sum() >= self.options.minimum_support_n
+                     and self._coverage(new) >= self.options.minimum_support_coverage
+                     and 150 <= g['turn_deg'] <= 218 and g['gap_fraction'] >= .4 and g['fit_rms_m'] <= .015
+                     and command['turn_deg'] <= 190.01 and command['gap_fraction'] >= .4)
+            if ready:
+                self.window = new
+                self.weights = self._mask(new).astype(float)
+                self._make_core(new, measured)
+                self.core.targets[:] = preload
+                self.events.append(dict(time_s=time_s, kind='complete', old=list(old), to=list(new),
+                                        strategy='unloaded phase gate', phase_rad=phase,
+                                        switch_angles_deg=np.degrees(measured[changed]).tolist(),
+                                        switch_velocity_deg_s=np.degrees(velocity[changed]).tolist(),
+                                        exit_torque_nm=motor_torque[exiting].tolist(),
+                                        reason=preparation['reason'],
+                                        support_coverage=self._coverage(new)))
+                self.preparation = None
+                self.phase_hold = False
+                self.cooldown_until = time_s+self.options.cooldown_s
+        if self.preparation is not None and time_s-preparation['start_s'] >= 20:
+            self.events.append(dict(time_s=time_s, kind='reject', to=list(new),
+                                    reason='unloaded phase gate timed out'))
+            self.preparation = None
+            self.phase_hold = False
+            self.cooldown_until = time_s+self.options.cooldown_s
+
+    def update(self, measured, phase, support_up, time_s, dt, motor_torque=None):
         measured, support_up = np.asarray(measured), np.asarray(support_up)
         if measured.shape != (self.p.joints,) or support_up.shape != measured.shape:
             raise ValueError('Expected one angle and upward support observation per joint')
         if not np.isfinite(measured).all() or not np.isfinite(support_up).all() or np.any(support_up < 0):
             raise ValueError('Nonfinite angles or invalid support observation')
         self.raw_support = support_up.copy()
+        velocity = np.zeros_like(measured) if self.last_measured is None else (measured-self.last_measured)/dt
+        self.last_measured = measured.copy()
         self.support += (1-math.exp(-dt/self.options.support_filter_s))*(support_up-self.support)
         if self.window is None:
             if not self._acquire(measured, time_s):
@@ -264,7 +330,9 @@ class SlidingSectionCompliance:
         if time_s+1e-10 >= self.next_selection_s:
             self.next_selection_s = time_s+self.section_options.geometry_period_s
             self._select(measured, phase, time_s)
-        if self.preparation is not None:
+        if self.preparation is not None and self.preparation.get('mode') == 'phase':
+            self._phase_handover(measured, velocity, phase, motor_torque, time_s)
+        elif self.preparation is not None:
             preparation = self.preparation
             u = np.clip((time_s-preparation['start_s'])/2., 0., 1.)
             self.budget_scale = preparation['from_scale']-(preparation['from_scale']-5/6)*u*u*(3-2*u)
@@ -303,6 +371,7 @@ class SlidingSectionCompliance:
                       window_options=asdict(self.options))
         result['preparation'] = self.preparation
         result['curvature_budget_deg'] = 180*self.budget_scale
+        result['phase_hold'] = self.phase_hold
         result['transfer'] = None if self.transfer is None else {
             k: (list(v) if isinstance(v, tuple) else v) for k, v in self.transfer.items()
             if k not in ('from_weights', 'to_weights')}

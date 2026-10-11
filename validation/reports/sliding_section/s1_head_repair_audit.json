@@ -1,0 +1,38 @@
+{
+  "label": "s1_head_repair",
+  "full_saved_samples": 660,
+  "enabled_counts": [
+    6,
+    7
+  ],
+  "inactive_force_max_nm": 0.0,
+  "mask_matches_weights": true,
+  "phase_continuous": true,
+  "post_event_cycles": [
+    {
+      "start_s": 34.38300000001057,
+      "body_peak_deg": 187.070069608256,
+      "pipe_peak_deg": 215.29062930197415,
+      "gap_min": 0.5529898334720065
+    },
+    {
+      "start_s": 44.85497551197655,
+      "body_peak_deg": 186.84906157210474,
+      "pipe_peak_deg": 215.27498990114682,
+      "gap_min": 0.5541803742699177
+    },
+    {
+      "start_s": 55.32695102394253,
+      "body_peak_deg": 186.69742437311209,
+      "pipe_peak_deg": 215.2891853068293,
+      "gap_min": 0.5548931085877451
+    }
+  ],
+  "maximum_body_turn_at_s": 19.300000000000605,
+  "minimum_body_turn_at_s": 34.40000000001053,
+  "minimum_gap_at_s": 26.80000000000977,
+  "body_failed_samples": 0,
+  "pipe_failed_samples": 103,
+  "pipe_unobservable_samples": 0,
+  "sent_failed_samples": 0
+}

@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import argparse
 import json
+import gzip
 import time
 from dataclasses import asdict
 import numpy as np
@@ -37,6 +38,7 @@ def run(scene, label, output, duration=62., mode='sliding', start=-.5,
     requested = set()
     manual_requests = []
     exit_time = None
+    exit_phase = None
     next_sample = 0.
     period = 2*np.pi/p.omega_rad_s
     pipe_radii = sim.model.numeric('pipe_centerline').data.reshape(-1, 4)[:, 3]
@@ -104,7 +106,8 @@ def run(scene, label, output, duration=62., mode='sliding', start=-.5,
             if scene != 'straight':
                 if exit_time is None and records[-1]['min_body_progress_m'] > sim.feature[-1]+.05:
                     exit_time = float(sim.data.time)
-                if exit_cycles and exit_time is not None and sim.data.time >= exit_time+exit_cycles*period:
+                    exit_phase = records[-1]['phase_rad']
+                if exit_cycles and exit_phase is not None and records[-1]['phase_rad'] >= exit_phase+exit_cycles*2*np.pi:
                     break
     audited = [r for r in records if r['time_s'] >= p.settle_s+1]
     valid = [r for r in audited if r['shape']['wrap_valid']]
@@ -135,7 +138,7 @@ def run(scene, label, output, duration=62., mode='sliding', start=-.5,
         checks['two_handoffs'] = len(completed) == 2 and all(r['accepted'] for r in manual_requests)
         checks['post_handoff_cycles'] = bool(completed) and final['time_s']-completed[-1]['time_s'] >= 3*period
     if payload:
-        checks['automatic_migration_observed'] = any(e['reason'] == 'persistent observed load displacement' for e in events if e['kind'] == 'begin') and bool(completed)
+        checks['automatic_migration_observed'] = any(e.get('reason') == 'persistent observed load displacement' for e in events if e['kind'] in ('prepare', 'begin')) and bool(completed)
     if mode == 'sliding':
         checks['acquired'] = sim.controller.window is not None
         checks['no_unfinished_handover'] = sim.controller.transfer is None and sim.controller.preparation is None
@@ -143,7 +146,7 @@ def run(scene, label, output, duration=62., mode='sliding', start=-.5,
         checks['online_sent_target_open'] = sim.controller.sent_constraint_violations == 0
     if scene != 'straight':
         checks['whole_body_beyond_feature'] = final['min_body_progress_m'] > sim.feature[-1]+.05
-        checks['post_exit_cycles'] = exit_time is not None and final['time_s']-exit_time >= exit_cycles*period-1e-8
+        checks['post_exit_cycles'] = exit_phase is not None and final['phase_rad']-exit_phase >= exit_cycles*2*np.pi-1e-8
     # Sharp-corner body openness and pipe-frame observability are reported
     # separately. Never silently turn an unobservable pipe angle into a pass.
     checks = {k: bool(v) for k, v in checks.items()}
@@ -155,6 +158,7 @@ def run(scene, label, output, duration=62., mode='sliding', start=-.5,
                   motion_and_body_passed=all(checks.values()), checks=checks, pipe_checks=pipe_checks,
                   duration_s=final['time_s'], maximum_duration_s=duration, exit_time_s=exit_time,
                   post_exit_s=None if exit_time is None else final['time_s']-exit_time,
+                  post_exit_phase_cycles=None if exit_phase is None else (final['phase_rad']-exit_phase)/(2*np.pi),
                   progress_m=final['progress_m']-initial_progress,
                   minimum_wrap_deg=None if not wrap else min(wrap), maximum_wrap_deg=None if not wrap else max(wrap),
                   unobservable_samples=len(audited)-len(valid),
@@ -170,7 +174,8 @@ def run(scene, label, output, duration=62., mode='sliding', start=-.5,
                                   plane_rms_max_m=.015, sent_turn_max_deg=190., command_audit_period_s=.02))
     output.mkdir(parents=True, exist_ok=True)
     (output/f'{label}.json').write_text(json.dumps(report, indent=2, allow_nan=False), encoding='utf-8')
-    (output/f'{label}_records.json').write_text(json.dumps(records, separators=(',', ':'), allow_nan=False), encoding='utf-8')
+    with gzip.open(output/f'{label}_records.json.gz', 'wt', encoding='utf-8') as stream:
+        json.dump(records, stream, separators=(',', ':'), allow_nan=False)
     np.savez_compressed(output/f'{label}_trace.npz', qpos=states, qvel=velocities, backbone=bones,
                         time_s=[r['time_s'] for r in records], windows=[r['window'] for r in records],
                         targets_rad=[r['target_rad'] for r in records], enabled=[r['enabled'] for r in records],

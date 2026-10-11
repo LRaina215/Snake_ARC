@@ -52,13 +52,13 @@ class SlidingSectionSimulation(ArcSimulation):
         else:
             self.target, self.weights = self.controller.update(
                 self.data.qpos[self.drive.qadr], self.phase, self.support_up,
-                float(self.data.time), self.model.opt.timestep)
+                float(self.data.time), self.model.opt.timestep, self.data.actuator_force.copy())
             self.enabled = self.weights > 1e-12
         self.last_phase = self.phase
         self.drive.apply_targets(self.data, self.target, self.enabled)
         self.data.ctrl[:] *= self.weights
         mujoco.mj_step(self.model, self.data)
-        if phase is None and not self.paused and self.data.time >= self.p.settle_s:
+        if phase is None and not self.paused and not self.controller.phase_hold and self.data.time >= self.p.settle_s:
             self.phase += self.p.omega_rad_s*self.model.opt.timestep
         return self.last_phase, self.target
 

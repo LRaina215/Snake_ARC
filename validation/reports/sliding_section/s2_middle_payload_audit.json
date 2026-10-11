@@ -1,0 +1,31 @@
+{
+  "label": "s2_middle_payload",
+  "full_saved_samples": 622,
+  "enabled_counts": [
+    6
+  ],
+  "inactive_force_max_nm": 0.0,
+  "mask_matches_weights": true,
+  "phase_continuous": true,
+  "post_event_cycles": [
+    {
+      "start_s": 31.850000000015942,
+      "body_peak_deg": 187.30774317686226,
+      "pipe_peak_deg": 216.23597337490338,
+      "gap_min": 0.5459755755612706
+    },
+    {
+      "start_s": 42.32197551198192,
+      "body_peak_deg": 186.34803296557197,
+      "pipe_peak_deg": 215.32275823362724,
+      "gap_min": 0.5563073452973708
+    }
+  ],
+  "maximum_body_turn_at_s": 32.50000000001496,
+  "minimum_body_turn_at_s": 27.800000000010993,
+  "minimum_gap_at_s": 32.10000000001589,
+  "body_failed_samples": 0,
+  "pipe_failed_samples": 0,
+  "pipe_unobservable_samples": 0,
+  "sent_failed_samples": 0
+}

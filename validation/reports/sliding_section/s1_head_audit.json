@@ -1,0 +1,38 @@
+{
+  "label": "s1_head",
+  "full_saved_samples": 622,
+  "enabled_counts": [
+    6,
+    7
+  ],
+  "inactive_force_max_nm": 0.0,
+  "mask_matches_weights": true,
+  "phase_continuous": true,
+  "post_event_cycles": [
+    {
+      "start_s": 27.000000000010015,
+      "body_peak_deg": 186.71532217941385,
+      "pipe_peak_deg": 241.56529503867964,
+      "gap_min": 0.48739720734905917
+    },
+    {
+      "start_s": 37.47197551197599,
+      "body_peak_deg": 186.21678116842347,
+      "pipe_peak_deg": 211.89491063340935,
+      "gap_min": 0.5615674577715208
+    },
+    {
+      "start_s": 47.94395102394196,
+      "body_peak_deg": 186.20330950247623,
+      "pipe_peak_deg": 211.82386506036525,
+      "gap_min": 0.5616982001993683
+    }
+  ],
+  "maximum_body_turn_at_s": 12.599999999998456,
+  "minimum_body_turn_at_s": 18.099999999999138,
+  "minimum_gap_at_s": 15.799999999996682,
+  "body_failed_samples": 0,
+  "pipe_failed_samples": 100,
+  "pipe_unobservable_samples": 0,
+  "sent_failed_samples": 4
+}

@@ -54,7 +54,7 @@ def main():
             for _ in range(20):
                 phase = sim.phase
                 sim.step(phase)
-                if sim.data.time >= p.settle_s and not sim.paused:
+                if sim.data.time >= p.settle_s and not sim.paused and not sim.controller.phase_hold:
                     sim.phase += direction*p.omega_rad_s*sim.model.opt.timestep
             with viewer.lock():
                 viewer.cam.lookat[:] = backbone(sim.model, sim.data).mean(axis=0)+[0, 0, -.1]

@@ -44,6 +44,27 @@ def main():
                     g = open_geometry(q, lengths, union)
                     assert g['turn_deg'] <= 190.01 and g['gap_fraction'] >= .4, g
                     assert np.max(abs(q)) < math.pi/2, q
+    # A real saved supported shape at the odd-family zero phase: high exiting
+    # torque must keep the old window; unloading allows one atomic mask switch.
+    saved = np.load(ROOT/'validation/reports/fixed_section/r1_hold90_state_k2_trace.npz')
+    measured = saved['qpos'][-1, 7:]
+    phase = float(saved['metrics'][-1, 1])
+    gate = SlidingSectionCompliance(p, lengths, automatic=False)
+    gate.window = (8, 13)
+    gate.weights = p.enabled.astype(float)
+    gate._make_core(gate.window, measured)
+    support = np.zeros(p.joints); support[9] = 30.
+    gate.support[:] = support
+    assert gate.request((7, 12), measured, phase, 0.)
+    loaded = np.zeros(p.joints); loaded[12] = 2.
+    gate.update(measured, phase, support, .001, .001, loaded)
+    assert gate.window == (8, 13) and gate.phase_hold
+    before = gate.core.targets.copy()
+    target, weights = gate.update(measured, phase, support, .002, .001, np.zeros(p.joints))
+    assert gate.window == (7, 12) and weights.sum() == 6 and weights[12] == 0
+    overlap = gate._mask((8, 12))
+    assert np.max(abs(target[overlap]-before[overlap])) <= math.radians(45)*.001+1e-10
+    assert abs(target[6]-measured[6]) <= math.radians(45)*.001+1e-10
     print(f'All union FK samples: maximum turn {maximum:.6f} deg, minimum gap {minimum_gap:.6f}; phase continuous.')
 
 
