@@ -80,7 +80,7 @@ def main():
     camera.distance, camera.azimuth, camera.elevation = 1.8, 125., -12.
     viewport = mujoco.MjrRect(0, 0, 960, 600)
     rgb = np.empty((600, 960, 3), np.uint8)
-    movie = ROOT/'validation/results/motor_feedback_sliding'/(args.path.name+'.mp4')
+    movie = ROOT/'validation/results'/args.path.parent.name/(args.path.name+'.mp4')
     movie.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(str(movie), cv2.VideoWriter_fourcc(*'mp4v'), 10, (960, 600))
     if not writer.isOpened():
@@ -101,8 +101,11 @@ def main():
             o = row['controller']['observation']
             text = f"t={row['time_s']:.2f}s | enabled J{active[0]}-J{active[-1]} | six joints\n"
             text += f"observer: {'settle' if o is None else o['state']} | hold={row['controller']['phase_hold']}"
+            force = np.asarray(row.get('external_force_world', []))
+            magnitude = float(np.linalg.norm(force[:, :3], axis=1).sum()) if force.size else 0.
+            text += f"\nApplied force sum={magnitude:.1f}N | feedback={status.get('motor_feedback_period_s', .02):g}s"
             mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPLEFT,
-                               viewport, 'Saved actual motion; no external pull\nBlue: enabled  Purple: disabled', text, context)
+                               viewport, 'Saved actual motion\nBlue: enabled  Purple: disabled', text, context)
             glfw.swap_buffers(surface)
         mujoco.mjr_readPixels(rgb, None, viewport, context)
         return np.flipud(rgb).copy()
@@ -113,11 +116,16 @@ def main():
         wanted = [0., 2.]
         complete = [e for e in status['events'] if e['kind'] == 'complete']
         if complete:
-            switch = complete[0]['time_s']
-            wanted += [switch-.02, switch+.02]
+            for event in complete:
+                switch = event['time_s']
+                wanted += [switch-.02, switch+.02]
         else:
             wanted += [next(r['time_s'] for r in evaluation if r.get('observation', {}).get('direction')),
                        max(evaluation, key=lambda r: r['pipe_angular_span_deg'])['time_s']]
+        stimulus = status.get('stimulation', {})
+        if stimulus.get('kind', 'none') != 'none':
+            start, end = stimulus['interval_s']
+            wanted += [start, (start+end)/2, end, end+2, 50.]
         wanted += [max(evaluation, key=lambda r: r['body_geometry']['turn_deg'])['time_s'], rows[-1]['time_s']]
         for index, timestamp in enumerate(wanted):
             row = min(rows, key=lambda r: abs(r['time_s']-timestamp))
@@ -128,7 +136,7 @@ def main():
             small.paste(picture.resize((640, 400)), (0, 26)); panels.append(small)
     finally:
         writer.release(); context.free(); glfw.destroy_window(surface); glfw.terminate()
-    montage = Image.new('RGB', (1280, 1278), 'white')
+    montage = Image.new('RGB', (1280, ((len(panels)+1)//2)*426), 'white')
     for i, panel in enumerate(panels):
         montage.paste(panel, ((i % 2)*640, (i//2)*426))
     montage.save(args.path/'actual_montage.png')

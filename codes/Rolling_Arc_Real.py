@@ -3,10 +3,11 @@
 直接运行本文件，自动查找CH340串口；所有实验配置在文件顶部修改。
 DRY_RUN=True时使用内存串口，不连接机器人；日志自动保存在本文件旁的logs目录。
 Ctrl+U 形成圆弧，Ctrl+J/H 正/反单步，Ctrl+G 连续/暂停，Ctrl+X 全部失能。
-Ctrl+E 开关固定窗口的实际截面顺应；J8–J13保持使能，其余关节失能。
+Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动滑窗（连续6关节）。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
 """
 import json
+import copy
 import math
 import statistics
 from dataclasses import dataclass, asdict, replace
@@ -58,6 +59,15 @@ LINK_LENGTHS_M = [.0645] * (NUM_JOINTS + 1)  # 仿真骨架尺寸，按实机铰
 COMPLIANCE_FEEDBACK_PERIOD_S = .20  # 全20舵机读角；不把重复计算当20 Hz新实测
 MAX_FEEDBACK_AGE_S = .8
 
+# 自动滑窗：仿真已验证连续向头端交接两次，实机及反向交接待验证。
+# 冻结的相位基准对应 A=60°、omega=0.6、21段64.5mm、正向滚动。
+# 其余模式仍可自由调幅值/频率。移窗始终是相邻一关节，保持6个使能。
+MOTOR_SLIDING_AUTO = True
+MOTOR_SLIDING_COOLDOWN_S = 5.0
+MOTOR_SLIDING_SWITCH_ANGLE_DEG = 4.0
+MOTOR_SLIDING_SWITCH_VELOCITY_DEG_S = 8.0  # 由两次新读角差分；不使用负载/电流
+MOTOR_SLIDING_STABLE_FEEDBACK_S = .06     # 200ms采样时至少跨两个新反馈
+
 # 历史幅值/滑动窗口原型参数：只供旧仿真导入第3A段，当前实机入口不用。
 MIN_COMPLIANCE_AMPLITUDE_DEG = 25.0
 CURVATURE_FILTER_S = 0.5
@@ -86,6 +96,7 @@ MAX_ANGLE_DEG = [90.0] * NUM_JOINTS
 HOTKEY_COMMANDS = {
     'U': 'apply', 'J': 'step', 'H': 'back', 'G': 'toggle', 'N': 'hold',
     'K': 'status', 'X': 'release', 'Q': 'quit', 'T': 'reverse', 'E': 'compliance',
+    'W': 'window_auto',
     '-': 'delta-', '=': 'delta+',
 }
 HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响应）：
@@ -94,12 +105,16 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   Ctrl+G 连续滚动/暂停；Ctrl+空格 暂停；Ctrl+N 保持并重发当前目标
   Ctrl+T 反转连续滚动方向；Ctrl+K 读取所有关节位置
   Ctrl+E 固定窗口截面顺应开/关：先形成圆弧；保留相位与连续/暂停状态
+  Ctrl+1 / 2 / 3 基础圆弧 / 固定截面顺应 / 角度反馈自动滑窗
+  Ctrl+W 自动选窗开/关（仅滑动模式）；窗口始终6关节，外侧扭矩关闭
   Ctrl+上/下 幅值±2°；Ctrl+右/左 角频率±0.05 rad/s
   Ctrl+X 全部失能（机器人会失去主动支撑）；Ctrl+Q 退出，接管后会失能
 控制台输入后回车：apply / step / back / run / pause / hold / reverse
-                  compliance / release / status / help / quit
+                  compliance / gait_basic / gait_fixed / gait_sliding / window_auto
+                  release / status / help / quit
 参数：amplitude=60 omega=0.6 delta=0.1 window=8:13 gain=0.02 yielding=0.7 filter=0.15
-window只在release后修改；本版不自动移窗、不使用support/load判据。
+window只在release后修改；自动滑窗只用全20关节角、采样时间和已知相位。
+滑窗基准只标定了60度/0.6/正向；移窗不等于已从电机观测到支撑或卸载。
 顺应性下pause冻结相位、继续形状反馈；hold冻结全部目标。
 '''
 
@@ -721,6 +736,729 @@ def make_section_options():
         minimum_gap_fraction=SECTION_MIN_GAP_FRACTION)
 
 
+# BEGIN MOTOR_SLIDING_CORE
+@dataclass(frozen=True)
+class ArcParameters:
+    joints: int = 20
+    first_joint: int = 8
+    last_joint: int = 13
+    amplitude_deg: float = 60.0
+    omega_rad_s: float = 0.6
+    direction: int = 1
+    initial_phase_rad: float = 0.0
+    settle_s: float = 2.0
+    kp: float = 127.0
+    kd: float = 1.0
+    torque_limit_nm: float = 2.355
+    passive_damping: float = 1.5
+
+    def __post_init__(self):
+        if any(type(v) is not int for v in (self.joints, self.first_joint, self.last_joint, self.direction)):
+            raise ValueError('Joint counts, bounds and direction must be integers')
+        if not 1 <= self.first_joint <= self.last_joint <= self.joints:
+            raise ValueError('Invalid one-based active window')
+        numeric = [v for v in asdict(self).values() if isinstance(v, (int, float))]
+        if not np.isfinite(numeric).all():
+            raise ValueError('Parameters must be finite')
+        if self.direction not in (-1, 1) or not 0 < self.amplitude_deg <= 90:
+            raise ValueError('direction must be ±1; amplitude must be in (0,90]')
+        if min(self.kp, self.torque_limit_nm) <= 0 or min(self.omega_rad_s, self.kd, self.settle_s, self.passive_damping) < 0:
+            raise ValueError('Invalid frequency, gain or damping')
+        if self.torque_limit_nm > 2.355:
+            raise ValueError('Torque exceeds the reused model rating (2.355 Nm)')
+
+    @classmethod
+    def load(cls, path):
+        return cls(**json.loads(Path(path).read_text(encoding='utf-8')))
+
+    @property
+    def enabled(self):
+        return (np.arange(1, self.joints + 1) >= self.first_joint) & (np.arange(1, self.joints + 1) <= self.last_joint)
+
+    def targets(self, phase):
+        if not math.isfinite(phase):
+            raise ValueError('Phase must be finite')
+        odd = np.arange(self.joints) % 2 == 0
+        angles = math.radians(self.amplitude_deg) * np.where(odd, np.cos(phase), self.direction * np.sin(phase))
+        return np.where(self.enabled, angles, 0.0)
+
+    def phase(self, time_s):
+        return self.initial_phase_rad + self.omega_rad_s * max(0.0, time_s - self.settle_s)
+
+
+@dataclass(frozen=True)
+class ObserverOptions:
+    width: int = 6
+    end_links: int = 4
+    minimum_end_links: int = 3
+    minimum_straightness: float = .98
+    maximum_end_disagreement_deg: float = 25.
+    minimum_turn_deg: float = 150.
+    maximum_turn_deg: float = 218.
+    minimum_gap: float = .4
+    maximum_plane_rms_m: float = .015
+    boundary_links: int = 2
+    top_band_link_fraction: float = .125
+    samples_per_module: int = 12
+    minimum_projected_down: float = .25
+    error_filter_s: float = .2
+    offset_threshold_joints: float = .5
+    persistence_s: float = .5
+
+
+class AngleShapeObserver:
+    """One causal observer; current enabled mask always comes from feedback.
+
+    Angles use controller/model signs, in degrees. Phase is a known commanded
+    phase in radians, and timestamps refer to actual motor feedback acquisition.
+    A recommendation never updates the enabled window inside the observer.
+    """
+    def __init__(self, link_lengths_m, amplitude_deg=60., options=ObserverOptions()):
+        self.lengths = np.asarray(link_lengths_m, float).copy()
+        if self.lengths.ndim != 1 or len(self.lengths) < 9 or not np.isfinite(self.lengths).all() or np.any(self.lengths <= 0):
+            raise ValueError('Finite positive mechanical link lengths required')
+        self.n = len(self.lengths) - 1
+        self.amplitude = math.radians(amplitude_deg)
+        self.options = options
+        self.last_time = None
+        self.window = None
+        self.filtered_error = None
+        self.pending_direction = 0
+        self.pending_since = None
+
+    def infer_down(self, points, window):
+        first, last = window
+        head_count = min(self.options.end_links, first - 1)
+        tail_count = min(self.options.end_links, self.n - last)
+        if min(head_count, tail_count) < self.options.minimum_end_links:
+            raise ValueError('insufficient passive end links')
+        head = points[:head_count + 1][::-1]
+        tail = points[-tail_count - 1:]
+        vectors, straightness = [], []
+        for end in (head, tail):
+            chord = end[-1] - end[0]
+            length = np.linalg.norm(chord)
+            if length <= 1e-12:
+                raise ValueError('degenerate end direction')
+            vectors.append(chord / length)
+            straightness.append(float(length / np.linalg.norm(np.diff(end, axis=0), axis=1).sum()))
+        disagreement = math.degrees(math.acos(float(np.clip(vectors[0] @ vectors[1], -1., 1.))))
+        summed = vectors[0] + vectors[1]
+        if np.linalg.norm(summed) <= 1e-12:
+            raise ValueError('opposite end directions')
+        down = summed / np.linalg.norm(summed)
+        quality = dict(head_straightness=straightness[0], tail_straightness=straightness[1],
+                       end_disagreement_deg=disagreement, head_direction=vectors[0].tolist(),
+                       tail_direction=vectors[1].tolist(), end_link_counts=[head_count, tail_count])
+        return down, quality
+
+    def geometry(self, q, window):
+        section = local_section(q, self.lengths, *window)
+        points = section['points'][1:-1]
+        length = np.linalg.norm(np.diff(points, axis=0), axis=1).sum()
+        info = dict(turn_deg=math.degrees(section['total_turn']), fit_rms_m=section['fit_rms'],
+                    gap_fraction=float(np.linalg.norm(points[-1] - points[0]) / length))
+        good = (self.options.minimum_turn_deg <= info['turn_deg'] <= self.options.maximum_turn_deg
+                and info['gap_fraction'] >= self.options.minimum_gap
+                and info['fit_rms_m'] <= self.options.maximum_plane_rms_m)
+        return good, info, section
+
+    def crest(self, points, window, section, down, return_curve=False):
+        """Smooth projected curve with a continuous physical joint coordinate.
+
+        Each curved mechanical module is mapped to j-0.5 .. j+0.5, including
+        all A/B/C pieces. This prevents short-radius smoothing from changing
+        its joint identity. End half-links retain their half-intervals.
+        """
+        start = max(0, window[0] - self.options.boundary_links)
+        stop = min(len(points), window[1] + self.options.boundary_links + 2)
+        axis = section['axis']
+        basis = axis['basis'][:, :2]
+        projected_down = down @ basis
+        down_norm = float(np.linalg.norm(projected_down))
+        if down_norm < self.options.minimum_projected_down:
+            raise ValueError('down direction nearly normal to section')
+        projected = (points[start:stop] - axis['point']) @ basis
+        curve = continuous_section(projected)
+        groups = []
+        for segment in curve:
+            group = (segment.joint, segment.kind == 'end')
+            if not groups or groups[-1][0] != group:
+                groups.append((group, []))
+            groups[-1][1].append(segment)
+        locations, coordinates, arc_weights = [], [], []
+        last_point = stop - 1
+        for (joint, is_end), pieces in groups:
+            if is_end and joint == 0:
+                lo, hi = start, start + .5
+            elif is_end:
+                lo, hi = last_point - .5, last_point
+            else:
+                lo, hi = start + joint - .5, start + joint + .5
+            module_length = sum(piece.length for piece in pieces)
+            traversed = 0.
+            for piece in pieces:
+                # Midpoint quadrature in arclength. Tiny A/B straight remnants
+                # cannot receive the same total weight as a long curved piece.
+                count = self.options.samples_per_module
+                for fraction in (np.arange(count) + .5) / count:
+                    coordinates.append(lo + (hi - lo) * (traversed + piece.length * fraction) / module_length)
+                    locations.append(piece.at(fraction))
+                    arc_weights.append(piece.length / count)
+                traversed += piece.length
+        locations = np.asarray(locations)
+        coordinates = np.asarray(coordinates)
+        heights = -locations @ projected_down
+        band = float(np.median(self.lengths) * self.options.top_band_link_fraction)
+        weight = np.maximum(0., heights - heights.max() + band) * np.asarray(arc_weights)
+        crest_joint = float(weight @ coordinates / weight.sum())
+        top_xy = (weight[:, None] * locations).sum(axis=0) / weight.sum()
+        result = dict(joint_coordinate=crest_joint, point_head_m=(axis['point'] + basis @ top_xy).tolist(),
+                      top_band_m=band, projected_down_norm=down_norm,
+                      top_coordinate_span=coordinates[weight > 0][[0, -1]].tolist())
+        if return_curve:
+            result.update(curve_head_m=(locations @ basis.T + axis['point']).tolist(),
+                          curve_joint_coordinates=coordinates.tolist())
+        return result
+
+    def reference_crest(self, window, phase):
+        q = np.zeros(self.n)
+        indices = np.arange(window[0] - 1, window[1])
+        q[indices] = self.amplitude * np.where(indices % 2 == 0, math.cos(phase), math.sin(phase))
+        points = forward(q, self.lengths)
+        down, _ = self.infer_down(points, window)
+        _, _, section = self.geometry(q, window)
+        return self.crest(points, window, section, down)['joint_coordinate']
+
+    def _clear_confirmation(self):
+        self.filtered_error = None
+        self.pending_direction = 0
+        self.pending_since = None
+
+    def update(self, angles_deg, phase_rad, enabled, feedback_time_s):
+        angles = np.asarray(angles_deg, float)
+        mask = np.asarray(enabled, bool)
+        if angles.shape != (self.n,) or mask.shape != angles.shape or not np.isfinite(angles).all():
+            raise ValueError('Expected one finite measured angle and enable flag per joint')
+        if not math.isfinite(phase_rad) or not math.isfinite(feedback_time_s):
+            raise ValueError('Finite phase and feedback timestamp required')
+        if self.last_time is not None and feedback_time_s <= self.last_time:
+            raise ValueError('Observer requires fresh, increasing feedback timestamps')
+        active = np.flatnonzero(mask)
+        if len(active) != self.options.width or np.any(np.diff(active) != 1):
+            raise ValueError('Expected one contiguous six-joint enable mask')
+        window = (int(active[0] + 1), int(active[-1] + 1))
+        dt = 0. if self.last_time is None else feedback_time_s - self.last_time
+        changed = self.window is not None and window != self.window
+        if changed:
+            self._clear_confirmation()
+        self.window, self.last_time = window, feedback_time_s
+        q = np.radians(angles)
+        result = dict(execution='observation_only', executes_window_update=False,
+                      feedback_time_s=feedback_time_s, current_window=list(window),
+                      external_window_change=changed, valid=False, direction=0,
+                      suggested_window=None, state='unobservable', reasons=[])
+        try:
+            points = forward(q, self.lengths)
+            down, quality = self.infer_down(points, window)
+            result.update(down_head=down.tolist(), end_quality=quality)
+            good, geometry, section = self.geometry(q, window)
+            result['current_geometry'] = geometry
+            crest = self.crest(points, window, section, down)
+            reference = self.reference_crest(window, phase_rad)
+            error = crest['joint_coordinate'] - reference
+            result.update(crest=crest, reference_joint_coordinate=reference, raw_error_joints=error)
+            reasons = result['reasons']
+            if min(quality['head_straightness'], quality['tail_straightness']) < self.options.minimum_straightness:
+                reasons.append('passive end not straight enough')
+            if quality['end_disagreement_deg'] > self.options.maximum_end_disagreement_deg:
+                reasons.append('passive ends disagree on down direction')
+            if not good:
+                reasons.append('current section outside open-shape limits')
+            if reasons:
+                self._clear_confirmation()
+                return result
+            result['valid'] = True
+            if self.filtered_error is None:
+                self.filtered_error = error
+            else:
+                self.filtered_error += (1 - math.exp(-dt / self.options.error_filter_s)) * (error - self.filtered_error)
+            result['filtered_error_joints'] = self.filtered_error
+            if abs(self.filtered_error) <= self.options.offset_threshold_joints:
+                self.pending_direction, self.pending_since = 0, None
+                result['state'] = 'retain'
+                return result
+            direction = 1 if self.filtered_error > 0 else -1
+            candidate = (window[0] + direction, window[1] + direction)
+            if candidate[0] < 2 or candidate[1] >= self.n:
+                result['state'] = 'blocked_boundary'
+                self.pending_direction, self.pending_since = 0, None
+                return result
+            candidate_good, candidate_geometry, _ = self.geometry(q, candidate)
+            result['candidate_window'] = list(candidate)
+            result['candidate_geometry'] = candidate_geometry
+            if not candidate_good:
+                result['state'] = 'blocked_candidate_shape'
+                self.pending_direction, self.pending_since = 0, None
+                return result
+            if self.pending_direction != direction:
+                self.pending_direction, self.pending_since = direction, feedback_time_s
+            persistent = feedback_time_s - self.pending_since
+            result.update(state='confirming', pending_direction=direction, persistence_s=persistent)
+            if persistent + 1e-9 >= self.options.persistence_s:
+                result.update(state='recommend_head' if direction < 0 else 'recommend_tail',
+                              direction=direction, suggested_window=list(candidate))
+            return result
+        except (ValueError, np.linalg.LinAlgError) as exc:
+            self._clear_confirmation()
+            result['reasons'].append(str(exc))
+            return result
+
+    def configuration(self):
+        return dict(options=asdict(self.options), mechanical_lengths_m=self.lengths.tolist(),
+                    nominal_amplitude_deg=math.degrees(self.amplitude), input_units='controller degrees; phase radians')
+
+
+def local_phase(phase, first):
+    """Local first hinge is cos; an even first hinge swaps the two families."""
+    return (phase if first % 2 else math.pi/2-phase) % (2*math.pi)
+
+
+def bending_features(angles_deg, lengths, window):
+    """Same-winding arc curvature, excluding reverse folds at passive ends.
+
+    The actual active section supplies its plane and winding, not gravity.
+    Integrating signed curvature over each physical module gives its turn.
+    Taking absolute motor angles would count a reverse tail fold as an arc.
+    """
+    first, last = window
+    n = len(angles_deg)
+    q = np.radians(angles_deg)
+    section = local_section(q, lengths, first, last)
+    points = forward(q, lengths)
+    start, stop = max(0, first-3), min(n+2, last+4)
+    projected = (points[start:stop]-section['axis']['point']) @ section['axis']['basis'][:, :2]
+    curve = continuous_section(projected)
+    indices = np.arange(max(1, first-2), min(n, last+2)+1)
+    signed = np.array([sum(segment.turn for segment in curve if start+segment.joint == j)
+                       for j in indices])
+    winding = 1 if signed[(indices >= first) & (indices <= last)].sum() >= 0 else -1
+    turns = np.degrees(np.maximum(0., winding*signed))
+    mass = turns
+    return dict(bending_center_joint=float(indices @ mass / max(mass.sum(), 1e-12)),
+                head_boundary_turn_deg=float(turns[indices < first].sum()),
+                tail_boundary_turn_deg=float(turns[indices > last].sum()),
+                reverse_boundary_turn_deg=float(np.degrees(np.maximum(0., -winding*signed[
+                    (indices < first) | (indices > last)])).sum()))
+
+
+@dataclass(frozen=True)
+class MotorObserverOptions:
+    crest_threshold_joints: float = .5
+    bending_threshold_joints: float = .2
+    boundary_threshold_deg: float = 8.
+    filter_s: float = .2
+    persistence_s: float = .5
+    maximum_feedback_gap_s: float = .1
+
+
+class PhaseShapeReference:
+    """Periodic shape offsets in relative body coordinates, with provenance."""
+    def __init__(self, values, metadata):
+        self.values = np.asarray(values, float)
+        if self.values.ndim != 2 or self.values.shape[1] != 3 or not np.isfinite(self.values).all():
+            raise ValueError('Reference requires finite crest/bending/boundary phase bins')
+        self.metadata = dict(metadata)
+
+    def at(self, phase, first):
+        count = len(self.values)
+        position = local_phase(phase, first)/(2*math.pi)*count-.5
+        left = math.floor(position)
+        fraction = position-left
+        return (1-fraction)*self.values[left % count] + fraction*self.values[(left+1) % count]
+
+    def to_dict(self):
+        return dict(values=self.values.tolist(), metadata=self.metadata)
+
+    @classmethod
+    def from_dict(cls, value):
+        return cls(value['values'], value['metadata'])
+
+
+class MotorShapeObserver:
+    """Angle-only corroborated recommendation; cannot operate any actuator."""
+    def __init__(self, lengths, reference, amplitude_deg=60., options=MotorObserverOptions()):
+        self.lengths = np.asarray(lengths, float)
+        self.reference = reference
+        self.options = options
+        self.geometry_observer = AngleShapeObserver(lengths, amplitude_deg, ObserverOptions())
+        self.filtered = None
+        self.pending_direction = 0
+        self.pending_since = None
+        self.last_time = None
+
+    def update(self, angles_deg, phase_rad, enabled, feedback_time_s):
+        # The legacy object supplies geometry/down quality only. Its nominal
+        # offset and recommendation are NOT used as migration evidence.
+        original = self.geometry_observer.update(angles_deg, phase_rad, enabled, feedback_time_s)
+        dt = 0. if self.last_time is None else feedback_time_s-self.last_time
+        self.last_time = feedback_time_s
+        if dt > self.options.maximum_feedback_gap_s:
+            self.filtered, self.pending_direction, self.pending_since = None, 0, None
+        window = tuple(original['current_window'])
+        result = {key: original[key] for key in ('feedback_time_s', 'current_window',
+                  'external_window_change', 'valid', 'reasons', 'execution', 'executes_window_update')}
+        result.update(direction=0, suggested_window=None, state='unobservable')
+        for key in ('down_head', 'end_quality', 'current_geometry', 'crest'):
+            if key in original:
+                result[key] = original[key]
+        if not original['valid']:
+            self.filtered, self.pending_direction, self.pending_since = None, 0, None
+            return result
+        f = bending_features(angles_deg, self.lengths, window)
+        center = sum(window)/2
+        values = np.array([original['crest']['joint_coordinate']-center,
+                           f['bending_center_joint']-center,
+                           f['tail_boundary_turn_deg']-f['head_boundary_turn_deg']])
+        baseline = self.reference.at(phase_rad, window[0])
+        error = values-baseline
+        if self.filtered is None or original['external_window_change']:
+            self.filtered, self.pending_direction, self.pending_since = error.copy(), 0, None
+        else:
+            self.filtered += (1-math.exp(-dt/self.options.filter_s))*(error-self.filtered)
+        result.update(features=f, phase_reference=baseline.tolist(), feature_error=error.tolist(),
+                      filtered_feature_error=self.filtered.tolist(),
+                      filtered_error_joints=float(self.filtered[0]))
+        if abs(self.filtered[0]) <= self.options.crest_threshold_joints:
+            self.pending_direction, self.pending_since = 0, None
+            result['state'] = 'retain'
+            return result
+        direction = 1 if self.filtered[0] > 0 else -1
+        corroborated = (direction*self.filtered[1] >= self.options.bending_threshold_joints or
+                        direction*self.filtered[2] >= self.options.boundary_threshold_deg)
+        if not corroborated:
+            self.pending_direction, self.pending_since = 0, None
+            result['state'] = 'reject_crest_without_bending_migration'
+            return result
+        candidate = (window[0]+direction, window[1]+direction)
+        # Both far ends need at least three passive links for the down proxy.
+        if candidate[0] < 4 or candidate[1] > len(angles_deg)-3:
+            self.pending_direction, self.pending_since = 0, None
+            result['state'] = 'blocked_passive_end_length'
+            return result
+        good, geometry, _ = self.geometry_observer.geometry(np.radians(angles_deg), candidate)
+        result.update(candidate_window=list(candidate), candidate_geometry=geometry)
+        if not good:
+            self.pending_direction, self.pending_since = 0, None
+            result['state'] = 'blocked_candidate_shape'
+            return result
+        if self.pending_direction != direction:
+            self.pending_direction, self.pending_since = direction, feedback_time_s
+        persistent = feedback_time_s-self.pending_since
+        result.update(state='confirming', persistence_s=persistent)
+        if persistent+1e-9 >= self.options.persistence_s:
+            result.update(state='recommend_head' if direction < 0 else 'recommend_tail',
+                          direction=direction, suggested_window=list(candidate))
+        return result
+
+    def configuration(self):
+        return dict(options=asdict(self.options), frozen_reference=self.reference.to_dict(),
+                    gravity_assumption='unforced sufficiently straight passive ends',
+                    inputs=['angles_deg', 'phase_rad', 'enabled', 'feedback_time_s'])
+
+
+@dataclass(frozen=True)
+class MotorSlidingOptions:
+    cooldown_s: float = 5.
+    phase_zero_tolerance: float = .015
+    switch_angle_deg: float = 4.
+    switch_velocity_deg_s: float = 8.
+    stable_feedback_s: float = .06
+    minimum_hold_s: float = .1
+    handover_timeout_s: float = 20.
+    maximum_feedback_age_s: float = .8
+
+
+class MotorFeedbackSliding:
+    def __init__(self, parameters, lengths, reference, execute=True,
+                 section_options=SectionOptions(), options=MotorSlidingOptions(), feedback_period_s=.02):
+        if parameters.last_joint-parameters.first_joint+1 != 6:
+            raise ValueError('Exactly six consecutive enabled joints required')
+        self.p, self.lengths, self.options = parameters, np.asarray(lengths), options
+        self.section_options, self.execute = section_options, execute
+        self.window = (parameters.first_joint, parameters.last_joint)
+        self.core = FixedSectionCompliance(parameters, lengths, section_options)
+        self.observer = MotorShapeObserver(lengths, reference, parameters.amplitude_deg,
+            MotorObserverOptions(maximum_feedback_gap_s=max(.1, 2.5*feedback_period_s)))
+        self.feedback_period_s = feedback_period_s
+        self.enabled = parameters.enabled.copy()
+        self.phase = parameters.initial_phase_rad
+        self.phase_hold = False
+        self.targets = parameters.targets(self.phase)
+        self.previous_angles, self.last_time = None, None
+        self.last_control_time = None
+        self.feedback_phase = self.phase
+        self.fresh_feedback = False
+        self.pending = None
+        self.cooldown_until = parameters.settle_s
+        self.events = []
+        self.observation = None
+        self.angle_velocity_deg_s = np.zeros(parameters.joints)
+        self.angle_velocity_available = False
+        self.last_gate = None
+        self.fault = None
+
+    def _handover(self, angles, time_s):
+        request = self.pending
+        new = tuple(request['to'])
+        new_mask = (np.arange(1, self.p.joints+1) >= new[0]) & (np.arange(1, self.p.joints+1) <= new[1])
+        entering = np.flatnonzero(new_mask & ~self.enabled)
+        exiting = np.flatnonzero(self.enabled & ~new_mask)
+        changed = np.r_[entering, exiting]
+        factor = math.cos(self.phase) if exiting[0] % 2 == 0 else math.sin(self.phase)
+        if not self.phase_hold and abs(factor) <= self.options.phase_zero_tolerance:
+            self.phase_hold = True
+            request['hold_since'] = time_s
+            self.events.append(dict(kind='phase_hold', time_s=time_s, phase_rad=self.phase,
+                                    entering=(entering+1).tolist(), exiting=(exiting+1).tolist()))
+        if self.phase_hold and self.fresh_feedback:
+            q = np.radians(angles)
+            good, geometry, _ = self.observer.geometry_observer.geometry(q, new)
+            preload = self.targets.copy()
+            preload[entering] = q[entering]
+            preload[~new_mask] = q[~new_mask]
+            next_core = FixedSectionCompliance(replace(self.p, first_joint=new[0], last_joint=new[1]),
+                                              self.lengths, self.section_options)
+            command_good, _ = next_core._check_goal(preload)
+            self.last_gate = dict(time_s=time_s, actual_candidate=geometry,
+                switch_angles_deg=angles[changed].tolist(),
+                switch_velocity_deg_s=self.angle_velocity_deg_s[changed].tolist(),
+                velocity_from_continuous_fresh_feedback=self.angle_velocity_available,
+                candidate_open=good, command_open=bool(command_good),
+                unloading_observed=False)
+            direction = new[0]-self.window[0]
+            evidence = self.observation is not None and self.observation['valid'] and self.observation['direction'] == direction
+            ready = (good and command_good and evidence and self.angle_velocity_available and
+                np.max(abs(angles[changed])) <= self.options.switch_angle_deg and
+                np.max(abs(self.angle_velocity_deg_s[changed])) <= self.options.switch_velocity_deg_s and
+                time_s-request['hold_since'] >= self.options.minimum_hold_s)
+            if ready:
+                if request['ready_since'] is None:
+                    request['ready_since'] = self.last_time
+                if self.last_time-request['ready_since']+1e-9 >= self.options.stable_feedback_s:
+                    old = self.window
+                    next_core.targets = preload.copy()
+                    next_core.previous_axis = self.core.previous_axis
+                    self.core, self.window, self.enabled = next_core, new, new_mask
+                    self.targets = preload.copy()
+                    self.events.append(dict(kind='complete', time_s=time_s, old=list(old), to=list(new),
+                                            gate=self.last_gate, strategy='motor-angle geometric trial'))
+                    self.pending, self.phase_hold = None, False
+                    self.cooldown_until = time_s+self.options.cooldown_s
+            else:
+                request['ready_since'] = None
+        if self.pending is not None and time_s-request['time_s'] >= self.options.handover_timeout_s:
+            self.events.append(dict(kind='reject', time_s=time_s, to=list(new),
+                                    reason='motor-angle handover timed out', last_gate=self.last_gate))
+            self.pending, self.phase_hold = None, False
+            self.cooldown_until = time_s+self.options.cooldown_s
+
+    @property
+    def automatic(self):
+        return self.execute
+
+    @automatic.setter
+    def automatic(self, value):
+        self.execute = bool(value)
+        if not self.execute and self.pending is not None:
+            self.events.append(dict(kind='cancel', time_s=self.last_control_time,
+                                    to=self.pending['to'], reason='automatic selection disabled'))
+            self.pending, self.phase_hold = None, False
+
+    def update(self, angles_deg, feedback_time_s, commanded_phase_rad=None):
+        """Compatibility: one fresh feedback and one control tick together."""
+        if self.last_time is not None and feedback_time_s <= self.last_time:
+            raise ValueError('Fresh increasing motor-feedback time required')
+        return self.advance(angles_deg, feedback_time_s, feedback_time_s, commanded_phase_rad)
+
+    def advance(self, angles_deg, feedback_time_s, control_time_s,
+                commanded_phase_rad=None, phase_at_feedback=None, freeze_targets=False):
+        """Control tick may hold a motor sample; observation may not invent one.
+
+        Both times use the caller's same clock. The known phase at acquisition
+        is separate from the next commanded phase. Mask changes require NEW
+        motor feedback; target filtering and phase gating run at control rate.
+        """
+        angles = np.asarray(angles_deg, float)
+        if angles.shape != (self.p.joints,) or not np.isfinite(angles).all():
+            raise ValueError('One finite actual motor angle per joint required')
+        if not all(math.isfinite(t) for t in (feedback_time_s, control_time_s)) or feedback_time_s > control_time_s+1e-8:
+            raise ValueError('Finite, nonfuture feedback/control times required')
+        if self.last_time is not None and feedback_time_s < self.last_time:
+            raise ValueError('Motor-feedback time cannot run backwards')
+        if self.last_control_time is not None and control_time_s <= self.last_control_time:
+            raise ValueError('Control clock must increase')
+        if control_time_s-feedback_time_s > self.options.maximum_feedback_age_s:
+            raise TimeoutError('Motor angles too old for sliding control')
+        dt = .02 if self.last_control_time is None else min(.02, control_time_s-self.last_control_time)
+        previous_time = control_time_s-dt if self.last_control_time is None else self.last_control_time
+        observed_phase = self.phase
+        self.fresh_feedback = self.last_time is None or feedback_time_s > self.last_time
+        if self.fresh_feedback:
+            feedback_dt = .02 if self.last_time is None else feedback_time_s-self.last_time
+            gap = feedback_dt > self.observer.options.maximum_feedback_gap_s
+            self.angle_velocity_available = self.previous_angles is not None and not gap
+            if gap and self.pending is not None:
+                self.pending['ready_since'] = None
+            if self.previous_angles is not None:
+                self.angle_velocity_deg_s = (angles-self.previous_angles)/feedback_dt
+            self.previous_angles, self.last_time = angles.copy(), feedback_time_s
+            self.feedback_phase = observed_phase if phase_at_feedback is None else phase_at_feedback
+            if control_time_s >= self.p.settle_s:
+                self.observation = self.observer.update(angles, self.feedback_phase, self.enabled, feedback_time_s)
+        elif not np.array_equal(angles, self.previous_angles):
+            raise ValueError('Changed angles with an unchanged feedback timestamp')
+        self.last_control_time = control_time_s
+        if freeze_targets:
+            if self.pending is not None:
+                self.pending['ready_since'] = None
+            return self.targets.copy(), self.enabled.copy()
+        if commanded_phase_rad is not None and not math.isfinite(commanded_phase_rad):
+            raise ValueError('Finite commanded phase required')
+        if commanded_phase_rad is not None:
+            if not self.phase_hold:
+                self.phase = float(commanded_phase_rad)
+        elif not self.phase_hold:
+            rolling_dt = min(dt, max(0., control_time_s-max(previous_time, self.p.settle_s)))
+            self.phase += self.p.omega_rad_s*rolling_dt
+        if control_time_s < self.p.settle_s:
+            self.targets = self.p.targets(self.phase)
+            return self.targets.copy(), self.enabled.copy()
+        if (self.execute and self.observation is not None and self.pending is None and control_time_s >= self.cooldown_until
+                and self.observation['suggested_window'] is not None and self.fault is None):
+            self.pending = dict(to=self.observation['suggested_window'], time_s=control_time_s,
+                                ready_since=None, hold_since=None)
+            self.events.append(dict(kind='prepare', time_s=control_time_s, old=list(self.window),
+                                    to=self.pending['to'], observation=self.observation))
+        if self.pending is not None:
+            self._handover(angles, control_time_s)
+        previous_targets = self.targets.copy()
+        proposed = self.core.update(np.radians(angles), self.phase, control_time_s, dt)
+        valid, _ = self.core._check_goal(proposed)
+        if self.core.status != 'running' or not valid:
+            if self.fault is None:
+                self.events.append(dict(kind='shape_hold', time_s=control_time_s, reason=self.core.status))
+            self.fault = self.core.status if self.core.status != 'running' else 'filtered target outside opening'
+            self.targets[self.enabled] = previous_targets[self.enabled]
+            self.targets[~self.enabled] = np.radians(angles)[~self.enabled]
+        else:
+            self.fault = None
+            self.targets = proposed
+        if self.enabled.sum() != 6:
+            raise RuntimeError('Six-joint mask invariant violated')
+        return self.targets.copy(), self.enabled.copy()
+
+    def snapshot(self):
+        return dict(window=list(self.window), phase_rad=self.phase, phase_hold=self.phase_hold,
+                    pending=self.pending, observation=self.observation, last_gate=self.last_gate,
+                    fault=self.fault, compliance=self.core.snapshot(), options=asdict(self.options),
+                    feedback_time_s=self.last_time, control_time_s=self.last_control_time,
+                    new_feedback_this_tick=self.fresh_feedback, feedback_phase_rad=self.feedback_phase,
+                    feedback_period_s=self.feedback_period_s,
+                    feedback_source='measured joint angles; qdot from fresh angle differences',
+                    observes_contact_or_unloading=False, execute=self.execute)
+
+MOTOR_PHASE_REFERENCE = {'values': [[0.15833807751140405, -0.06707766383423497, 15.790626070439448],
+            [0.24920276274168796, 0.02536057701555894, 12.395211690197813],
+            [0.3734541008434089, 0.16845054934214154, 7.62153022032187],
+            [0.46378255925176504, 0.3253755415483619, 3.199743136734469],
+            [0.5073863314267077, 0.4513296148095325, 0.9978033754624366],
+            [0.5223977266067124, 0.5125031733178709, 0.8439353914176058],
+            [0.39561665739814167, 0.3747303690784296, -1.0122521644161462],
+            [0.37505650923980927, 0.2605016598342882, 2.3391707944094295],
+            [0.2993804563979765, 0.09126427422450512, 6.112216197237271],
+            [0.14734398772633384, -0.0703727243346286, 9.45566373288018],
+            [0.0013173140603726097, -0.16453627632445222, 11.938442674644946],
+            [-0.06634367647607498, -0.2061481609866309, 11.69737589944446],
+            [-0.03201483675658423, -0.17334666333776294, 10.126628677912105],
+            [0.094737682550603, -0.06629309598288913, 7.279149714181012],
+            [0.24696620944067682, 0.0957196623174319, 3.6334985715118986],
+            [0.3704103527859024, 0.27905585980702163, 0.5598734460687046],
+            [0.4310940894138815, 0.3936009166417138, -1.4012551228543793],
+            [0.4575229058899257, 0.4695048988132493, -0.3977261241876268],
+            [0.4680110247611182, 0.4439960793038127, 2.098362837401867],
+            [0.460983373691235, 0.33745983417685643, 6.004498340048969],
+            [0.4195904217878894, 0.1743310317474167, 10.402662608307672],
+            [0.31802774120819066, 0.013682720649617508, 14.091099107139492],
+            [0.21647529307361868, -0.07238521748343807, 16.925851990920634],
+            [0.14392091508250182, -0.0988697887929968, 17.241840646977693]],
+ 'metadata': {'source': 'validation/reports/angle_observer/whole_body_observer_trace.jsonl.gz',
+              'stage': 'shared no_force prefix; first full commanded cycle only',
+              'samples': 524,
+              'start_time_s': 2.1999999999998687,
+              'end_time_s': 12.659999999998423,
+              'phase_span_rad': 6.275999999999921,
+              'start_phase_rad': 0.0,
+              'bins': 24,
+              'bin_counts': [21,
+                             22,
+                             22,
+                             22,
+                             22,
+                             21,
+                             23,
+                             22,
+                             21,
+                             22,
+                             22,
+                             22,
+                             22,
+                             21,
+                             22,
+                             22,
+                             22,
+                             22,
+                             22,
+                             21,
+                             22,
+                             22,
+                             22,
+                             22],
+              'first_joint': 8,
+              'calibration_window': [8, 13],
+              'link_lengths_m': [0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645,
+                                 0.0645],
+              'adaptation': 'frozen offline; no online learning',
+              'fields': ['angle-only crest relative to window center',
+                         'angle bending center relative to window center',
+                         'tail minus head passive-boundary absolute turns'],
+              'unused_inputs': ['contact',
+                                'root pose',
+                                'gravity truth',
+                                'motor torque',
+                                'side-pull labels']}}
+
+# END MOTOR_SLIDING_CORE
+
 # ==================== 4. 飞特串口协议（只有主循环操作串口） ====================
 def instruction_packet(servo_id, instruction, parameters):
     body = bytes([servo_id, len(parameters) + 2, instruction, *parameters])
@@ -854,9 +1592,14 @@ class RollingArcController:
         self.section_clock_s = 0.
         self.section_checked_sequence = -1
         self.section_block_reason, self.actual_section = None, None
+        self.sliding, self.pending_gait = None, None
+        self.sliding_fault = False
+        self.motor_clock_origin_s = time.monotonic()
+        self.feedback_phase_rad = self.command_phase
 
     def refresh_compliance_feedback(self):
         started = time.monotonic()
+        acquisition_phase = self.command_phase  # 扫读期间控制线程不改相位
         states = self.bus.read_states()
         if time.monotonic()-started > MAX_FEEDBACK_AGE_S:
             raise TimeoutError('全关节反馈读取过慢，最早样本已经过期')
@@ -866,7 +1609,150 @@ class RollingArcController:
         self.states = states
         self.last_feedback = {i: state['angle_deg'] for i, state in states.items()}
         self.feedback_wall_s = started  # 顺序扫读，按最早样本计龄
+        self.feedback_phase_rad = acquisition_phase
         self.feedback_sequence += 1
+
+    def motor_sample_clock(self):
+        """控制时间/最早反馈时间共用单调时钟；MuJoCo子类改用仿真时钟。"""
+        now = time.monotonic()-self.motor_clock_origin_s
+        sample = None if self.feedback_wall_s is None else self.feedback_wall_s-self.motor_clock_origin_s
+        return now, sample
+
+    def select_gait(self, kind):
+        """保留当前窗口、相位和已发目标；切模式不会重新搭管或重置机器人。"""
+        if kind not in ('basic', 'fixed', 'sliding'):
+            raise ValueError('模式：basic / fixed / sliding')
+        if kind == 'basic':
+            self.pending_gait = None
+            if self.compliance is not None:
+                self.sliding, self.compliance = None, None
+                self.sliding_fault = False
+                self.section_block_reason = None
+                self.freeze_targets = False
+                self.forming, self.settle_remaining = True, 0.
+            return
+        if self.mode == 'released' or self.forming or self.settle_remaining > 0:
+            self.pending_gait = kind
+            print(f'已选择{kind}，形成与静置完成后尝试接入。', flush=True)
+            return
+        if kind == 'fixed' and self.sliding is None:
+            self.pending_gait = None
+            if self.compliance is None:
+                self.toggle_compliance()
+            return
+        if kind == 'sliding' and self.sliding is not None and not self.sliding_fault:
+            return
+        if self.last-self.first+1 != 6:
+            raise ValueError('顺应/滑动模式要求连续6关节')
+        self.refresh_compliance_feedback()
+        measured = self.measured_angles()
+        valid, geometry = self.check_actual_section(measured)
+        if not valid:
+            raise ValueError('实际形态不满足开放圆弧条件，未切换：'+str(geometry))
+        if kind == 'fixed':
+            reference = SectionReference(self.first, self.last, self.amplitude)
+            core = FixedSectionCompliance(reference, LINK_LENGTHS_M, self.options)
+            nominal = np.radians(measured)
+            nominal[core.enabled] = reference.targets(self.phase)[core.enabled]
+            if not core._check_goal(nominal)[0]:
+                raise ValueError('当前名义参考不满足开放约束，未切换')
+            core.targets = np.radians(self.targets)
+            core.next_geometry_s = self.section_clock_s
+            self.sliding, self.compliance = None, core
+        else:
+            if self.amplitude != 60. or self.omega != .6 or self.direction != 1:
+                raise ValueError('冻结角度基准只标定了amplitude=60 omega=0.6正向；先在基础模式恢复')
+            if not np.allclose(LINK_LENGTHS_M, MOTOR_PHASE_REFERENCE['metadata']['link_lengths_m'], rtol=0., atol=1e-9):
+                raise ValueError('实际连杆尺寸与相位基准不一致，需要重新标定')
+            now, _ = self.motor_sample_clock()
+            p = ArcParameters(joints=NUM_JOINTS, first_joint=self.first, last_joint=self.last,
+                              amplitude_deg=self.amplitude, omega_rad_s=self.omega,
+                              initial_phase_rad=self.phase, settle_s=0.)
+            slider = MotorFeedbackSliding(p, LINK_LENGTHS_M,
+                PhaseShapeReference.from_dict(MOTOR_PHASE_REFERENCE), execute=MOTOR_SLIDING_AUTO,
+                section_options=self.options,
+                options=MotorSlidingOptions(cooldown_s=MOTOR_SLIDING_COOLDOWN_S,
+                    switch_angle_deg=MOTOR_SLIDING_SWITCH_ANGLE_DEG,
+                    switch_velocity_deg_s=MOTOR_SLIDING_SWITCH_VELOCITY_DEG_S,
+                    stable_feedback_s=MOTOR_SLIDING_STABLE_FEEDBACK_S,
+                    maximum_feedback_age_s=MAX_FEEDBACK_AGE_S),
+                feedback_period_s=COMPLIANCE_FEEDBACK_PERIOD_S)
+            slider.targets = np.radians(self.targets)
+            slider.core.targets = slider.targets.copy()
+            slider.core.next_geometry_s = now
+            slider.cooldown_until = now
+            slider.events.append(dict(kind='acquire', time_s=now, to=list(slider.window),
+                                      reason='take over current six joints; measured angles only'))
+            self.sliding, self.compliance = slider, slider.core
+        self.pending_gait = None
+        self.sliding_fault = False
+        self.actual_section = geometry
+        self.section_checked_sequence = -1
+        self.section_block_reason = None
+        self.freeze_targets = False
+
+    def tick_motor_sliding(self, dt):
+        """20ms目标更新；只有新的200ms全关节角反馈可以完成交接。"""
+        slider = self.sliding
+        control_time, feedback_time = self.motor_sample_clock()
+        if feedback_time is None:
+            raise TimeoutError('自动滑窗尚未取得全关节读角')
+        if control_time-feedback_time > MAX_FEEDBACK_AGE_S:
+            raise TimeoutError('自动滑窗全关节反馈已过期，结束运行并尝试失能')
+        measured = np.asarray(self.measured_angles(), float)
+        if self.sliding_fault:
+            self.bus.send_targets(self.targets, self.enabled)
+            return
+        self.section_clock_s += dt
+        previous_phase, previous_pending = self.phase, self.pending_phase
+        previous_core, previous_window = slider.core, slider.window
+        previous_targets = self.targets.copy()
+        if not slider.phase_hold and not self.freeze_targets:
+            if self.mode == 'run':
+                self.phase += self.direction*self.omega*dt
+            elif self.mode == 'step':
+                increment = max(-self.omega*dt, min(self.omega*dt, self.pending_phase))
+                self.phase += increment
+                self.pending_phase -= increment
+        try:
+            if slider.last_time is None or feedback_time > slider.last_time:
+                valid, self.actual_section = self.check_actual_section(measured)
+                if not valid:
+                    raise ValueError('新实测形态超出开放圆弧/平面范围 '+str(self.actual_section))
+            target, enabled = slider.advance(measured, feedback_time, control_time,
+                commanded_phase_rad=self.phase, phase_at_feedback=self.feedback_phase_rad,
+                freeze_targets=self.freeze_targets)
+            if enabled.sum() != 6 or slider.fault is not None:
+                raise ValueError('滑窗使能或开放目标异常：'+str(slider.fault))
+            targets = np.degrees(target).tolist()
+            for i in np.flatnonzero(enabled):
+                angle_to_raw(i, targets[i])
+        except (ValueError, np.linalg.LinAlgError) as exc:
+            slider.core, slider.window = previous_core, previous_window
+            slider.enabled = np.asarray(self.enabled, bool)
+            slider.targets = np.radians(previous_targets)
+            slider.pending, slider.phase_hold = None, False
+            self.phase, self.pending_phase = previous_phase, previous_pending
+            self.sliding_fault = True
+            self.block_section(str(exc)+'，重新选择模式后继续')
+            self.bus.send_targets(previous_targets, self.enabled)
+            return
+        if enabled.tolist() != self.enabled:
+            entering = enabled & ~np.asarray(self.enabled, bool)
+            # 预置新进入舵机的实测角，再同步写0x28开/关并读回确认。
+            # 五个公共关节不重新配置；窗口外不发送位置目标。
+            self.bus.prepare_enabled(measured, enabled, configure_mask=entering)
+            self.first, self.last = slider.window
+            self.enabled = enabled.tolist()
+            print(f'自动移窗完成：J{self.first}–J{self.last}，6关节使能。', flush=True)
+        self.phase, self.compliance = slider.phase, slider.core
+        if slider.fresh_feedback:
+            _, self.actual_section = self.check_actual_section(measured)
+        self.targets = targets
+        self.bus.send_targets(targets, self.enabled)
+        self.command_phase = self.phase
+        if self.mode == 'step' and abs(self.pending_phase) < 1e-10:
+            self.mode = 'hold'
 
     def measured_angles(self):
         return [self.states[i]['angle_deg'] for i in range(NUM_JOINTS)]
@@ -897,6 +1783,9 @@ class RollingArcController:
 
 
     def toggle_compliance(self):
+        if self.sliding is not None:
+            self.select_gait('basic')
+            return
         if self.compliance is not None:
             # 不重新使能、不归零、不跳相位；下个基础帧按正常限速恢复名义圆弧。
             self.compliance = None
@@ -998,6 +1887,8 @@ class RollingArcController:
         self.pending_phase, self.mode = 0.0, 'hold'
 
     def release(self, verify=True):
+        self.sliding, self.pending_gait = None, None
+        self.sliding_fault = False
         self.compliance = None
         self.mode, self.pending_phase = 'released', 0.0
         self.enabled = [False] * NUM_JOINTS
@@ -1014,6 +1905,11 @@ class RollingArcController:
 
     def assign_parameters(self, command):
         """先验证整行，再一起更新；固定窗口只在release后允许人工修改。"""
+        if isinstance(self.sliding, MotorFeedbackSliding):
+            for item in command.split():
+                key, value = item.split('=', 1)
+                if key in ('amplitude', 'window') or (key == 'omega' and float(value) != .6):
+                    raise ValueError('自动滑窗使用冻结60度/0.6/6关节基准；改幅值/频率/窗口先切回基础模式')
         amplitude, omega, delta = self.amplitude, self.omega, self.phase_step
         first, last, options = self.first, self.last, self.options
         option_keys = {'gain': 'gain', 'yielding': 'yielding', 'filter': 'target_filter_s'}
@@ -1035,7 +1931,7 @@ class RollingArcController:
         if not math.isfinite(delta) or not 0 < delta <= math.pi:
             raise ValueError('单步相位增量必须在(0,pi] rad内')
         if (first, last) != (self.first, self.last) and self.mode != 'released':
-            raise ValueError('修改固定window前先release；顺应性不会自动移动窗口')
+            raise ValueError('手动修改window前先release')
         if self.compliance is not None:
             reference = replace(self.compliance.p, amplitude_deg=amplitude)
             # 六关节均匀名义圆弧的峰值为3*幅值；参考必须留在目标开放范围。
@@ -1049,11 +1945,22 @@ class RollingArcController:
             self.compliance.p = reference
             self.compliance.options = options
             self.compliance.next_geometry_s = self.section_clock_s
+            if self.sliding is not None:
+                self.sliding.section_options = options
 
     def command(self, command):
         command = command.strip().lower()
+        if isinstance(self.sliding, MotorFeedbackSliding) and (command in ('reverse', 'back') or
+                (command == 'step' and self.pending_phase < 0)):
+            raise ValueError('角度相位基准未标定反向滚动；先切换基础/固定模式')
         if '=' in command:
             self.assign_parameters(command)
+        elif command.startswith('gait_'):
+            self.select_gait(command[5:])
+        elif command == 'window_auto':
+            if self.sliding is None:
+                raise ValueError('先Ctrl+3切换到自动滑窗模式')
+            self.sliding.automatic = not self.sliding.automatic
         elif command in ('quit', 'exit'):
             self.quit = True
         elif command in ('arm', 'apply'):
@@ -1108,6 +2015,9 @@ class RollingArcController:
         step_finished = False
         # 不追赶阻塞期间漏发的帧，防止串口延迟后突然跳过一大段相位。
         dt = min(dt, CONTROL_PERIOD_S)
+        if self.sliding is not None:
+            self.tick_motor_sliding(dt)
+            return
         if self.compliance is not None:
             self.tick_compliance(dt)
             return
@@ -1141,6 +2051,12 @@ class RollingArcController:
             self.forming = any(abs(goal[i] - self.targets[i]) > 1e-8 for i, e in enumerate(self.enabled) if e)
         else:
             self.settle_remaining = max(0.0, self.settle_remaining - dt)
+        if self.pending_gait and not self.forming and self.settle_remaining <= 0:
+            kind, self.pending_gait = self.pending_gait, None
+            try:
+                self.select_gait(kind)
+            except ValueError as exc:
+                print(f'模式接入未执行：{exc}；可再次按模式热键重试。', flush=True)
 
     def snapshot(self):
         section = None
@@ -1149,9 +2065,11 @@ class RollingArcController:
             section = (core.snapshot() if core.geometry is not None and core.target_geometry is not None
                        else dict(status=core.status, window=[core.first, core.last]))
             section.update(block_reason=self.section_block_reason, actual_body_geometry=self.actual_section,
-                           options=asdict(self.options), input='measured_joint_angles', window_fixed=True)
+                           options=asdict(self.options), input='measured_joint_angles', window_fixed=self.sliding is None)
         age = None if self.feedback_wall_s is None else time.monotonic()-self.feedback_wall_s
-        return dict(mode=self.mode, gait='basic_arc' if self.compliance is None else 'fixed_section_compliance',
+        gait = ('sliding_section_compliance' if self.sliding is not None else
+                'basic_arc' if self.compliance is None else 'fixed_section_compliance')
+        return dict(mode=self.mode, gait=gait,
                     targets_frozen=self.freeze_targets,
                     forming=self.forming, phase_rad=self.phase, command_phase_rad=self.command_phase,
                     amplitude_deg=self.amplitude, omega_rad_s=self.omega, direction=self.direction,
@@ -1160,6 +2078,9 @@ class RollingArcController:
                     enabled=self.enabled.copy(), target_controller_deg=self.targets.copy(),
                     feedback_time_s=self.feedback_time_s, feedback_age_s=age,
                     feedback_sequence=self.feedback_sequence, compliance=section,
+                    pending_gait=self.pending_gait,
+                    sliding=None if self.sliding is None else copy.deepcopy(self.sliding.snapshot()),
+                    sliding_events=[] if self.sliding is None else copy.deepcopy(self.sliding.events),
                     servo_feedback_raw=self.states,
                     measured_controller_deg={f'J{i+1}': v for i, v in self.last_feedback.items()})
 
@@ -1169,12 +2090,18 @@ class RollingArcController:
             label += '，正在形成基础圆弧'
         elif self.settle_remaining > 0:
             label += f'，静置余{self.settle_remaining:.1f}s'
-        gait = '基础圆弧' if self.compliance is None else '固定截面顺应'
+        gait = ('角度反馈滑窗顺应' if self.sliding is not None else
+                '基础圆弧' if self.compliance is None else '固定截面顺应')
         print(f'{gait} | {label} | J{self.first}–J{self.last} | A={self.amplitude:g}° '
               f'omega={self.omega:g}rad/s | phase={self.phase:.4f}rad | delta={self.phase_step:g}rad', flush=True)
         if self.compliance is not None:
+            window_state = '窗口固定' if self.sliding is None else f'自动选窗={self.sliding.automatic} 等相位={self.sliding.phase_hold}'
             print(f'截面K={self.options.gain:g} yielding={self.options.yielding:g} | '
-                  f'窗口固定 | 阻塞原因={self.section_block_reason or "无"}', flush=True)
+                  f'{window_state} | 阻塞原因={self.section_block_reason or "无"}', flush=True)
+        if self.sliding is not None and self.sliding.observation is not None:
+            o = self.sliding.observation
+            print(f'角度观察器={o["state"]} 建议={o["suggested_window"]} '
+                  f'不可观测原因={o.get("reasons", [])}', flush=True)
         if include_feedback:
             print('实测角：'+' '.join(f'J{i+1}={v:.1f}°' for i, v in self.last_feedback.items()), flush=True)
             print('原始负载/电流（只记录）：'+' '.join(
@@ -1223,7 +2150,9 @@ def decode_hotkey(vk, control_down):
     if not control_down:
         return None
     special = {32: 'pause', 38: 'amplitude_up', 40: 'amplitude_down',
-               39: 'omega_up', 37: 'omega_down', 189: 'delta-', 187: 'delta+'}
+               39: 'omega_up', 37: 'omega_down', 189: 'delta-', 187: 'delta+',
+               49: 'gait_basic', 50: 'gait_fixed', 51: 'gait_sliding',
+               97: 'gait_basic', 98: 'gait_fixed', 99: 'gait_sliding'}
     return special.get(vk) or HOTKEY_COMMANDS.get(chr(vk) if vk is not None and 65 <= vk <= 90 else '')
 
 

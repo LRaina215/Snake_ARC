@@ -1,5 +1,6 @@
 """Small physics-independent checks of signal meaning and six-joint handover."""
 import unittest
+from unittest.mock import patch
 from dataclasses import replace
 import numpy as np
 from snake_control.rolling_arc import ArcParameters
@@ -28,6 +29,7 @@ class MotorSlidingTests(unittest.TestCase):
         p = ArcParameters(initial_phase_rad=np.pi/2, settle_s=0., omega_rad_s=0.)
         reference = PhaseShapeReference([[0., 0., 0.]]*24, {})
         controller = MotorFeedbackSliding(p, [.0645]*21, reference)
+        controller.observer.update = lambda *args: dict(valid=True, direction=-1, suggested_window=[7, 12])
         angles = np.degrees(p.targets(np.pi/2))
         controller.pending = dict(to=[7, 12], time_s=0., ready_since=None, hold_since=None)
         before = controller.targets.copy()
@@ -46,6 +48,7 @@ class MotorSlidingTests(unittest.TestCase):
     def test_feedback_gap_cannot_count_as_continuous_handover_readiness(self):
         p = ArcParameters(initial_phase_rad=np.pi/2, settle_s=0., omega_rad_s=0.)
         controller = MotorFeedbackSliding(p, [.0645]*21, PhaseShapeReference([[0., 0., 0.]]*24, {}))
+        controller.observer.update = lambda *args: dict(valid=True, direction=-1, suggested_window=[7, 12])
         angles = np.degrees(p.targets(np.pi/2))
         controller.pending = dict(to=[7, 12], time_s=0., ready_since=None, hold_since=None)
         for t in np.arange(0., .16, .02):
@@ -58,6 +61,22 @@ class MotorSlidingTests(unittest.TestCase):
             controller.update(angles, t)
             self.assertEqual(controller.window, (8, 13))
         controller.update(angles, 1.22)
+        self.assertEqual(controller.window, (7, 12))
+
+    def test_held_feedback_does_not_create_velocity_or_finish_a_handover(self):
+        p = ArcParameters(initial_phase_rad=np.pi/2, settle_s=0., omega_rad_s=0.)
+        controller = MotorFeedbackSliding(p, [.0645]*21, PhaseShapeReference([[0., 0., 0.]]*24, {}), feedback_period_s=.2)
+        updates = []
+        controller.observer.update = lambda *args: (updates.append(args[-1]) or
+            dict(valid=True, direction=-1, suggested_window=[7, 12]))
+        angles = np.degrees(p.targets(np.pi/2))
+        for tick in range(20):
+            t = tick*.02
+            sample_t = 0. if tick < 10 else .2
+            controller.advance(angles, sample_t, t)
+            self.assertEqual(controller.window, (8, 13))
+        self.assertEqual(updates, [0., .2])
+        controller.advance(angles, .4, .4)
         self.assertEqual(controller.window, (7, 12))
 
 

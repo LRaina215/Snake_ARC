@@ -22,8 +22,7 @@ from snake_control.rolling_arc import ArcParameters
 from snake_control.simulation import ArcSimulation, ROOT, backbone
 from snake_control.sliding_section_compliance import SlidingSectionCompliance, WindowOptions
 from snake_control.sliding_section_simulation import upward_support
-from snake_control.motor_feedback_sliding import MotorFeedbackSliding
-from snake_control.motor_shape_observer import PhaseShapeReference
+MotorFeedbackSliding = real.MotorFeedbackSliding
 
 
 # ==================== 1. 手动测试参数 ====================
@@ -71,7 +70,7 @@ def decode_sim_release(vk, is_control):
 
 
 class DebugArcController(real.RollingArcController):
-    """基础/固定模式复用实机，滑动模式调用已有研究核心，不移植至实机。"""
+    """三种仅角度模式共用实机控制；保留历史接触控制供已有实验复现。"""
     def __init__(self, bus, session):
         super().__init__(bus)
         self.session = session
@@ -83,6 +82,10 @@ class DebugArcController(real.RollingArcController):
         self.help_text = real.HELP+'\n'+SIM_HELP
 
     def select_gait(self, kind):
+        if SLIDING_FEEDBACK == 'motor_angles':
+            super().select_gait(kind)
+            self.session.record_event('gait_change', to=kind)
+            return
         if kind not in ('basic', 'fixed', 'sliding'):
             raise ValueError('未知模式')
         if kind == 'basic':
@@ -132,17 +135,7 @@ class DebugArcController(real.RollingArcController):
                 raise ValueError('实际形态不满足开放圆弧条件，未切换')
             p = replace(self.session.sim.p, first_joint=self.first, last_joint=self.last,
                         amplitude_deg=self.amplitude, omega_rad_s=self.omega, direction=1)
-            if SLIDING_FEEDBACK == 'motor_angles':
-                if self.amplitude != 60. or self.omega != .6 or self.direction != 1:
-                    raise ValueError('冻结角度基准对应amplitude=60 omega=0.6正向；先在基础模式恢复参数')
-                reference = PhaseShapeReference.from_dict(json.loads(
-                    (ROOT/'configs/motor_shape_reference.json').read_text(encoding='utf8')))
-                p = replace(p, settle_s=0., initial_phase_rad=self.phase)
-                slider = MotorFeedbackSliding(p, real.LINK_LENGTHS_M, reference, section_options=self.options)
-                slider.targets = np.radians(self.targets)
-                slider.cooldown_until = self.session.elapsed
-                reason = 'take over current six-joint window; measured angles only'
-            elif SLIDING_FEEDBACK == 'contact':
+            if SLIDING_FEEDBACK == 'contact':
                 slider = SlidingSectionCompliance(p, real.LINK_LENGTHS_M, self.options, WindowOptions())
                 support = upward_support(self.session.sim)
                 slider.window = (self.first, self.last)
@@ -292,52 +285,17 @@ class DebugArcController(real.RollingArcController):
             self.mode = 'hold'
 
     def tick_motor_sliding(self, dt):
-        """Manual phase operations with an angle-only outer controller."""
-        self.section_clock_s += dt
-        self.refresh_compliance_feedback()
+        """仿真按实机200ms读角，调用同一个20ms目标/使能更新方法。"""
+        if self.feedback_time_s is None or self.session.elapsed-self.feedback_time_s >= real.COMPLIANCE_FEEDBACK_PERIOD_S-1e-9:
+            self.refresh_compliance_feedback()
+        return super().tick_motor_sliding(dt)
+
+    def refresh_compliance_feedback(self):
+        super().refresh_compliance_feedback()
         self.feedback_time_s = self.session.elapsed
-        measured = np.asarray(self.measured_angles(), float)
-        if self.freeze_targets or self.sliding_fault:
-            self.bus.send_targets(self.targets, self.enabled)
-            return
-        slider = self.sliding
-        previous_phase, previous_pending = self.phase, self.pending_phase
-        previous_core, previous_window = slider.core, slider.window
-        previous_targets = self.targets.copy()
-        if not slider.phase_hold:
-            if self.mode == 'run':
-                self.phase += self.direction*self.omega*dt
-            elif self.mode == 'step':
-                increment = max(-self.omega*dt, min(self.omega*dt, self.pending_phase))
-                self.phase += increment
-                self.pending_phase -= increment
-        try:
-            target, enabled = slider.update(measured, self.session.elapsed, commanded_phase_rad=self.phase)
-            targets = np.degrees(target).tolist()
-            for i in np.flatnonzero(enabled):
-                real.angle_to_raw(i, targets[i])
-        except (ValueError, np.linalg.LinAlgError) as exc:
-            slider.core, slider.window = previous_core, previous_window
-            slider.enabled = np.asarray(self.enabled, bool)
-            slider.targets = np.radians(previous_targets)
-            slider.pending, slider.phase_hold = None, False
-            self.phase, self.pending_phase = previous_phase, previous_pending
-            self.sliding_fault = True
-            self.block_section(str(exc)+'，重新选择模式后继续')
-            self.bus.send_targets(previous_targets, self.enabled)
-            return
-        if enabled.tolist() != self.enabled:
-            entering = enabled & ~np.asarray(self.enabled, bool)
-            self.bus.prepare_enabled(measured, enabled, configure_mask=entering)
-            self.first, self.last = slider.window
-            self.enabled = enabled.tolist()
-        self.phase, self.compliance = slider.phase, slider.core
-        self.actual_section = None if slider.observation is None else slider.observation.get('current_geometry')
-        self.targets = targets
-        self.bus.send_targets(targets, self.enabled)
-        self.command_phase = self.phase
-        if self.mode == 'step' and abs(self.pending_phase) < 1e-10:
-            self.mode = 'hold'
+
+    def motor_sample_clock(self):
+        return self.session.elapsed, self.feedback_time_s
 
     def change_parameters(self, amplitude=None, omega=None):
         if isinstance(self.sliding, MotorFeedbackSliding) and (
@@ -555,7 +513,7 @@ class DebugSession:
                     physics_started=self.physics_started, **self.controller.snapshot(),
                     actual_qpos=data.qpos.tolist(), actual_qvel=data.qvel.tolist(),
                     actuator_force_nm=data.actuator_force.tolist(),
-                    motor_feedback='continuous_model_joint_angles', episode=self.episode_index,
+                    motor_feedback='200ms actual joint samples / 20ms control in compliance modes', episode=self.episode_index,
                     events=copy.deepcopy(self.events), body_center_m=center.tolist(),
                     body_displacement_m=(center-self.initial_center).tolist(),
                     support_up_n=support.tolist(),

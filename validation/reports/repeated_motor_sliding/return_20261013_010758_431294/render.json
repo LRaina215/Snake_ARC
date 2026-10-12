@@ -1,0 +1,25 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\repeated_motor_sliding\\return_20261013_010758_431294.mp4",
+  "frames": 821,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    82.00000000002748
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    17.979999999999016,
+    18.019999999999015,
+    29.580000000013193,
+    29.620000000013192,
+    36.0,
+    37.5,
+    39.0,
+    41.0,
+    50.0,
+    30.460000000014244,
+    82.00000000002748
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}

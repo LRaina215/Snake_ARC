@@ -1,0 +1,637 @@
+{
+  "status": "complete",
+  "error": null,
+  "samples": 2530,
+  "final_time_s": 50.57999999997282,
+  "case": "natural",
+  "stopped_after_coverage": true,
+  "parameters": {
+    "joints": 20,
+    "first_joint": 6,
+    "last_joint": 11,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5
+  },
+  "start_x_m": -0.9,
+  "scene": "straight",
+  "closed_loop": true,
+  "control_period_s": 0.02,
+  "motor_feedback_period_s": 0.2,
+  "statistics_1ms": {
+    "physical_steps": 50580,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 1444,
+    "mask_violation_steps": 0,
+    "floor_contact_steps": 0,
+    "maximum_external_force_n": 0.0,
+    "finite": true
+  },
+  "scene_geometry": {
+    "pipe_radius_m": 0.0565,
+    "pipe_half_length_m": 1.5,
+    "pipe_position_world": [
+      0.30000000000000004,
+      0.0,
+      1.2
+    ],
+    "pipe_axis_world": [
+      -0.9999999999999999,
+      0.0,
+      -1.1102230246251565e-16
+    ],
+    "pipe_friction": [
+      2.0,
+      0.005,
+      0.002
+    ],
+    "gravity": [
+      0.0,
+      0.0,
+      -9.81
+    ]
+  },
+  "passive_model": {
+    "damping": [
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5
+    ],
+    "armature": [
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01
+    ],
+    "calibrated_to_hardware": false
+  },
+  "stimulation": {
+    "kind": "none",
+    "interval_s": [
+      36.0,
+      39.0
+    ],
+    "total_force_n": 0.0,
+    "sign": null,
+    "enters_controller": false
+  },
+  "events": [
+    {
+      "kind": "prepare",
+      "time_s": 11.399999999999121,
+      "old": [
+        6,
+        11
+      ],
+      "to": [
+        5,
+        10
+      ],
+      "observation": {
+        "feedback_time_s": 11.399999999999121,
+        "current_window": [
+          6,
+          11
+        ],
+        "external_window_change": false,
+        "valid": true,
+        "reasons": [],
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "direction": -1,
+        "suggested_window": [
+          5,
+          10
+        ],
+        "state": "recommend_head",
+        "down_head": [
+          0.9926838583333041,
+          -0.11615075486889112,
+          -0.032981199915886016
+        ],
+        "end_quality": {
+          "head_straightness": 0.9997138775965312,
+          "tail_straightness": 0.9999789174030342,
+          "end_disagreement_deg": 15.981699048458033,
+          "head_direction": [
+            0.9998280851571091,
+            0.01710825740751347,
+            0.007148962130712342
+          ],
+          "tail_direction": [
+            0.9662622726057749,
+            -0.2471541851996948,
+            -0.07247088571970403
+          ],
+          "end_link_counts": [
+            4,
+            4
+          ]
+        },
+        "current_geometry": {
+          "turn_deg": 183.75873665645457,
+          "fit_rms_m": 0.008138111931779553,
+          "gap_fraction": 0.610905013582772
+        },
+        "crest": {
+          "joint_coordinate": 8.101708982847601,
+          "point_head_m": [
+            -0.4505851198781944,
+            -0.07320878518263098,
+            0.08076067808602247
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.9930259431097191,
+          "top_coordinate_span": [
+            7.376607494648238,
+            8.792127928439383
+          ]
+        },
+        "features": {
+          "bending_center_joint": 8.37197593521871,
+          "head_boundary_turn_deg": 3.765707682367754,
+          "tail_boundary_turn_deg": 0.0,
+          "reverse_boundary_turn_deg": 8.343101636583821
+        },
+        "phase_reference": [
+          0.29898158466356684,
+          0.09084021524363455,
+          6.120987821105554
+        ],
+        "feature_error": [
+          -0.6972726018159658,
+          -0.21886428002492414,
+          -9.886695503473309
+        ],
+        "filtered_feature_error": [
+          -0.6692533313995697,
+          -0.21743193051835707,
+          -9.798343673473248
+        ],
+        "filtered_error_joints": -0.6692533313995697,
+        "candidate_window": [
+          5,
+          10
+        ],
+        "candidate_geometry": {
+          "turn_deg": 158.43462199945404,
+          "fit_rms_m": 0.008499520541587494,
+          "gap_fraction": 0.5970803798609863
+        },
+        "persistence_s": 0.5999999999996675
+      }
+    },
+    {
+      "kind": "phase_hold",
+      "time_s": 15.079999999997082,
+      "phase_rad": 7.84799999999745,
+      "entering": [
+        5
+      ],
+      "exiting": [
+        11
+      ]
+    },
+    {
+      "kind": "complete",
+      "time_s": 17.999999999999016,
+      "old": [
+        6,
+        11
+      ],
+      "to": [
+        5,
+        10
+      ],
+      "gate": {
+        "time_s": 17.999999999999016,
+        "actual_candidate": {
+          "turn_deg": 187.22429491940338,
+          "fit_rms_m": 9.509947919575006e-05,
+          "gap_fraction": 0.5453181800999451
+        },
+        "switch_angles_deg": [
+          3.4564364706116706,
+          0.3655153577621295
+        ],
+        "switch_velocity_deg_s": [
+          -1.628005737268263,
+          -0.017630285652637627
+        ],
+        "velocity_from_continuous_fresh_feedback": true,
+        "candidate_open": true,
+        "command_open": true,
+        "unloading_observed": false
+      },
+      "strategy": "motor-angle geometric trial"
+    },
+    {
+      "kind": "prepare",
+      "time_s": 25.00000000000757,
+      "old": [
+        5,
+        10
+      ],
+      "to": [
+        4,
+        9
+      ],
+      "observation": {
+        "feedback_time_s": 25.00000000000757,
+        "current_window": [
+          5,
+          10
+        ],
+        "external_window_change": false,
+        "valid": true,
+        "reasons": [],
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "direction": -1,
+        "suggested_window": [
+          4,
+          9
+        ],
+        "state": "recommend_head",
+        "down_head": [
+          0.9999954223166226,
+          -0.0023964570653460717,
+          0.0018472518327047938
+        ],
+        "end_quality": {
+          "head_straightness": 0.9995740391328396,
+          "tail_straightness": 0.9999863958364702,
+          "end_disagreement_deg": 3.5619214285520515,
+          "head_direction": [
+            0.9995741557535907,
+            -0.0005249774384112003,
+            -0.0291758727064986
+          ],
+          "tail_direction": [
+            0.9994505791445334,
+            -0.004265621441181826,
+            0.0328685917157598
+          ],
+          "end_link_counts": [
+            4,
+            4
+          ]
+        },
+        "current_geometry": {
+          "turn_deg": 181.82992306025477,
+          "fit_rms_m": 0.008147666995731977,
+          "gap_fraction": 0.6128548148308881
+        },
+        "crest": {
+          "joint_coordinate": 7.072140079854898,
+          "point_head_m": [
+            -0.3804754307706317,
+            -0.09132136209773835,
+            0.08144420139235563
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.99968046062294,
+          "top_coordinate_span": [
+            6.458889074369274,
+            7.708050846878257
+          ]
+        },
+        "features": {
+          "bending_center_joint": 7.278186104659083,
+          "head_boundary_turn_deg": 7.86490301958202,
+          "tail_boundary_turn_deg": 0.0,
+          "reverse_boundary_turn_deg": 10.222757300937236
+        },
+        "phase_reference": [
+          0.2698783254408187,
+          -0.02712497048469536,
+          15.435150360518072
+        ],
+        "feature_error": [
+          -0.6977382455859208,
+          -0.19468892485622163,
+          -23.300053380100092
+        ],
+        "filtered_feature_error": [
+          -0.6787876255789608,
+          -0.17546409311150568,
+          -23.02042608406768
+        ],
+        "filtered_error_joints": -0.6787876255789608,
+        "candidate_window": [
+          4,
+          9
+        ],
+        "candidate_geometry": {
+          "turn_deg": 167.2581870153689,
+          "fit_rms_m": 0.007658053040842693,
+          "gap_fraction": 0.601612579494256
+        },
+        "persistence_s": 0.6000000000007333
+      }
+    },
+    {
+      "kind": "phase_hold",
+      "time_s": 25.840000000008597,
+      "phase_rad": 12.551999999997618,
+      "entering": [
+        4
+      ],
+      "exiting": [
+        10
+      ]
+    },
+    {
+      "kind": "complete",
+      "time_s": 29.600000000013193,
+      "old": [
+        5,
+        10
+      ],
+      "to": [
+        4,
+        9
+      ],
+      "gate": {
+        "time_s": 29.600000000013193,
+        "actual_candidate": {
+          "turn_deg": 187.45170724925643,
+          "fit_rms_m": 0.000230670066772663,
+          "gap_fraction": 0.5443909385235756
+        },
+        "switch_angles_deg": [
+          -3.5857067117332835,
+          -0.9040502359273411
+        ],
+        "switch_velocity_deg_s": [
+          1.0783019096738544,
+          -0.11441338675283802
+        ],
+        "velocity_from_continuous_fresh_feedback": true,
+        "candidate_open": true,
+        "command_open": true,
+        "unloading_observed": false
+      },
+      "strategy": "motor-angle geometric trial"
+    }
+  ],
+  "motor_observer": {
+    "options": {
+      "crest_threshold_joints": 0.5,
+      "bending_threshold_joints": 0.2,
+      "boundary_threshold_deg": 8.0,
+      "filter_s": 0.2,
+      "persistence_s": 0.5,
+      "maximum_feedback_gap_s": 0.5
+    },
+    "frozen_reference": {
+      "values": [
+        [
+          0.15833807751140405,
+          -0.06707766383423497,
+          15.790626070439448
+        ],
+        [
+          0.24920276274168796,
+          0.02536057701555894,
+          12.395211690197813
+        ],
+        [
+          0.3734541008434089,
+          0.16845054934214154,
+          7.62153022032187
+        ],
+        [
+          0.46378255925176504,
+          0.3253755415483619,
+          3.199743136734469
+        ],
+        [
+          0.5073863314267077,
+          0.4513296148095325,
+          0.9978033754624366
+        ],
+        [
+          0.5223977266067124,
+          0.5125031733178709,
+          0.8439353914176058
+        ],
+        [
+          0.39561665739814167,
+          0.3747303690784296,
+          -1.0122521644161462
+        ],
+        [
+          0.37505650923980927,
+          0.2605016598342882,
+          2.3391707944094295
+        ],
+        [
+          0.2993804563979765,
+          0.09126427422450512,
+          6.112216197237271
+        ],
+        [
+          0.14734398772633384,
+          -0.0703727243346286,
+          9.45566373288018
+        ],
+        [
+          0.0013173140603726097,
+          -0.16453627632445222,
+          11.938442674644946
+        ],
+        [
+          -0.06634367647607498,
+          -0.2061481609866309,
+          11.69737589944446
+        ],
+        [
+          -0.03201483675658423,
+          -0.17334666333776294,
+          10.126628677912105
+        ],
+        [
+          0.094737682550603,
+          -0.06629309598288913,
+          7.279149714181012
+        ],
+        [
+          0.24696620944067682,
+          0.0957196623174319,
+          3.6334985715118986
+        ],
+        [
+          0.3704103527859024,
+          0.27905585980702163,
+          0.5598734460687046
+        ],
+        [
+          0.4310940894138815,
+          0.3936009166417138,
+          -1.4012551228543793
+        ],
+        [
+          0.4575229058899257,
+          0.4695048988132493,
+          -0.3977261241876268
+        ],
+        [
+          0.4680110247611182,
+          0.4439960793038127,
+          2.098362837401867
+        ],
+        [
+          0.460983373691235,
+          0.33745983417685643,
+          6.004498340048969
+        ],
+        [
+          0.4195904217878894,
+          0.1743310317474167,
+          10.402662608307672
+        ],
+        [
+          0.31802774120819066,
+          0.013682720649617508,
+          14.091099107139492
+        ],
+        [
+          0.21647529307361868,
+          -0.07238521748343807,
+          16.925851990920634
+        ],
+        [
+          0.14392091508250182,
+          -0.0988697887929968,
+          17.241840646977693
+        ]
+      ],
+      "metadata": {
+        "source": "validation/reports/angle_observer/whole_body_observer_trace.jsonl.gz",
+        "stage": "shared no_force prefix; first full commanded cycle only",
+        "samples": 524,
+        "start_time_s": 2.1999999999998687,
+        "end_time_s": 12.659999999998423,
+        "phase_span_rad": 6.275999999999921,
+        "start_phase_rad": 0.0,
+        "bins": 24,
+        "bin_counts": [
+          21,
+          22,
+          22,
+          22,
+          22,
+          21,
+          23,
+          22,
+          21,
+          22,
+          22,
+          22,
+          22,
+          21,
+          22,
+          22,
+          22,
+          22,
+          22,
+          21,
+          22,
+          22,
+          22,
+          22
+        ],
+        "first_joint": 8,
+        "calibration_window": [
+          8,
+          13
+        ],
+        "link_lengths_m": [
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645
+        ],
+        "adaptation": "frozen offline; no online learning",
+        "fields": [
+          "angle-only crest relative to window center",
+          "angle bending center relative to window center",
+          "tail minus head passive-boundary absolute turns"
+        ],
+        "unused_inputs": [
+          "contact",
+          "root pose",
+          "gravity truth",
+          "motor torque",
+          "side-pull labels"
+        ]
+      }
+    },
+    "gravity_assumption": "unforced sufficiently straight passive ends",
+    "inputs": [
+      "angles_deg",
+      "phase_rad",
+      "enabled",
+      "feedback_time_s"
+    ]
+  }
+}

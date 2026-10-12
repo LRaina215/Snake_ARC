@@ -1,0 +1,20 @@
+{
+  "closed_20261012_232959_220742": {
+    "fresh_samples": 3100,
+    "maximum_target_error_rad": 1.3148053826239625e-11,
+    "maximum_phase_error_rad": 1.2192913345643319e-11,
+    "mask_mismatches": 0,
+    "events_match": true,
+    "final_observer_state": "blocked_passive_end_length",
+    "passed": true
+  },
+  "observe_20261012_232452_922019": {
+    "fresh_samples": 3100,
+    "maximum_target_error_rad": 1.3170117774130574e-11,
+    "maximum_phase_error_rad": 1.2171597063570516e-11,
+    "mask_mismatches": 0,
+    "events_match": true,
+    "final_observer_state": "unobservable",
+    "passed": true
+  }
+}

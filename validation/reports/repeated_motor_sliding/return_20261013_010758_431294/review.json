@@ -1,0 +1,195 @@
+{
+  "case": "return",
+  "source": "return_20261013_010758_431294",
+  "passed": false,
+  "transitions": [
+    {
+      "time_s": 17.999999999999016,
+      "old": [
+        6,
+        11
+      ],
+      "new": [
+        5,
+        10
+      ],
+      "chained": true,
+      "adjacent": true,
+      "evidence_agrees_with_evaluation": true,
+      "feedback_time_s": 17.999999999999016,
+      "returned_to_prior": false,
+      "exit_torque_nm_evaluation": 0.0005729927298428445,
+      "true_gravity_offset": -0.8931561025885326,
+      "suggested_support_coverage": 1.0
+    },
+    {
+      "time_s": 29.600000000013193,
+      "old": [
+        5,
+        10
+      ],
+      "new": [
+        4,
+        9
+      ],
+      "chained": true,
+      "adjacent": true,
+      "evidence_agrees_with_evaluation": true,
+      "feedback_time_s": 29.600000000013193,
+      "returned_to_prior": false,
+      "exit_torque_nm_evaluation": 0.05479846582937712,
+      "true_gravity_offset": -0.8368157277735697,
+      "suggested_support_coverage": 1.0
+    }
+  ],
+  "unique_feedback_samples": 410,
+  "rolling_new_feedback_frames": 400,
+  "morphology_pass": true,
+  "six_and_disabled_invariant_pass": true,
+  "mechanics_pass": true,
+  "repeated_motion_pass": true,
+  "actual_return_pass": false,
+  "post_handover_cycles_pass": true,
+  "full_audit": {
+    "samples": 4101,
+    "rolling_samples": 4000,
+    "observation_states": {
+      "null": 10,
+      "retain": 800,
+      "confirming": 150,
+      "recommend_head": 510,
+      "blocked_candidate_shape": 90,
+      "blocked_passive_end_length": 800,
+      "reject_crest_without_bending_migration": 10,
+      "unobservable": 1630
+    },
+    "rejection_reasons": {
+      "passive ends disagree on down direction": 1560,
+      "passive end not straight enough": 240
+    },
+    "actual_open_violations": 0,
+    "body_turn_range_deg": [
+      172.69452128755464,
+      187.75545210558113
+    ],
+    "minimum_gap": 0.5443844038640004,
+    "maximum_plane_rms_m": 0.00853252420222912,
+    "pipe_angular_span_range_deg": [
+      195.97037130450818,
+      216.40603385164226
+    ],
+    "smooth_radius_min_m": 0.05149272843917952,
+    "minimum_backbone_height_m": 0.36183481916347865,
+    "command_open_violations": 0,
+    "minimum_support_n": 26.106557043681462,
+    "minimum_support_coverage": 1.0,
+    "suggested_frames": 510,
+    "evaluation_consistent_suggested_frames": 510,
+    "first_suggestion_s": 11.41999999999911,
+    "suggested_down_error_max_deg": 11.282620386285123,
+    "valid_fraction": 0.59,
+    "displacement_m": [
+      1.395974237025344,
+      -0.017094211158628445,
+      -0.04681446204089401
+    ],
+    "statistics_1ms": {
+      "physical_steps": 82000,
+      "passive_torque_max_nm": 0.0,
+      "active_torque_max_nm": 2.355,
+      "joint_limit_excess_max_rad": 0.0,
+      "saturation_joint_steps": 773,
+      "mask_violation_steps": 0,
+      "floor_contact_steps": 0,
+      "maximum_external_force_n": 20.0,
+      "finite": true
+    },
+    "complete_events": [
+      {
+        "kind": "complete",
+        "time_s": 17.999999999999016,
+        "old": [
+          6,
+          11
+        ],
+        "to": [
+          5,
+          10
+        ],
+        "gate": {
+          "time_s": 17.999999999999016,
+          "actual_candidate": {
+            "turn_deg": 187.22429491940338,
+            "fit_rms_m": 9.509947919575006e-05,
+            "gap_fraction": 0.5453181800999451
+          },
+          "switch_angles_deg": [
+            3.4564364706116706,
+            0.3655153577621295
+          ],
+          "switch_velocity_deg_s": [
+            -1.628005737268263,
+            -0.017630285652637627
+          ],
+          "velocity_from_continuous_fresh_feedback": true,
+          "candidate_open": true,
+          "command_open": true,
+          "unloading_observed": false
+        },
+        "strategy": "motor-angle geometric trial"
+      },
+      {
+        "kind": "complete",
+        "time_s": 29.600000000013193,
+        "old": [
+          5,
+          10
+        ],
+        "to": [
+          4,
+          9
+        ],
+        "gate": {
+          "time_s": 29.600000000013193,
+          "actual_candidate": {
+            "turn_deg": 187.45170724925643,
+            "fit_rms_m": 0.000230670066772663,
+            "gap_fraction": 0.5443909385235756
+          },
+          "switch_angles_deg": [
+            -3.5857067117332835,
+            -0.9040502359273411
+          ],
+          "switch_velocity_deg_s": [
+            1.0783019096738544,
+            -0.11441338675283802
+          ],
+          "velocity_from_continuous_fresh_feedback": true,
+          "candidate_open": true,
+          "command_open": true,
+          "unloading_observed": false
+        },
+        "strategy": "motor-angle geometric trial"
+      }
+    ],
+    "reject_events": [],
+    "final_time_s": 82.00000000002748,
+    "total_phase_cycles": 6.99963439717413,
+    "post_last_handover_phase_cycles": 5.001921551485039,
+    "phase_hold_spans_s": [
+      [
+        15.079999999997082,
+        17.999999999999016
+      ],
+      [
+        25.840000000008597,
+        29.600000000013193
+      ]
+    ]
+  },
+  "notes": [
+    "No scripted window requests or qpos resets",
+    "All handover gates use new motor feedback",
+    "High support coverage does not prove migration necessity or efficiency gain"
+  ]
+}

@@ -6,7 +6,6 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 from codes import Rolling_Arc_Debug_Mujoco as debug
-from snake_control.motor_feedback_sliding import MotorFeedbackSliding
 
 
 class MotorDebugAdapterTests(unittest.TestCase):
@@ -30,7 +29,7 @@ class MotorDebugAdapterTests(unittest.TestCase):
             c.mode, c.forming, c.settle_remaining = 'hold', False, 0.
             with patch.object(debug, 'upward_support', side_effect=AssertionError('Privileged contact feedback used')):
                 c.select_gait('sliding')
-                self.assertIsInstance(c.sliding, MotorFeedbackSliding)
+                self.assertIsInstance(c.sliding, debug.MotorFeedbackSliding)
                 phase = c.phase
                 c.tick(.02)
                 self.assertAlmostEqual(c.phase, phase)

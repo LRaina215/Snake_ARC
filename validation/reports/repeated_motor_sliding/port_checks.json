@@ -1,0 +1,215 @@
+{
+  "passed": true,
+  "tests": 3,
+  "dynamics_runs": 0,
+  "physical_serial_connections": 0,
+  "replays": [
+    {
+      "source": "natural_20261013_010202_444234",
+      "frames": 2529,
+      "target_error_rad": 1.1102230246251565e-16,
+      "phase_error_rad": 0.0,
+      "mask_mismatches": 0,
+      "completed": [
+        [
+          5,
+          10
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "real_adapter_preloads": [
+        {
+          "entering": [
+            5
+          ],
+          "preload": [
+            3.4564364706116706
+          ],
+          "old": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "new": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ]
+        },
+        {
+          "entering": [
+            4
+          ],
+          "preload": [
+            -3.5857067117332835
+          ],
+          "old": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "new": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ],
+      "manual_target_error_rad": 1.1102230246251565e-16,
+      "manual_feedback_reads": 253
+    },
+    {
+      "source": "return_20261013_010758_431294",
+      "frames": 4100,
+      "target_error_rad": 1.1102230246251565e-16,
+      "phase_error_rad": 0.0,
+      "mask_mismatches": 0,
+      "completed": [
+        [
+          5,
+          10
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "real_adapter_preloads": [
+        {
+          "entering": [
+            5
+          ],
+          "preload": [
+            3.4564364706116706
+          ],
+          "old": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "new": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ]
+        },
+        {
+          "entering": [
+            4
+          ],
+          "preload": [
+            -3.5857067117332835
+          ],
+          "old": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "new": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ],
+      "manual_target_error_rad": 0.0,
+      "manual_feedback_reads": null
+    },
+    {
+      "source": "return_repair_20261013_012403_696880",
+      "frames": 4100,
+      "target_error_rad": 1.1102230246251565e-16,
+      "phase_error_rad": 0.0,
+      "mask_mismatches": 0,
+      "completed": [
+        [
+          5,
+          10
+        ],
+        [
+          4,
+          9
+        ]
+      ],
+      "real_adapter_preloads": [
+        {
+          "entering": [
+            5
+          ],
+          "preload": [
+            3.4564364706116706
+          ],
+          "old": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "new": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ]
+        },
+        {
+          "entering": [
+            4
+          ],
+          "preload": [
+            -3.5857067117332835
+          ],
+          "old": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "new": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ],
+      "manual_target_error_rad": 0.0,
+      "manual_feedback_reads": null
+    }
+  ]
+}

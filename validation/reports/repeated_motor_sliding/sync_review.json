@@ -1,0 +1,33 @@
+{
+  "allow_sync": true,
+  "requested_objective": "verify multiple consecutive automatic window transfers",
+  "verified_scope": "headward J6-J11 -> J5-J10 -> J4-J9, 200ms motor feedback / 20ms control",
+  "primary_source": "natural_20261013_010202_444234",
+  "primary_passed": true,
+  "extra_probes": [
+    {
+      "source": "return_20261013_010758_431294",
+      "return_passed": false,
+      "physical_reverse_samples": 0,
+      "classification": "not covered: no corroborated reverse arc migration",
+      "morphology_pass": true,
+      "invariants_pass": true,
+      "mechanics_pass": true
+    },
+    {
+      "source": "return_repair_20261013_012403_696880",
+      "return_passed": false,
+      "physical_reverse_samples": 0,
+      "classification": "not covered: no corroborated reverse arc migration",
+      "morphology_pass": true,
+      "invariants_pass": true,
+      "mechanics_pass": true
+    }
+  ],
+  "unverified": [
+    "tailward handover and return",
+    "short passive ends",
+    "real device timing and mechanics"
+  ],
+  "scope_decision": "Do not turn an unexcited extra return case into failure of the passed primary objective; sync this experimental method without claiming return or real-world validation"
+}
