@@ -13,6 +13,7 @@ import io
 import json
 import numpy as np
 from codes import Rolling_Arc_Real as real
+from codes import Rolling_Arc_Debug_Mujoco as debug
 from codes.Rolling_Arc_Debug_Mujoco import DebugSession
 from snake_control.sliding_section_compliance import open_geometry
 
@@ -21,6 +22,7 @@ OUTPUT = Path(__file__).resolve().parents[2] / 'results' / ('debug_modes_reprodu
 
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=False)
+    debug.SLIDING_FEEDBACK = 'contact'  # Reproduce the original contact-based controller.
     session = DebugSession()
     console, error, records = io.StringIO(), None, []
     try:

@@ -1,0 +1,56 @@
+{
+  "samples": 3101,
+  "rolling_samples": 3000,
+  "observation_states": {
+    "null": 1,
+    "confirming": 301,
+    "recommend_head": 944,
+    "unobservable": 1253,
+    "blocked_candidate_shape": 501
+  },
+  "rejection_reasons": {
+    "passive ends disagree on down direction": 1253
+  },
+  "actual_open_violations": 0,
+  "body_turn_range_deg": [
+    177.0863306418536,
+    185.67272684801398
+  ],
+  "minimum_gap": 0.569896251324352,
+  "maximum_plane_rms_m": 0.008371745829336374,
+  "pipe_angular_span_range_deg": [
+    200.5084861571977,
+    210.56566360576508
+  ],
+  "smooth_radius_min_m": 0.05265058887820983,
+  "minimum_backbone_height_m": 0.43590879005904976,
+  "command_open_violations": 0,
+  "minimum_support_n": 26.158734085238038,
+  "minimum_support_coverage": 1.0,
+  "suggested_frames": 944,
+  "evaluation_consistent_suggested_frames": 944,
+  "first_suggestion_s": 2.5399999999998313,
+  "suggested_down_error_max_deg": 12.282761867978827,
+  "valid_fraction": 0.582,
+  "displacement_m": [
+    1.1509803402940284,
+    -0.048232250628814685,
+    0.00858628946498774
+  ],
+  "statistics_1ms": {
+    "physical_steps": 62000,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 318,
+    "mask_violation_steps": 0,
+    "floor_contact_steps": 0,
+    "maximum_external_force_n": 0.0,
+    "finite": true
+  },
+  "complete_events": [],
+  "reject_events": [],
+  "final_time_s": 61.999999999946205,
+  "total_phase_cycles": 5.727668091985998,
+  "phase_hold_spans_s": []
+}

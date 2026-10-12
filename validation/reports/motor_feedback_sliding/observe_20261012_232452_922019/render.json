@@ -1,0 +1,18 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\motor_feedback_sliding\\observe_20261012_232452_922019.mp4",
+  "frames": 621,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    61.999999999946205
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    2.5399999999998313,
+    10.87999999999941,
+    8.220000000000883,
+    61.999999999946205
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}

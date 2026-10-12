@@ -1,0 +1,98 @@
+{
+  "samples": 3101,
+  "rolling_samples": 3000,
+  "observation_states": {
+    "null": 1,
+    "confirming": 51,
+    "recommend_head": 345,
+    "unobservable": 1506,
+    "blocked_candidate_shape": 65,
+    "retain": 130,
+    "blocked_passive_end_length": 901,
+    "reject_crest_without_bending_migration": 1
+  },
+  "rejection_reasons": {
+    "passive ends disagree on down direction": 1506
+  },
+  "actual_open_violations": 0,
+  "body_turn_range_deg": [
+    175.22105941212712,
+    187.13441673446405
+  ],
+  "minimum_gap": 0.5464928866209555,
+  "maximum_plane_rms_m": 0.008428121866385958,
+  "pipe_angular_span_range_deg": [
+    196.25117065066124,
+    216.10080243332192
+  ],
+  "smooth_radius_min_m": 0.05197746733106588,
+  "minimum_backbone_height_m": 0.36200513955881025,
+  "command_open_violations": 0,
+  "minimum_support_n": 25.785119230204106,
+  "minimum_support_coverage": 1.0,
+  "suggested_frames": 345,
+  "evaluation_consistent_suggested_frames": 345,
+  "first_suggestion_s": 2.5399999999998313,
+  "suggested_down_error_max_deg": 10.598531471721445,
+  "valid_fraction": 0.49766666666666665,
+  "displacement_m": [
+    1.0616611156512388,
+    -0.010011065047529591,
+    -0.029549867878198244
+  ],
+  "statistics_1ms": {
+    "physical_steps": 62000,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 569,
+    "mask_violation_steps": 0,
+    "floor_contact_steps": 0,
+    "maximum_external_force_n": 0.0,
+    "finite": true
+  },
+  "complete_events": [
+    {
+      "kind": "complete",
+      "time_s": 11.919999999998833,
+      "old": [
+        5,
+        10
+      ],
+      "to": [
+        4,
+        9
+      ],
+      "gate": {
+        "time_s": 11.919999999998833,
+        "actual_candidate": {
+          "turn_deg": 187.0090823912416,
+          "fit_rms_m": 0.000151955386407225,
+          "gap_fraction": 0.5465340620099897
+        },
+        "switch_angles_deg": [
+          3.906333565698194,
+          0.5828179671682395
+        ],
+        "switch_velocity_deg_s": [
+          -1.228297422827588,
+          -0.0026335677883030538
+        ],
+        "candidate_open": true,
+        "command_open": true,
+        "unloading_observed": false
+      },
+      "strategy": "motor-angle geometric trial"
+    }
+  ],
+  "reject_events": [],
+  "final_time_s": 61.999999999946205,
+  "total_phase_cycles": 5.278851152467035,
+  "post_last_handover_phase_cycles": 4.7803778707031475,
+  "phase_hold_spans_s": [
+    [
+      7.220000000000746,
+      11.919999999998833
+    ]
+  ]
+}

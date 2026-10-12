@@ -1,0 +1,412 @@
+{
+  "frozen_reference": {
+    "values": [
+      [
+        0.15833807751140405,
+        -0.1951460935249596,
+        4.2904037833905555
+      ],
+      [
+        0.24920276274168796,
+        -0.058591384228595444,
+        3.8977018536756667
+      ],
+      [
+        0.3734541008434089,
+        0.039547581163625445,
+        1.880722545707962
+      ],
+      [
+        0.46378255925176504,
+        0.13298122582743943,
+        -0.1749235400918292
+      ],
+      [
+        0.5073863314267077,
+        0.25152544815335975,
+        -1.1968470349425349
+      ],
+      [
+        0.5223977266067124,
+        0.4286114209425307,
+        -0.7564520846349905
+      ],
+      [
+        0.39561665739814167,
+        0.19057204893018742,
+        -1.1331911920203588
+      ],
+      [
+        0.37505650923980927,
+        0.020596604474168778,
+        -2.199311653120019
+      ],
+      [
+        0.2993804563979765,
+        -0.1159746189992994,
+        -3.5262246927911534
+      ],
+      [
+        0.14734398772633384,
+        -0.21621342767986995,
+        -3.305292197528315
+      ],
+      [
+        0.0013173140603726097,
+        -0.267017020342319,
+        0.47390876743950106
+      ],
+      [
+        -0.06634367647607498,
+        -0.3327755385518403,
+        2.4422389068696564
+      ],
+      [
+        -0.03201483675658423,
+        -0.1756310138567967,
+        3.957104011406984
+      ],
+      [
+        0.094737682550603,
+        -0.006818182318864885,
+        5.649917990351598
+      ],
+      [
+        0.24696620944067682,
+        0.12217781582397524,
+        6.028808075371563
+      ],
+      [
+        0.3704103527859024,
+        0.23698191500588095,
+        5.749317825969307
+      ],
+      [
+        0.4310940894138815,
+        0.2768922825034936,
+        1.0187683987399416
+      ],
+      [
+        0.4575229058899257,
+        0.3545271580403311,
+        0.6783398615953793
+      ],
+      [
+        0.4680110247611182,
+        0.18387493912354458,
+        -0.22511350699812116
+      ],
+      [
+        0.460983373691235,
+        0.024789333095668553,
+        -0.9989317083768761
+      ],
+      [
+        0.4195904217878894,
+        -0.10228900207405278,
+        -1.794954681350447
+      ],
+      [
+        0.31802774120819066,
+        -0.21479858749537417,
+        -2.565322527595333
+      ],
+      [
+        0.21647529307361868,
+        -0.28773665695763206,
+        -0.35180833144693224
+      ],
+      [
+        0.14392091508250182,
+        -0.34377843362587157,
+        2.7994499737635454
+      ]
+    ],
+    "metadata": {
+      "source": "validation/reports/angle_observer/whole_body_observer_trace.jsonl.gz",
+      "stage": "shared no_force prefix; first full commanded cycle only",
+      "samples": 524,
+      "start_time_s": 2.1999999999998687,
+      "end_time_s": 12.659999999998423,
+      "phase_span_rad": 6.275999999999921,
+      "start_phase_rad": 0.0,
+      "bins": 24,
+      "bin_counts": [
+        21,
+        22,
+        22,
+        22,
+        22,
+        21,
+        23,
+        22,
+        21,
+        22,
+        22,
+        22,
+        22,
+        21,
+        22,
+        22,
+        22,
+        22,
+        22,
+        21,
+        22,
+        22,
+        22,
+        22
+      ],
+      "first_joint": 8,
+      "calibration_window": [
+        8,
+        13
+      ],
+      "link_lengths_m": [
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645,
+        0.0645
+      ],
+      "adaptation": "frozen offline; no online learning",
+      "fields": [
+        "angle-only crest relative to window center",
+        "angle bending center relative to window center",
+        "tail minus head passive-boundary absolute turns"
+      ],
+      "unused_inputs": [
+        "contact",
+        "root pose",
+        "gravity truth",
+        "motor torque",
+        "side-pull labels"
+      ]
+    }
+  },
+  "offline_passes": 1,
+  "new_dynamics_runs": 0,
+  "results": {
+    "whole_body": {
+      "stages": {
+        "no_force": {
+          "samples": 600,
+          "states": {
+            "retain": 600
+          },
+          "valid_samples": 600,
+          "suggested_samples": 0,
+          "spans": [],
+          "crest_residual": {
+            "minimum": -0.24347949381838638,
+            "maximum": 0.06377568467989914,
+            "absolute_p90": 0.10104468506904364
+          },
+          "bending_residual": {
+            "minimum": -0.03376421483711082,
+            "maximum": 0.18436608434738222,
+            "absolute_p90": 0.03183558249266707
+          },
+          "boundary_residual_deg": {
+            "minimum": -1.2170287406012612,
+            "maximum": 4.536017946989964,
+            "absolute_p90": 0.9047920663962048
+          }
+        },
+        "right_force": {
+          "samples": 700,
+          "states": {
+            "retain": 673,
+            "reject_crest_without_bending_migration": 27
+          },
+          "valid_samples": 700,
+          "suggested_samples": 0,
+          "spans": [],
+          "crest_residual": {
+            "minimum": -0.5259087807646202,
+            "maximum": 0.16318569319085097,
+            "absolute_p90": 0.4765049176921311
+          },
+          "bending_residual": {
+            "minimum": -0.05907675070716543,
+            "maximum": 0.08445908370915572,
+            "absolute_p90": 0.05371851093961212
+          },
+          "boundary_residual_deg": {
+            "minimum": -2.876932801400794,
+            "maximum": 3.8679639702778554,
+            "absolute_p90": 2.667705609944567
+          }
+        },
+        "recovery": {
+          "samples": 400,
+          "states": {
+            "retain": 379,
+            "reject_crest_without_bending_migration": 21
+          },
+          "valid_samples": 400,
+          "suggested_samples": 0,
+          "spans": [],
+          "crest_residual": {
+            "minimum": -0.31937231690048606,
+            "maximum": 0.5301483121080272,
+            "absolute_p90": 0.46580002777397483
+          },
+          "bending_residual": {
+            "minimum": -0.10678789857631454,
+            "maximum": 0.0918515254183427,
+            "absolute_p90": 0.09901312945185237
+          },
+          "boundary_residual_deg": {
+            "minimum": -7.827046858455271,
+            "maximum": 4.458963593847322,
+            "absolute_p90": 7.03666955718951
+          }
+        }
+      },
+      "normal_holdout": {
+        "samples": 76,
+        "states": {
+          "retain": 76
+        },
+        "valid_samples": 76,
+        "suggested_samples": 0,
+        "spans": [],
+        "crest_residual": {
+          "minimum": -0.24347949381838638,
+          "maximum": -0.02729931121298734,
+          "absolute_p90": 0.21426907329824818
+        },
+        "bending_residual": {
+          "minimum": -0.028623698976283897,
+          "maximum": 0.09142728691693897,
+          "absolute_p90": 0.09009177533253854
+        },
+        "boundary_residual_deg": {
+          "minimum": 0.039361185386821936,
+          "maximum": 4.536017946989964,
+          "absolute_p90": 4.440834813777057
+        }
+      }
+    },
+    "endpoint": {
+      "stages": {
+        "no_force": {
+          "samples": 600,
+          "states": {
+            "retain": 600
+          },
+          "valid_samples": 600,
+          "suggested_samples": 0,
+          "spans": [],
+          "crest_residual": {
+            "minimum": -0.24347949381838638,
+            "maximum": 0.06377568467989914,
+            "absolute_p90": 0.10104468506904364
+          },
+          "bending_residual": {
+            "minimum": -0.03376421483711082,
+            "maximum": 0.18436608434738222,
+            "absolute_p90": 0.03183558249266707
+          },
+          "boundary_residual_deg": {
+            "minimum": -1.2170287406012612,
+            "maximum": 4.536017946989964,
+            "absolute_p90": 0.9047920663962048
+          }
+        },
+        "right_force": {
+          "samples": 700,
+          "states": {
+            "retain": 15,
+            "unobservable": 685
+          },
+          "valid_samples": 15,
+          "suggested_samples": 0,
+          "spans": [],
+          "crest_residual": {
+            "minimum": -0.4396788417616284,
+            "maximum": -0.24847349735452762,
+            "absolute_p90": 0.41765505248888
+          },
+          "bending_residual": {
+            "minimum": 0.05800294093167523,
+            "maximum": 0.08445908370915572,
+            "absolute_p90": 0.08244909787699585
+          },
+          "boundary_residual_deg": {
+            "minimum": 1.3514927596810722,
+            "maximum": 3.8679639702778554,
+            "absolute_p90": 3.7082379592738306
+          }
+        },
+        "recovery": {
+          "samples": 400,
+          "states": {
+            "unobservable": 70,
+            "reject_crest_without_bending_migration": 327,
+            "confirming": 3
+          },
+          "valid_samples": 330,
+          "suggested_samples": 0,
+          "spans": [],
+          "crest_residual": {
+            "minimum": -1.8596685627122251,
+            "maximum": -0.5372407588798946,
+            "absolute_p90": 1.7469275287328128
+          },
+          "bending_residual": {
+            "minimum": -0.1998733982408636,
+            "maximum": 0.3815651177695573,
+            "absolute_p90": 0.35203261303273803
+          },
+          "boundary_residual_deg": {
+            "minimum": -8.393081264551189,
+            "maximum": 26.282910755181362,
+            "absolute_p90": 16.38941992045207
+          }
+        }
+      },
+      "normal_holdout": {
+        "samples": 76,
+        "states": {
+          "retain": 76
+        },
+        "valid_samples": 76,
+        "suggested_samples": 0,
+        "spans": [],
+        "crest_residual": {
+          "minimum": -0.24347949381838638,
+          "maximum": -0.02729931121298734,
+          "absolute_p90": 0.21426907329824818
+        },
+        "bending_residual": {
+          "minimum": -0.028623698976283897,
+          "maximum": 0.09142728691693897,
+          "absolute_p90": 0.09009177533253854
+        },
+        "boundary_residual_deg": {
+          "minimum": 0.039361185386821936,
+          "maximum": 4.536017946989964,
+          "absolute_p90": 4.440834813777057
+        }
+      }
+    }
+  }
+}

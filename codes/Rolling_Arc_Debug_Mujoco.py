@@ -1,8 +1,8 @@
 """手动调试版MuJoCo：基本Ctrl操作共用，仿真额外支持三模式和物理扰动。
 
-基础与固定顺应共用实机控制器；滑动模式调用既有仿真研究核心。
+基础与固定顺应共用实机控制器；滑动模式默认仅角度反馈，原接触版本可选。
 MuJoCo关节接口提供真实动力学反馈而非目标回显。
-修改下方场景参数；步态、顺应与键位修改Rolling_Arc_Real.py顶部。
+修改下方仿真场景、窗口和幅值参数；基本算法与键位共用实机代码。
 自动研究实验仍使用原入口。本文件不打开真实串口。
 """
 from pathlib import Path
@@ -22,11 +22,18 @@ from snake_control.rolling_arc import ArcParameters
 from snake_control.simulation import ArcSimulation, ROOT, backbone
 from snake_control.sliding_section_compliance import SlidingSectionCompliance, WindowOptions
 from snake_control.sliding_section_simulation import upward_support
+from snake_control.motor_feedback_sliding import MotorFeedbackSliding
+from snake_control.motor_shape_observer import PhaseShapeReference
 
 
 # ==================== 1. 手动测试参数 ====================
 SCENE = 'straight'              # straight / bend90 / elbow90 / taper_true90 / elbow90_taper110_210
 START_X_M = -.5                 # 弯管常用-.35，急弯常用-.25
+SIM_FIRST_JOINT = real.FIRST_JOINT  # 本轮偏置搭管实验设5 / 10，不修改实机文件
+SIM_LAST_JOINT = real.LAST_JOINT
+SIM_AMPLITUDE_DEG = 60.0         # 与本轮冻结基准一致；独立于用户的实机幅值调试
+SIM_OMEGA_RAD_S = .6
+SLIDING_FEEDBACK = 'motor_angles'  # motor_angles：新角度滑窗；contact：原接触反馈版本
 SAVE_LOG = True
 LOG_DIRECTORY = Path(__file__).resolve().parent / 'logs'
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 800
@@ -41,7 +48,8 @@ SIM_HELP = '''MuJoCo新增操作：
   Ctrl+[ / ]：扰动总力减小 / 增大；Ctrl+W：自动选窗开/关（仅滑动模式）
   Ctrl+R：明确结束当前试验，重建初始预览；不是连续运动中的位姿修正
 窗口外头/尾关节数是使能窗口的分布，不等于实际接触/悬垂关节数。
-滑动模式自动判断是否移窗；本体位移、承重和交接事件均单独记录。
+默认滑动模式仅用实测角和已知相位；接触力只记录用于评价。
+冻结相位基准对应幅值60度、omega=0.6、正向；持续侧拉可能失去方向观测。
 '''
 
 
@@ -67,6 +75,8 @@ class DebugArcController(real.RollingArcController):
     def __init__(self, bus, session):
         super().__init__(bus)
         self.session = session
+        self.first, self.last = session.sim.p.first_joint, session.sim.p.last_joint
+        self.amplitude, self.omega = session.sim.p.amplitude_deg, session.sim.p.omega_rad_s
         self.sliding = None
         self.pending_gait = None
         self.sliding_fault = False
@@ -122,22 +132,37 @@ class DebugArcController(real.RollingArcController):
                 raise ValueError('实际形态不满足开放圆弧条件，未切换')
             p = replace(self.session.sim.p, first_joint=self.first, last_joint=self.last,
                         amplitude_deg=self.amplitude, omega_rad_s=self.omega, direction=1)
-            slider = SlidingSectionCompliance(p, real.LINK_LENGTHS_M, self.options, WindowOptions())
-            support = upward_support(self.session.sim)
-            slider.window = (self.first, self.last)
-            slider.weights = np.asarray(self.enabled, float)
-            slider.support[:] = support
-            slider.raw_support[:] = support
-            if support.sum() < slider.options.minimum_support_n or slider._coverage(slider.window) < slider.options.minimum_support_coverage:
-                raise ValueError('当前窗口承重或覆盖不足，未切换到滑动模式')
-            slider._make_core(slider.window, measured)
+            if SLIDING_FEEDBACK == 'motor_angles':
+                if self.amplitude != 60. or self.omega != .6 or self.direction != 1:
+                    raise ValueError('冻结角度基准对应amplitude=60 omega=0.6正向；先在基础模式恢复参数')
+                reference = PhaseShapeReference.from_dict(json.loads(
+                    (ROOT/'configs/motor_shape_reference.json').read_text(encoding='utf8')))
+                p = replace(p, settle_s=0., initial_phase_rad=self.phase)
+                slider = MotorFeedbackSliding(p, real.LINK_LENGTHS_M, reference, section_options=self.options)
+                slider.targets = np.radians(self.targets)
+                slider.cooldown_until = self.session.elapsed
+                reason = 'take over current six-joint window; measured angles only'
+            elif SLIDING_FEEDBACK == 'contact':
+                slider = SlidingSectionCompliance(p, real.LINK_LENGTHS_M, self.options, WindowOptions())
+                support = upward_support(self.session.sim)
+                slider.window = (self.first, self.last)
+                slider.weights = np.asarray(self.enabled, float)
+                slider.support[:] = support
+                slider.raw_support[:] = support
+                if support.sum() < slider.options.minimum_support_n or slider._coverage(slider.window) < slider.options.minimum_support_coverage:
+                    raise ValueError('当前窗口承重或覆盖不足，未切换到滑动模式')
+                slider._make_core(slider.window, measured)
+                slider.last_measured = measured.copy()
+                slider._reset_phase_load(self.phase)
+                reason = 'take over currently driven supported window'
+            else:
+                raise ValueError('SLIDING_FEEDBACK应为motor_angles或contact')
             slider.core.targets = np.radians(self.targets)
             slider.core.next_geometry_s = self.section_clock_s
-            slider.last_measured = measured.copy()
-            slider._reset_phase_load(self.phase)
             slider.events.append(dict(time_s=self.session.elapsed, kind='acquire',
-                                      to=list(slider.window), reason='take over currently driven supported window'))
-            slider.cooldown_until = self.session.elapsed+slider.options.cooldown_s
+                                      to=list(slider.window), reason=reason))
+            if not isinstance(slider, MotorFeedbackSliding):
+                slider.cooldown_until = self.session.elapsed+slider.options.cooldown_s
             self.sliding, self.compliance = slider, slider.core
             self.sliding_fault = False
         self.pending_gait = None
@@ -158,12 +183,19 @@ class DebugArcController(real.RollingArcController):
     def assign_parameters(self, command):
         if self.sliding is not None and any(token.split('=')[0] in ('amplitude', 'window') for token in command.split()):
             raise ValueError('滑动模式使用半圆归一化预算；调幅值/窗口先切回基础模式')
+        if isinstance(self.sliding, MotorFeedbackSliding):
+            for item in command.split():
+                key, value = item.split('=', 1)
+                if key == 'omega' and float(value) != .6:
+                    raise ValueError('角度滑窗的相位基准只标定了omega=0.6')
         super().assign_parameters(command)
         if self.sliding is not None:
             self.sliding.section_options = self.options
             self.sliding.core.options = self.options
 
     def command(self, command):
+        if isinstance(self.sliding, MotorFeedbackSliding) and command.strip().lower() == 'reverse':
+            raise ValueError('冻结角度基准未标定反向滚动；先切换基础/固定模式')
         command = command.strip().lower()
         if command.startswith('gait_'):
             self.select_gait(command[5:])
@@ -184,7 +216,8 @@ class DebugArcController(real.RollingArcController):
             if self.sliding is None:
                 raise ValueError('先切换到滑动模式')
             self.sliding.automatic = not self.sliding.automatic
-            self.sliding.pending = None
+            if not isinstance(self.sliding, MotorFeedbackSliding):
+                self.sliding.pending = None
         elif command in ('quit', 'exit'):
             self.session.stop_push()
             super().command(command)
@@ -204,6 +237,8 @@ class DebugArcController(real.RollingArcController):
                 print(f'模式接入未执行：{exc}；可再次按模式热键重试。', flush=True)
 
     def tick_sliding(self, dt):
+        if isinstance(self.sliding, MotorFeedbackSliding):
+            return self.tick_motor_sliding(dt)
         self.section_clock_s += dt
         self.refresh_compliance_feedback()  # 新实际角，每20ms采集，不能拿保持读数假装卸载速度为0。
         self.feedback_time_s = self.session.elapsed
@@ -255,6 +290,60 @@ class DebugArcController(real.RollingArcController):
         self.command_phase = self.phase
         if self.mode == 'step' and abs(self.pending_phase) < 1e-10:
             self.mode = 'hold'
+
+    def tick_motor_sliding(self, dt):
+        """Manual phase operations with an angle-only outer controller."""
+        self.section_clock_s += dt
+        self.refresh_compliance_feedback()
+        self.feedback_time_s = self.session.elapsed
+        measured = np.asarray(self.measured_angles(), float)
+        if self.freeze_targets or self.sliding_fault:
+            self.bus.send_targets(self.targets, self.enabled)
+            return
+        slider = self.sliding
+        previous_phase, previous_pending = self.phase, self.pending_phase
+        previous_core, previous_window = slider.core, slider.window
+        previous_targets = self.targets.copy()
+        if not slider.phase_hold:
+            if self.mode == 'run':
+                self.phase += self.direction*self.omega*dt
+            elif self.mode == 'step':
+                increment = max(-self.omega*dt, min(self.omega*dt, self.pending_phase))
+                self.phase += increment
+                self.pending_phase -= increment
+        try:
+            target, enabled = slider.update(measured, self.session.elapsed, commanded_phase_rad=self.phase)
+            targets = np.degrees(target).tolist()
+            for i in np.flatnonzero(enabled):
+                real.angle_to_raw(i, targets[i])
+        except (ValueError, np.linalg.LinAlgError) as exc:
+            slider.core, slider.window = previous_core, previous_window
+            slider.enabled = np.asarray(self.enabled, bool)
+            slider.targets = np.radians(previous_targets)
+            slider.pending, slider.phase_hold = None, False
+            self.phase, self.pending_phase = previous_phase, previous_pending
+            self.sliding_fault = True
+            self.block_section(str(exc)+'，重新选择模式后继续')
+            self.bus.send_targets(previous_targets, self.enabled)
+            return
+        if enabled.tolist() != self.enabled:
+            entering = enabled & ~np.asarray(self.enabled, bool)
+            self.bus.prepare_enabled(measured, enabled, configure_mask=entering)
+            self.first, self.last = slider.window
+            self.enabled = enabled.tolist()
+        self.phase, self.compliance = slider.phase, slider.core
+        self.actual_section = None if slider.observation is None else slider.observation.get('current_geometry')
+        self.targets = targets
+        self.bus.send_targets(targets, self.enabled)
+        self.command_phase = self.phase
+        if self.mode == 'step' and abs(self.pending_phase) < 1e-10:
+            self.mode = 'hold'
+
+    def change_parameters(self, amplitude=None, omega=None):
+        if isinstance(self.sliding, MotorFeedbackSliding) and (
+                (amplitude is not None and amplitude != 60.) or (omega is not None and omega != .6)):
+            raise ValueError('先切换基础/固定模式再调幅值或频率；角度滑窗使用冻结的60度/0.6基准')
+        return super().change_parameters(amplitude, omega)
 
     def snapshot(self):
         row = super().snapshot()
@@ -337,9 +426,11 @@ class DebugSession:
     def __init__(self, scene=SCENE, start_x=START_X_M):
         self.start_x = start_x
         real.validate_setup()
+        if SIM_LAST_JOINT-SIM_FIRST_JOINT+1 != 6:
+            raise ValueError('手调仿真初始窗口也需要连续6关节')
         p = replace(ArcParameters.load(ROOT/'configs/step1.json'),
-                    joints=real.NUM_JOINTS, first_joint=real.FIRST_JOINT, last_joint=real.LAST_JOINT,
-                    amplitude_deg=real.AMPLITUDE_DEG, omega_rad_s=real.OMEGA_RAD_S,
+                    joints=real.NUM_JOINTS, first_joint=SIM_FIRST_JOINT, last_joint=SIM_LAST_JOINT,
+                    amplitude_deg=SIM_AMPLITUDE_DEG, omega_rad_s=SIM_OMEGA_RAD_S,
                     initial_phase_rad=real.INITIAL_PHASE_RAD, settle_s=real.SETTLE_S)
         self.sim = ArcSimulation(scene, p, start_x)
         lengths = np.linalg.norm(np.diff(backbone(self.sim.model, self.sim.data), axis=0), axis=1)
@@ -408,8 +499,8 @@ class DebugSession:
         self.record_event('reset_episode', previous_state=before)
         self.controller.release()
         p = replace(ArcParameters.load(ROOT/'configs/step1.json'),
-                    joints=real.NUM_JOINTS, first_joint=real.FIRST_JOINT, last_joint=real.LAST_JOINT,
-                    amplitude_deg=real.AMPLITUDE_DEG, omega_rad_s=real.OMEGA_RAD_S,
+                    joints=real.NUM_JOINTS, first_joint=SIM_FIRST_JOINT, last_joint=SIM_LAST_JOINT,
+                    amplitude_deg=SIM_AMPLITUDE_DEG, omega_rad_s=SIM_OMEGA_RAD_S,
                     initial_phase_rad=real.INITIAL_PHASE_RAD, settle_s=real.SETTLE_S)
         self.sim = ArcSimulation(self.sim.scene, p, self.start_x)
         self.bus = MujocoMotorBus(self.sim)
@@ -547,6 +638,10 @@ class DebugViewer:
         slider = c.sliding.snapshot() if c.sliding is not None else None
         if slider is None:
             cycle, handover = '-', '-'
+        elif isinstance(c.sliding, MotorFeedbackSliding):
+            o = slider['observation']
+            cycle = 'waiting motor angles' if o is None else f"{o['state']} offset={o.get('filtered_error_joints', float('nan')):+.2f}"
+            handover = 'geometric trial hold' if slider['phase_hold'] else 'waiting zero phase' if slider['pending'] else 'none'
         else:
             center = slider['cycle_support_center_joint']
             cycle = f'J{center:.2f}' if center is not None else f"collecting {slider['load_observation_phase_rad']:.1f}/6.3 rad"
@@ -556,7 +651,8 @@ class DebugViewer:
             sign = next(iter(self.session.push_keys))
             body = self.session.sim.model.body(self.session.push_targets[sign][0]).name
             pull = f'{"left" if sign < 0 else "right"} {self.session.push_force:.1f} N @{body}'
-        left = 'Gait\nMode\nWindow\nOutside joints\nPhase\nPhysics\nTime\nPull\nSide displacement\nCycle load center\nHandover'
+        observation_label = 'Motor shape observer' if isinstance(c.sliding, MotorFeedbackSliding) else 'Cycle load center'
+        left = 'Gait\nMode\nWindow\nOutside joints\nPhase\nPhysics\nTime\nPull\nSide displacement\n'+observation_label+'\nHandover'
         right = (f'{gait}{" -> "+c.pending_gait if c.pending_gait else ""}\n{c.mode}'
                  f'\nJ{c.first}-J{c.last}\nHead:{c.first-1}  Tail:{real.NUM_JOINTS-c.last}'
                  f'\n{c.phase:.3f} rad'

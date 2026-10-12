@@ -1,0 +1,243 @@
+{
+  "same_initial_actual_qpos": true,
+  "cases": {
+    "closed_20261012_232959_220742": {
+      "valid_down_error_max_deg": 14.283822061217398,
+      "all_down_error_max_deg": 25.08648048278936,
+      "recommendations_have_support_gain": false,
+      "recommendations_have_proven_need": false,
+      "first_actual_pose": [
+        -0.5,
+        -0.11171727708819264,
+        0.974,
+        6.123031769111886e-17,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0471975511965976,
+        0.0,
+        1.0471975511965976,
+        0.0,
+        1.0471975511965976,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "events": [
+        {
+          "kind": "prepare",
+          "time_s": 2.5199999999998335,
+          "old": [
+            5,
+            10
+          ],
+          "to": [
+            4,
+            9
+          ],
+          "observation": {
+            "feedback_time_s": 2.5199999999998335,
+            "current_window": [
+              5,
+              10
+            ],
+            "external_window_change": false,
+            "valid": true,
+            "reasons": [],
+            "execution": "observation_only",
+            "executes_window_update": false,
+            "direction": -1,
+            "suggested_window": [
+              4,
+              9
+            ],
+            "state": "recommend_head",
+            "down_head": [
+              0.9945125717051436,
+              -0.037833570686268296,
+              -0.09753648368456197
+            ],
+            "end_quality": {
+              "head_straightness": 0.9995514517664742,
+              "tail_straightness": 0.999998168183945,
+              "end_disagreement_deg": 13.38004222204501,
+              "head_direction": [
+                0.9997509994923431,
+                0.022184465972530078,
+                0.0024059267600682003
+              ],
+              "tail_direction": [
+                0.9757307809616802,
+                -0.0973363863269381,
+                -0.19615063339363115
+              ],
+              "end_link_counts": [
+                4,
+                4
+              ]
+            },
+            "current_geometry": {
+              "turn_deg": 183.91588345445282,
+              "fit_rms_m": 0.003253262764534382,
+              "gap_fraction": 0.6508067825450262
+            },
+            "crest": {
+              "joint_coordinate": 6.845370788687049,
+              "point_head_m": [
+                -0.366292308147177,
+                -0.11638576947129298,
+                -0.0132805185182953
+              ],
+              "top_band_m": 0.0080625,
+              "projected_down_norm": 0.9998743984801866,
+              "top_coordinate_span": [
+                6.375167412208197,
+                7.3742650201421185
+              ]
+            },
+            "features": {
+              "bending_center_joint": 6.94208096960437,
+              "head_boundary_turn_deg": 3.935458201028216,
+              "tail_boundary_turn_deg": 0.0,
+              "reverse_boundary_turn_deg": 11.275861342058585
+            },
+            "phase_reference": [
+              0.2170289943058274,
+              -0.0073703629330269076,
+              13.59747498684407
+            ],
+            "feature_error": [
+              -0.8716582056187785,
+              -0.5505486674626031,
+              -17.532933187872285
+            ],
+            "filtered_feature_error": [
+              -0.8266409236624652,
+              -0.5266766443093337,
+              -18.355559421738306
+            ],
+            "filtered_error_joints": -0.8266409236624652,
+            "candidate_window": [
+              4,
+              9
+            ],
+            "candidate_geometry": {
+              "turn_deg": 181.86169111360488,
+              "fit_rms_m": 0.003079250289029313,
+              "gap_fraction": 0.5636286483199681
+            },
+            "persistence_s": 0.49999999999994493
+          }
+        },
+        {
+          "kind": "phase_hold",
+          "time_s": 7.220000000000746,
+          "phase_rad": 3.1320000000004473,
+          "entering": [
+            4
+          ],
+          "exiting": [
+            10
+          ]
+        },
+        {
+          "kind": "complete",
+          "time_s": 11.919999999998833,
+          "old": [
+            5,
+            10
+          ],
+          "to": [
+            4,
+            9
+          ],
+          "gate": {
+            "time_s": 11.919999999998833,
+            "actual_candidate": {
+              "turn_deg": 187.0090823912416,
+              "fit_rms_m": 0.000151955386407225,
+              "gap_fraction": 0.5465340620099897
+            },
+            "switch_angles_deg": [
+              3.906333565698194,
+              0.5828179671682395
+            ],
+            "switch_velocity_deg_s": [
+              -1.228297422827588,
+              -0.0026335677883030538
+            ],
+            "candidate_open": true,
+            "command_open": true,
+            "unloading_observed": false
+          },
+          "strategy": "motor-angle geometric trial"
+        }
+      ],
+      "handover_truth": [
+        {
+          "time_s": 11.919999999998833,
+          "exiting": 10,
+          "entering": 4,
+          "previous_saved_exit_actuator_torque_nm": 0.0056856571073143755,
+          "before_support_sum_n": 28.019743114790607,
+          "after_support_sum_n": 28.086780236208376,
+          "observation_valid_at_handover": true,
+          "continuous_physical_state_max_20ms_joint_change_deg": 0.2568104502287626,
+          "evaluation_scope": "saved 20ms interval; torque is evaluation only, not motor-controller input"
+        }
+      ]
+    },
+    "observe_20261012_232452_922019": {
+      "valid_down_error_max_deg": 12.282761867978827,
+      "all_down_error_max_deg": 16.03836328567945,
+      "recommendations_have_support_gain": false,
+      "recommendations_have_proven_need": false,
+      "first_actual_pose": [
+        -0.5,
+        -0.11171727708819264,
+        0.974,
+        6.123031769111886e-17,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0471975511965976,
+        0.0,
+        1.0471975511965976,
+        0.0,
+        1.0471975511965976,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "events": [],
+      "handover_truth": []
+    }
+  },
+  "dynamics_runs": 2,
+  "calibration_holdout_note": "76 feedback samples, 1.52s; not a full independent cycle",
+  "feature_inspection_error": "Initial cheap feature inspection used endpoint_pull instead of endpoint filename; fixed before replay; no dynamics."
+}

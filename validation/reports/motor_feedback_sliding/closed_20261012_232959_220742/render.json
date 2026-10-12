@@ -1,0 +1,18 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\motor_feedback_sliding\\closed_20261012_232959_220742.mp4",
+  "frames": 621,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    61.999999999946205
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    11.899999999998833,
+    11.939999999998832,
+    9.919999999999941,
+    61.999999999946205
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}
