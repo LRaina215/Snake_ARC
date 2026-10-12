@@ -11,41 +11,32 @@ conda activate mujoco
 cd "D:\Desktop\SNAKE\Paper Code\Mujoco\Snake_ARC"
 ```
 
-## 仿真测试
+## 仿真手动调试
 
 ```powershell
-# 基础圆弧：直管
-python .\codes\Rolling_Arc_Mujoco.py --scene straight --duration 30
-
-# 固定截面顺应：连续90°柔弯内变径
-python .\codes\Rolling_Arc_Section_Mujoco.py --scene taper_true90 --start-x -0.35 --duration 75
-
-# 滑动窗口：110→210 mm连续90°急弯变径
-python .\codes\Rolling_Arc_Sliding_Section_Mujoco.py --scene elbow90_taper110_210 --start-x -0.25 --duration 150
+python .\codes\Rolling_Arc_Debug_Mujoco.py
 ```
 
-基础入口还支持`--scene bend90`（柔弯）和`--scene elbow90`（连续急弯）。三个查看器均用空格暂停/恢复滚动相位；固定截面用E切换顺应增益、R反向，滑动窗口用A/D请求头/尾交接、U切换自动选窗、R反向。
+这是供人工操作的版本，与实机共用控制器和Ctrl热键。场景与初始位置在该文件顶部改`SCENE / START_X_M`，步态参数在`Rolling_Arc_Real.py`顶部修改。普通字母/空格不控制步态，也不触发MuJoCo原生键盘菜单。
 
-无图形窗口测试基础步态：
+## 实机测试
+
+直接运行一份Python文件控制舵机，无需填写启动参数或使用外部可视化程序。默认自动识别CH340，日志自动保存到`codes/logs/`：
+
+```powershell
+python .\codes\Rolling_Arc_Real.py
+```
+
+两端操作相同：**Ctrl+U**形成基础圆弧，等待形成与静置完成；**Ctrl+J/H**正/反单步，**Ctrl+G**连续/暂停，**Ctrl+E**开/关固定截面顺应，**Ctrl+空格**暂停相位，**Ctrl+N**冻结目标，**Ctrl+X**全部失能，**Ctrl+Q**退出。默认固定使能J8–J13，其余14关节失能。两端使用全局热键，操作时运行其中一个入口。
+
+也可在使用`mujoco`解释器的IDE中直接运行该文件。需要固定端口时修改文件顶部的`PORT`；不连接机器人演练时将顶部`DRY_RUN`改为`True`，再运行同一文件。运行前关闭其他占用串口的程序。
+
+## 自动实验
+
+自动研究实验与手调入口分开保留。例如无图形窗口运行基础急弯：
 
 ```powershell
 python .\codes\Rolling_Arc_Mujoco.py --headless --scene elbow90 --start-x -0.25 --duration 60 --output validation/results/elbow90.json
 ```
 
-## 实机测试
-
-一份Python文件直接控制舵机，无需外部可视化程序。按实际连接修改`--port`，并关闭其他占用串口的程序：
-
-```powershell
-python .\codes\Rolling_Arc_Real.py --port COM9 --log logs/rolling_arc_real.jsonl
-```
-
-启动后按**Ctrl+U**形成基础圆弧，等待形成与静置完成；**Ctrl+J/H**正/反单步，**Ctrl+G**连续/暂停，**Ctrl+E**开启/关闭固定截面顺应，**Ctrl+X**全部失能，**Ctrl+Q**退出。默认固定使能J8–J13，其余14关节失能。
-
-不连接机器人时，可用内存串口演练同一操作流程：
-
-```powershell
-python .\codes\Rolling_Arc_Real.py --dry-run
-```
-
-完整热键及调参见[实机调试说明](docs/实机调试代码说明.md)；实现、环境和实验资料见[开发与验证记录](docs/开发与验证记录.md)。
+完整操作见[两端统一调试说明](docs/仿真实机统一调试说明.md)及[实机调试说明](docs/实机调试代码说明.md)；其他实验入口及记录见[开发与验证记录](docs/开发与验证记录.md)。

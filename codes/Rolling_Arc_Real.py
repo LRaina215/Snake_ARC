@@ -1,15 +1,16 @@
 """圆弧滚动实机控制：只运行本文件，通过热键直接控制飞特串口舵机。
 
-默认连接真实串口；--dry-run 使用内存串口，不连接机器人。
+直接运行本文件，自动查找CH340串口；所有实验配置在文件顶部修改。
+DRY_RUN=True时使用内存串口，不连接机器人；日志自动保存在本文件旁的logs目录。
 Ctrl+U 形成圆弧，Ctrl+J/H 正/反单步，Ctrl+G 连续/暂停，Ctrl+X 全部失能。
 Ctrl+E 开关固定窗口的实际截面顺应；J8–J13保持使能，其余关节失能。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
 """
-import argparse
 import json
 import math
 import statistics
 from dataclasses import dataclass, asdict, replace
+from datetime import datetime
 from pathlib import Path
 import queue
 import sys
@@ -19,8 +20,11 @@ import numpy as np
 
 
 # ==================== 1. 经常修改的实验参数 ====================
-PORT = 'COM9'                  # 原设备档案；实际端口变化时改这里或用 --port
+PORT = None                    # None：和CaseA一样自动查找CH340；手动指定时改为'COM9'
 BAUD_RATE = 115200
+DRY_RUN = False                # False：真实机器人；True：内存串口演练，不打开设备
+SAVE_LOG = True                # 自动保存实测角、目标、使能与模式；每次运行生成新文件
+LOG_DIRECTORY = Path(__file__).resolve().parent / 'logs'  # 不依赖终端/IDE工作目录
 NUM_JOINTS = 20
 FIRST_JOINT = 8                 # 关节从 1 开始编号，包含两个端点
 LAST_JOINT = 13                 # 窗口外明确关闭舵机扭矩，不发送零角位置目标
@@ -84,7 +88,7 @@ HOTKEY_COMMANDS = {
     'K': 'status', 'X': 'release', 'Q': 'quit', 'T': 'reverse', 'E': 'compliance',
     '-': 'delta-', '=': 'delta+',
 }
-HELP = '''圆弧滚动实机调试（Ctrl+字母全局热键；任何窗口均会响应）：
+HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响应）：
   Ctrl+U 读取当前位置，使能局部并缓慢形成圆弧；默认完成后保持
   Ctrl+J / Ctrl+H 正向 / 反向单步；Ctrl+-/= 相位步长减半/加倍
   Ctrl+G 连续滚动/暂停；Ctrl+空格 暂停；Ctrl+N 保持并重发当前目标
@@ -1276,7 +1280,7 @@ def console_listener(commands, stop):
                 line += char
                 print(char, end='', flush=True)
     else:
-        for line in sys.stdin:  # 重定向输入；单纯离线批处理使用 --no-console
+        for line in sys.stdin:  # 重定向输入；离线检查可在run_controller中关闭控制台
             if stop.is_set():
                 return
             commands.put(line)
@@ -1285,88 +1289,124 @@ def console_listener(commands, stop):
 
 
 # ==================== 8. 运行入口与退出清理 ====================
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--port', default=PORT)
-    parser.add_argument('--baud', type=int, default=BAUD_RATE)
-    parser.add_argument('--dry-run', action='store_true', help='内存串口，不打开真实设备')
-    parser.add_argument('--no-hotkeys', action='store_true', help='用于离线批量验证')
-    parser.add_argument('--no-console', action='store_true', help='不读取控制台输入')
-    parser.add_argument('--auto', action='store_true', help='连接后直接形成圆弧并连续滚动')
-    parser.add_argument('--compliance',action='store_true',help='与 --auto 一起使用，形成后接入顺应性')
-    parser.add_argument('--duration', type=float, help='到时自动结束；默认等待 Ctrl+Q/quit')
-    parser.add_argument('--fast', action='store_true', help='仅离线模式：取消实际等待')
-    parser.add_argument('--log', type=Path, help='JSONL，记录发出的目标和实测反馈')
-    args = parser.parse_args()
-    if args.fast and not args.dry_run:
-        parser.error('--fast 只能用于 --dry-run')
-    if args.compliance and not args.auto:
-        parser.error('--compliance 自动接入需同时指定 --auto；手动接入用 Ctrl+E')
-    if args.duration is not None and (not math.isfinite(args.duration) or args.duration <= 0):
-        parser.error('--duration 必须为有限正数')
-    if args.baud <= 0 or (args.no_hotkeys and args.no_console and args.duration is None):
-        parser.error('波特率必须为正；关闭全部交互输入时必须指定 --duration')
+def find_robot_port(available_ports):
+    """参考CaseA的CH340识别；多个适配器时由顶部PORT明确选择。"""
+    candidates = [p for p in available_ports if 'CH340' in (p.description or '').upper()]
+    if not candidates:
+        raise RuntimeError("未找到CH340串口，请检查连接；其他适配器可在文件顶部设置PORT。")
+    if len(candidates) > 1:
+        names = ', '.join(p.device for p in candidates)
+        raise RuntimeError(f"找到多个CH340串口：{names}；请在文件顶部设置PORT选择机器人。")
+    return candidates[0].device
+
+
+def open_robot_serial():
+    """真实连接只在运行入口调用；导入文件和内存串口检查不会打开设备。"""
+    import serial
+    import serial.tools.list_ports
+    name = PORT if PORT else find_robot_port(serial.tools.list_ports.comports())
+    return serial.Serial(name, BAUD_RATE, timeout=0.01, write_timeout=SERIAL_TIMEOUT_S)
+
+
+def open_run_log(folder, prefix='rolling_arc'):
+    """每次启动新建日志；即使在同一时间戳启动，也不覆盖既有记录。"""
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    number = 0
+    while True:
+        suffix = '' if number == 0 else f'_{number}'
+        path = folder / f'{prefix}_{stamp}{suffix}.jsonl'
+        try:
+            return path, path.open('x', encoding='utf-8')
+        except FileExistsError:
+            number += 1
+
+
+def process_control_commands(controller, commands, elapsed):
+    """实机与MuJoCo手调共用同一命令分派和状态提示。"""
+    for _ in range(commands.qsize()):
+        command = commands.get_nowait()
+        try:
+            if command.strip().lower() == 'help':
+                print(HELP, flush=True)
+                continue
+            controller.command(command)
+            if command.strip().lower() == 'status':
+                controller.feedback_time_s = elapsed
+            controller.show_status(include_feedback=command.strip().lower() == 'status')
+        except ValueError as exc:
+            print(f'参数/操作未执行: {exc}', flush=True)
+
+
+def poll_control_feedback(controller, elapsed, next_feedback):
+    """共用实机反馈节奏；顺应读全关节，基础模式读主动关节。"""
+    compliance_due = (controller.compliance is not None and
+                      (controller.feedback_time_s is None or
+                       elapsed-controller.feedback_time_s >= COMPLIANCE_FEEDBACK_PERIOD_S))
+    if (elapsed >= next_feedback or compliance_due) and controller.mode != 'released':
+        if controller.compliance is not None:
+            controller.refresh_compliance_feedback()
+            period = COMPLIANCE_FEEDBACK_PERIOD_S
+        else:
+            active = [i for i, e in enumerate(controller.enabled) if e]
+            controller.last_feedback = controller.bus.read_angles(active)
+            period = FEEDBACK_PERIOD_S
+        controller.feedback_time_s = elapsed
+        return elapsed + period
+    return next_feedback
+
+
+def run_controller(*, dry_run=False, hotkeys=True, console=True, auto=False,
+                   auto_compliance=False, duration_s=None, fast=False,
+                   log_directory=None):
+    """运行控制循环；关键字参数供内存串口检查，日常直接运行文件即可。"""
+    if fast and not dry_run:
+        raise ValueError('加速循环只能用于内存串口检查。')
+    if auto_compliance and not auto:
+        raise ValueError('离线自动接入顺应需先自动形成基础圆弧。')
+    if duration_s is not None and (not math.isfinite(duration_s) or duration_s <= 0):
+        raise ValueError('运行时长必须为有限正数。')
+    if BAUD_RATE <= 0 or (not hotkeys and not console and duration_s is None):
+        raise ValueError('波特率必须为正；关闭全部交互输入的离线检查需设置时长。')
     validate_setup()
     # 打开设备前检查热键依赖，避免连接成功后才因缺包退出。
     keyboard_module = None
-    if not args.no_hotkeys:
+    if hotkeys:
         from pynput import keyboard as keyboard_module
-    if args.dry_run:
+    if dry_run:
         port = DryRunSerial()
     else:
-        import serial
-        port = serial.Serial(args.port, args.baud, timeout=0.01, write_timeout=SERIAL_TIMEOUT_S)
+        port = open_robot_serial()
     controller = RollingArcController(FeetechBus(port))
     commands = queue.Queue()
-    listener, console, log_file = None, None, None
+    listener, console_thread, log_file = None, None, None
     stop_console = threading.Event()
     try:
-        if args.log:
-            args.log.parent.mkdir(parents=True, exist_ok=True)
-            log_file = args.log.open('w', encoding='utf-8')
+        if log_directory is not None:
+            log_path, log_file = open_run_log(log_directory)
+            print(f'实验日志：{log_path}', flush=True)
         if keyboard_module:
             listener = global_key_listener(commands, keyboard_module)
-        if not args.no_console:
-            console = threading.Thread(target=console_listener, args=(commands, stop_console), daemon=True)
-            console.start()
-        print('离线串口（不是动力学仿真）' if args.dry_run else f'实机串口 {args.port} / {args.baud}', flush=True)
+        if console:
+            console_thread = threading.Thread(target=console_listener, args=(commands, stop_console), daemon=True)
+            console_thread.start()
+        print('离线串口（不是动力学仿真）' if dry_run else f'实机串口 {port.port} / {BAUD_RATE}', flush=True)
         print(HELP, flush=True)
         print('启动仅打开串口，不改变扭矩；尚未接管的舵机原使能状态未知。', flush=True)
-        if args.auto:
+        if auto:
             commands.put('arm')
             commands.put('run')
         elapsed, next_feedback, next_log = 0.0, 0.0, 0.0
-        auto_compliance_pending = args.auto and args.compliance
-        while not controller.quit and (args.duration is None or elapsed < args.duration):
+        auto_compliance_pending = auto and auto_compliance
+        while not controller.quit and (duration_s is None or elapsed < duration_s):
             cycle_start = time.monotonic()
             # 热键线程只排队；状态改变、读反馈、写目标都在这个线程依次执行。
-            for _ in range(commands.qsize()):
-                command = commands.get_nowait()
-                try:
-                    if command.strip().lower() == 'help':
-                        print(HELP, flush=True)
-                        continue
-                    controller.command(command)
-                    if command.strip().lower() == 'status':
-                        controller.feedback_time_s = elapsed
-                    controller.show_status(include_feedback=command.strip().lower() == 'status')
-                except ValueError as exc:
-                    print(f'参数/操作未执行: {exc}', flush=True)
+            process_control_commands(controller, commands, elapsed)
             if controller.quit:
                 break
             before = (controller.mode, controller.forming, controller.settle_remaining > 0)
-            compliance_due = (controller.compliance is not None and
-                              (controller.feedback_time_s is None or elapsed-controller.feedback_time_s>=COMPLIANCE_FEEDBACK_PERIOD_S))
-            if (elapsed>=next_feedback or compliance_due) and controller.mode!='released':
-                if controller.compliance is not None:
-                    controller.refresh_compliance_feedback()
-                    period = COMPLIANCE_FEEDBACK_PERIOD_S
-                else:
-                    active = [i for i,e in enumerate(controller.enabled) if e]
-                    controller.last_feedback = controller.bus.read_angles(active)
-                    period = FEEDBACK_PERIOD_S
-                controller.feedback_time_s = elapsed
-                next_feedback = elapsed+period
+            next_feedback = poll_control_feedback(controller, elapsed, next_feedback)
             if auto_compliance_pending and not controller.forming and controller.settle_remaining<=0:
                 controller.command('compliance');controller.command('run')
                 controller.show_status()
@@ -1376,11 +1416,11 @@ def main():
             if before != after:
                 controller.show_status()
             if log_file and elapsed >= next_log:
-                record = dict(time_s=elapsed, execution='dry_run' if args.dry_run else 'serial', **controller.snapshot())
+                record = dict(time_s=elapsed, execution='dry_run' if dry_run else 'serial', **controller.snapshot())
                 log_file.write(json.dumps(record, ensure_ascii=False) + '\n')
                 log_file.flush()
                 next_log = elapsed + 0.1
-            if args.fast:
+            if fast:
                 elapsed += CONTROL_PERIOD_S
             else:
                 time.sleep(max(0.0, CONTROL_PERIOD_S - (time.monotonic() - cycle_start)))
@@ -1399,14 +1439,21 @@ def main():
             if listener:
                 listener.stop()
                 listener.join(timeout=1.)
-            if console:
-                console.join(timeout=.1)
+            if console_thread:
+                console_thread.join(timeout=.1)
             if log_file:
                 log_file.close()
 
 
+def main():
+    """直接运行本文件：使用顶部配置连接，等待Ctrl热键，不自动使能或滚动。"""
+    run_controller(dry_run=DRY_RUN, log_directory=LOG_DIRECTORY if SAVE_LOG else None)
+
+
 if __name__ == '__main__':
     try:
+        if len(sys.argv) > 1:
+            raise ValueError('请直接运行本文件，不附加启动参数；设置在文件顶部修改，离线用DRY_RUN=True。')
         main()
     except KeyboardInterrupt:
         print('用户中止。')

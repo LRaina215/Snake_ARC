@@ -1,0 +1,22 @@
+{
+  "check": "manual interaction; not pipe crossing",
+  "samples": 254,
+  "simulation_duration_s": 4.919999999999978,
+  "scene": "straight",
+  "gaits": [
+    "basic_arc",
+    "fixed_section_compliance"
+  ],
+  "masks": [
+    0,
+    6
+  ],
+  "blocked_samples": 0,
+  "passive_actuator_max_nm": 0.0,
+  "actual_state_finite": true,
+  "renderer_frame": [
+    1280,
+    800
+  ],
+  "hardware_connected": false
+}

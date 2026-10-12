@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from collections import namedtuple
 from types import SimpleNamespace
@@ -194,13 +195,70 @@ class RealControllerTests(unittest.TestCase):
                     raise OSError('simulated cable failure during feedback')
                 return super().write(packet)
         port = FaultSerial()
-        argv = ['Rolling_Arc_Real.py', '--dry-run', '--no-hotkeys', '--no-console',
-                '--auto', '--fast', '--duration', '1']
-        with patch.object(sys, 'argv', argv), patch.object(real, 'DryRunSerial', return_value=port), redirect_stdout(io.StringIO()):
+        with patch.object(real, 'DryRunSerial', return_value=port), redirect_stdout(io.StringIO()):
             with self.assertRaises(OSError):
-                real.main()
+                real.run_controller(dry_run=True, hotkeys=False, console=False,
+                                    auto=True, fast=True, duration_s=1)
         self.assertTrue(port.closed)
         self.assertTrue(all(port.registers[sid][0x28] == 0 for sid in real.SERVO_IDS))
+
+    def test_auto_ch340_and_manual_port_never_select_an_ambiguous_device(self):
+        import serial
+        import serial.tools.list_ports
+        robot = SimpleNamespace(device='COM9', description='USB-SERIAL ch340')
+        other = SimpleNamespace(device='COM3', description='Bluetooth')
+        duplicate = SimpleNamespace(device='COM12', description='USB-SERIAL CH340')
+        with patch.object(real, 'PORT', None), \
+             patch.object(serial.tools.list_ports, 'comports') as scan, \
+             patch.object(serial, 'Serial') as constructor:
+            for available in ([], [other], [robot, duplicate]):
+                scan.return_value = available
+                with self.subTest(available=available), self.assertRaises(RuntimeError):
+                    real.open_robot_serial()
+            constructor.assert_not_called()
+            scan.return_value = [other, robot]
+            real.open_robot_serial()
+            constructor.assert_called_once_with(
+                'COM9', real.BAUD_RATE, timeout=.01, write_timeout=real.SERIAL_TIMEOUT_S)
+            scan.reset_mock()
+            constructor.reset_mock()
+            with patch.object(real, 'PORT', 'COM12'):
+                real.open_robot_serial()
+            scan.assert_not_called()
+            constructor.assert_called_once_with(
+                'COM12', real.BAUD_RATE, timeout=.01, write_timeout=real.SERIAL_TIMEOUT_S)
+
+    def test_plain_main_reads_top_settings_keeps_motors_idle_and_creates_new_logs(self):
+        import serial
+        import serial.tools.list_ports
+        opened = []
+        def open_fake(name, *args, **kwargs):
+            port = RecordingSerial()
+            port.port = name
+            opened.append(port)
+            return port
+        def idle_listener(commands, keyboard):
+            commands.put('quit')
+            return SimpleNamespace(stop=lambda: None, join=lambda timeout: None)
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(real, 'PORT', None), patch.object(real, 'DRY_RUN', False), \
+                 patch.object(real, 'SAVE_LOG', True), patch.object(real, 'LOG_DIRECTORY', Path(folder)), \
+                 patch.object(serial.tools.list_ports, 'comports', return_value=[
+                     SimpleNamespace(device='COM9', description='USB-SERIAL CH340')]), \
+                 patch.object(serial, 'Serial', side_effect=open_fake), \
+                 patch.object(real, 'global_key_listener', side_effect=idle_listener), \
+                 patch.object(real, 'console_listener', return_value=None), \
+                 patch.object(real, 'datetime') as clock, \
+                 patch.object(sys, 'argv', ['Rolling_Arc_Real.py']), redirect_stdout(io.StringIO()):
+                clock.now.return_value.strftime.return_value = '20261012_120000_000000'
+                real.main()
+                real.main()
+            self.assertEqual(len(list(Path(folder).glob('rolling_arc_*.jsonl'))), 2)
+        self.assertEqual(len(opened), 2)
+        for port in opened:
+            self.assertEqual(port.port, 'COM9')
+            self.assertTrue(port.closed)
+            self.assertEqual(port.packets, [])  # 直接启动与退出没有自行形成圆弧/改变使能。
 
 
 if __name__ == '__main__':
