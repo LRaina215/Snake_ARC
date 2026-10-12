@@ -1,0 +1,1099 @@
+{
+  "analysis": "one frozen observer; two complete archived traces; zero new dynamics runs",
+  "controller_input": "20 measured angles, known phase, current enable mask, feedback timestamp",
+  "evaluation_only": "matched free pose, actual gravity, contacts, old events, stage labels",
+  "environment": {
+    "python": "3.9.21",
+    "mujoco": "3.2.7",
+    "numpy": "1.23.5"
+  },
+  "pipe_diameter_min_max_m": [
+    0.113,
+    0.113
+  ],
+  "support_coordinate_convention": "contact bin j represents downstream link j, whose center is body coordinate j+0.5",
+  "normal_prefix_identical": true,
+  "cases": {
+    "whole_body": {
+      "source": "validation\\reports\\debug_modes\\whole_body_trace.jsonl.gz",
+      "frames": 1700,
+      "config": {
+        "options": {
+          "width": 6,
+          "end_links": 4,
+          "minimum_end_links": 3,
+          "minimum_straightness": 0.98,
+          "maximum_end_disagreement_deg": 25.0,
+          "minimum_turn_deg": 150.0,
+          "maximum_turn_deg": 218.0,
+          "minimum_gap": 0.4,
+          "maximum_plane_rms_m": 0.015,
+          "boundary_links": 2,
+          "top_band_link_fraction": 0.125,
+          "samples_per_module": 12,
+          "minimum_projected_down": 0.25,
+          "error_filter_s": 0.2,
+          "offset_threshold_joints": 0.5,
+          "persistence_s": 0.5
+        },
+        "mechanical_lengths_m": [
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645
+        ],
+        "nominal_amplitude_deg": 59.99999999999999,
+        "input_units": "controller degrees; phase radians"
+      },
+      "original_feedback_delay_s": {
+        "samples": 1700,
+        "minimum": 0.01999999999995339,
+        "median": 0.02000000000000668,
+        "p90": 0.020000000000024443,
+        "maximum": 0.020000000000024443
+      },
+      "stages": {
+        "no_force": {
+          "frames": 600,
+          "valid_frames": 600,
+          "valid_fraction": 1.0,
+          "recommendation_frames": 0,
+          "states": {
+            "retain": 484,
+            "confirming": 35,
+            "blocked_candidate_shape": 81
+          },
+          "rejection_reasons": {},
+          "raw_error_joints": {
+            "samples": 600,
+            "minimum": -0.1060757615613781,
+            "median": 0.22067325821041806,
+            "p90": 0.6365358598647586,
+            "maximum": 0.6779752391359004
+          },
+          "filtered_error_joints": {
+            "samples": 600,
+            "minimum": -0.10305920302845366,
+            "median": 0.21046149800833516,
+            "p90": 0.6370619668622047,
+            "maximum": 0.6630209249968133
+          },
+          "down_error_all_deg": {
+            "samples": 599,
+            "minimum": 0.06507959540079301,
+            "median": 2.5683486474537474,
+            "p90": 3.9084377631103666,
+            "maximum": 4.633822712024958
+          },
+          "down_error_valid_deg": {
+            "samples": 599,
+            "minimum": 0.06507959540079301,
+            "median": 2.5683486474537474,
+            "p90": 3.9084377631103666,
+            "maximum": 4.633822712024958
+          },
+          "absolute_crest_error_all_joints": {
+            "samples": 599,
+            "minimum": 2.0808454225473838e-05,
+            "median": 0.04991659302764084,
+            "p90": 0.1007143848613435,
+            "maximum": 0.1430970218261134
+          },
+          "absolute_crest_error_valid_joints": {
+            "samples": 599,
+            "minimum": 2.0808454225473838e-05,
+            "median": 0.04991659302764084,
+            "p90": 0.1007143848613435,
+            "maximum": 0.1430970218261134
+          },
+          "true_gravity_error_joints": {
+            "samples": 599,
+            "minimum": -0.12150043785092812,
+            "median": 0.19351195824186895,
+            "p90": 0.6225110708325087,
+            "maximum": 0.7343576137313281
+          },
+          "support_cycle_center_joint_bin": {
+            "samples": 76,
+            "minimum": 10.36020928950737,
+            "median": 10.392040302100485,
+            "p90": 10.408179913540796,
+            "maximum": 10.412433064250758
+          },
+          "current_support_coverage": {
+            "samples": 599,
+            "minimum": 1.0,
+            "median": 1.0,
+            "p90": 1.0,
+            "maximum": 1.0
+          },
+          "recommendation_support_coverage": null,
+          "recommendation_spans": []
+        },
+        "right_force": {
+          "frames": 700,
+          "valid_frames": 700,
+          "valid_fraction": 1.0,
+          "recommendation_frames": 0,
+          "states": {
+            "retain": 554,
+            "blocked_candidate_shape": 125,
+            "confirming": 21
+          },
+          "rejection_reasons": {},
+          "raw_error_joints": {
+            "samples": 700,
+            "minimum": -0.22816682998520932,
+            "median": 0.17099150719832057,
+            "p90": 0.5612246351381567,
+            "maximum": 0.6006390003708422
+          },
+          "filtered_error_joints": {
+            "samples": 700,
+            "minimum": -0.20786759489017645,
+            "median": 0.1766369394565177,
+            "p90": 0.5575523048694971,
+            "maximum": 0.583998999195203
+          },
+          "down_error_all_deg": {
+            "samples": 700,
+            "minimum": 2.5963528629436086,
+            "median": 15.568779872702512,
+            "p90": 19.14672590814647,
+            "maximum": 24.135843847904475
+          },
+          "down_error_valid_deg": {
+            "samples": 700,
+            "minimum": 2.5963528629436086,
+            "median": 15.568779872702512,
+            "p90": 19.14672590814647,
+            "maximum": 24.135843847904475
+          },
+          "absolute_crest_error_all_joints": {
+            "samples": 700,
+            "minimum": 0.07930325843440578,
+            "median": 0.457631363111596,
+            "p90": 0.8923981985217647,
+            "maximum": 0.9958857981864178
+          },
+          "absolute_crest_error_valid_joints": {
+            "samples": 700,
+            "minimum": 0.07930325843440578,
+            "median": 0.457631363111596,
+            "p90": 0.8923981985217647,
+            "maximum": 0.9958857981864178
+          },
+          "true_gravity_error_joints": {
+            "samples": 700,
+            "minimum": 0.04843603778369676,
+            "median": 0.6371432280429303,
+            "p90": 1.4341227235688965,
+            "maximum": 1.492962292872786
+          },
+          "support_cycle_center_joint_bin": {
+            "samples": 700,
+            "minimum": 10.124685088538955,
+            "median": 10.224979341488977,
+            "p90": 10.439493510167207,
+            "maximum": 10.486802625655336
+          },
+          "current_support_coverage": {
+            "samples": 700,
+            "minimum": 1.0,
+            "median": 1.0,
+            "p90": 1.0,
+            "maximum": 1.0
+          },
+          "recommendation_support_coverage": null,
+          "recommendation_spans": []
+        },
+        "recovery": {
+          "frames": 400,
+          "valid_frames": 400,
+          "valid_fraction": 1.0,
+          "recommendation_frames": 12,
+          "states": {
+            "retain": 268,
+            "confirming": 50,
+            "recommend_tail": 12,
+            "blocked_candidate_shape": 70
+          },
+          "rejection_reasons": {},
+          "raw_error_joints": {
+            "samples": 400,
+            "minimum": -0.05781057886597196,
+            "median": 0.32818116390988195,
+            "p90": 0.921355688241656,
+            "maximum": 0.9876937555527849
+          },
+          "filtered_error_joints": {
+            "samples": 400,
+            "minimum": -0.03983819815309823,
+            "median": 0.3204852606173086,
+            "p90": 0.9145535381255055,
+            "maximum": 0.9733447903120644
+          },
+          "down_error_all_deg": {
+            "samples": 400,
+            "minimum": 0.45086566721914484,
+            "median": 3.202824374545444,
+            "p90": 5.23477600000728,
+            "maximum": 15.39731670316798
+          },
+          "down_error_valid_deg": {
+            "samples": 400,
+            "minimum": 0.45086566721914484,
+            "median": 3.202824374545444,
+            "p90": 5.23477600000728,
+            "maximum": 15.39731670316798
+          },
+          "absolute_crest_error_all_joints": {
+            "samples": 400,
+            "minimum": 0.00011713148445835486,
+            "median": 0.05455106294027967,
+            "p90": 0.18007860432596454,
+            "maximum": 0.26865693890711206
+          },
+          "absolute_crest_error_valid_joints": {
+            "samples": 400,
+            "minimum": 0.00011713148445835486,
+            "median": 0.05455106294027967,
+            "p90": 0.18007860432596454,
+            "maximum": 0.26865693890711206
+          },
+          "true_gravity_error_joints": {
+            "samples": 400,
+            "minimum": -0.054027158768573,
+            "median": 0.32722426527828485,
+            "p90": 0.8906684632552997,
+            "maximum": 1.0989599956593405
+          },
+          "support_cycle_center_joint_bin": {
+            "samples": 400,
+            "minimum": 10.487303132106334,
+            "median": 10.60719772528423,
+            "p90": 10.639677645072766,
+            "maximum": 10.641946471724397
+          },
+          "current_support_coverage": {
+            "samples": 400,
+            "minimum": 1.0,
+            "median": 1.0,
+            "p90": 1.0,
+            "maximum": 1.0
+          },
+          "recommendation_support_coverage": {
+            "samples": 12,
+            "minimum": 1.0,
+            "median": 1.0,
+            "p90": 1.0,
+            "maximum": 1.0
+          },
+          "recommendation_spans": [
+            {
+              "direction": 1,
+              "window": [
+                9,
+                14
+              ],
+              "start_s": 30.36000000001412,
+              "end_s": 30.36000000001412,
+              "frames": 1,
+              "support_coverage": {
+                "samples": 1,
+                "minimum": 1.0,
+                "median": 1.0,
+                "p90": 1.0,
+                "maximum": 1.0
+              }
+            },
+            {
+              "direction": 1,
+              "window": [
+                9,
+                14
+              ],
+              "start_s": 32.28000000001547,
+              "end_s": 32.480000000015,
+              "frames": 11,
+              "support_coverage": {
+                "samples": 11,
+                "minimum": 1.0,
+                "median": 1.0,
+                "p90": 1.0,
+                "maximum": 1.0
+              }
+            }
+          ]
+        }
+      },
+      "before_original_handover": {
+        "frames": 1700,
+        "valid_frames": 1700,
+        "valid_fraction": 1.0,
+        "recommendation_frames": 12,
+        "states": {
+          "retain": 1306,
+          "confirming": 106,
+          "blocked_candidate_shape": 276,
+          "recommend_tail": 12
+        },
+        "rejection_reasons": {},
+        "raw_error_joints": {
+          "samples": 1700,
+          "minimum": -0.22816682998520932,
+          "median": 0.21201756604138033,
+          "p90": 0.6399850937930976,
+          "maximum": 0.9876937555527849
+        },
+        "filtered_error_joints": {
+          "samples": 1700,
+          "minimum": -0.20786759489017645,
+          "median": 0.20898356271420798,
+          "p90": 0.6381514929643779,
+          "maximum": 0.9733447903120644
+        },
+        "down_error_all_deg": {
+          "samples": 1699,
+          "minimum": 0.06507959540079301,
+          "median": 4.150049961202818,
+          "p90": 17.823851762047255,
+          "maximum": 24.135843847904475
+        },
+        "down_error_valid_deg": {
+          "samples": 1699,
+          "minimum": 0.06507959540079301,
+          "median": 4.150049961202818,
+          "p90": 17.823851762047255,
+          "maximum": 24.135843847904475
+        },
+        "absolute_crest_error_all_joints": {
+          "samples": 1699,
+          "minimum": 2.0808454225473838e-05,
+          "median": 0.11159928439615818,
+          "p90": 0.7538582366756671,
+          "maximum": 0.9958857981864178
+        },
+        "absolute_crest_error_valid_joints": {
+          "samples": 1699,
+          "minimum": 2.0808454225473838e-05,
+          "median": 0.11159928439615818,
+          "p90": 0.7538582366756671,
+          "maximum": 0.9958857981864178
+        },
+        "true_gravity_error_joints": {
+          "samples": 1699,
+          "minimum": -0.12150043785092812,
+          "median": 0.3627588604849503,
+          "p90": 1.2261191538408522,
+          "maximum": 1.492962292872786
+        },
+        "support_cycle_center_joint_bin": {
+          "samples": 1176,
+          "minimum": 10.124685088538955,
+          "median": 10.370575309972182,
+          "p90": 10.626740154562313,
+          "maximum": 10.641946471724397
+        },
+        "current_support_coverage": {
+          "samples": 1699,
+          "minimum": 1.0,
+          "median": 1.0,
+          "p90": 1.0,
+          "maximum": 1.0
+        },
+        "recommendation_support_coverage": {
+          "samples": 12,
+          "minimum": 1.0,
+          "median": 1.0,
+          "p90": 1.0,
+          "maximum": 1.0
+        },
+        "recommendation_spans": [
+          {
+            "direction": 1,
+            "window": [
+              9,
+              14
+            ],
+            "start_s": 30.36000000001412,
+            "end_s": 30.36000000001412,
+            "frames": 1,
+            "support_coverage": {
+              "samples": 1,
+              "minimum": 1.0,
+              "median": 1.0,
+              "p90": 1.0,
+              "maximum": 1.0
+            }
+          },
+          {
+            "direction": 1,
+            "window": [
+              9,
+              14
+            ],
+            "start_s": 32.28000000001547,
+            "end_s": 32.480000000015,
+            "frames": 11,
+            "support_coverage": {
+              "samples": 11,
+              "minimum": 1.0,
+              "median": 1.0,
+              "p90": 1.0,
+              "maximum": 1.0
+            }
+          }
+        ]
+      },
+      "after_original_handover": {
+        "frames": 0,
+        "valid_frames": 0,
+        "valid_fraction": 0.0,
+        "recommendation_frames": 0,
+        "states": {},
+        "rejection_reasons": {},
+        "raw_error_joints": null,
+        "filtered_error_joints": null,
+        "down_error_all_deg": null,
+        "down_error_valid_deg": null,
+        "absolute_crest_error_all_joints": null,
+        "absolute_crest_error_valid_joints": null,
+        "true_gravity_error_joints": null,
+        "support_cycle_center_joint_bin": null,
+        "current_support_coverage": null,
+        "recommendation_support_coverage": null,
+        "recommendation_spans": []
+      },
+      "max_motor_matching_error_rad": 1.1102230246251565e-16,
+      "max_fk_world_matching_error_m": 2.2725698534629935e-15,
+      "matched_frames": 1699,
+      "first_external_window_change_s": null,
+      "old_controller_events": [
+        {
+          "time_s": 2.1999999999998687,
+          "kind": "acquire",
+          "to": [
+            8,
+            13
+          ],
+          "reason": "take over currently driven supported window"
+        }
+      ]
+    },
+    "endpoint": {
+      "source": "validation\\reports\\debug_modes\\endpoint_pull_trace.jsonl.gz",
+      "frames": 1700,
+      "config": {
+        "options": {
+          "width": 6,
+          "end_links": 4,
+          "minimum_end_links": 3,
+          "minimum_straightness": 0.98,
+          "maximum_end_disagreement_deg": 25.0,
+          "minimum_turn_deg": 150.0,
+          "maximum_turn_deg": 218.0,
+          "minimum_gap": 0.4,
+          "maximum_plane_rms_m": 0.015,
+          "boundary_links": 2,
+          "top_band_link_fraction": 0.125,
+          "samples_per_module": 12,
+          "minimum_projected_down": 0.25,
+          "error_filter_s": 0.2,
+          "offset_threshold_joints": 0.5,
+          "persistence_s": 0.5
+        },
+        "mechanical_lengths_m": [
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645
+        ],
+        "nominal_amplitude_deg": 59.99999999999999,
+        "input_units": "controller degrees; phase radians"
+      },
+      "original_feedback_delay_s": {
+        "samples": 1700,
+        "minimum": 0.01999999999995339,
+        "median": 0.02000000000000668,
+        "p90": 0.020000000000024443,
+        "maximum": 0.020000000000024443
+      },
+      "stages": {
+        "no_force": {
+          "frames": 600,
+          "valid_frames": 600,
+          "valid_fraction": 1.0,
+          "recommendation_frames": 0,
+          "states": {
+            "retain": 484,
+            "confirming": 35,
+            "blocked_candidate_shape": 81
+          },
+          "rejection_reasons": {},
+          "raw_error_joints": {
+            "samples": 600,
+            "minimum": -0.1060757615613781,
+            "median": 0.22067325821041806,
+            "p90": 0.6365358598647586,
+            "maximum": 0.6779752391359004
+          },
+          "filtered_error_joints": {
+            "samples": 600,
+            "minimum": -0.10305920302845366,
+            "median": 0.21046149800833516,
+            "p90": 0.6370619668622047,
+            "maximum": 0.6630209249968133
+          },
+          "down_error_all_deg": {
+            "samples": 599,
+            "minimum": 0.06507959540079301,
+            "median": 2.5683486474537474,
+            "p90": 3.9084377631103666,
+            "maximum": 4.633822712024958
+          },
+          "down_error_valid_deg": {
+            "samples": 599,
+            "minimum": 0.06507959540079301,
+            "median": 2.5683486474537474,
+            "p90": 3.9084377631103666,
+            "maximum": 4.633822712024958
+          },
+          "absolute_crest_error_all_joints": {
+            "samples": 599,
+            "minimum": 2.0808454225473838e-05,
+            "median": 0.04991659302764084,
+            "p90": 0.1007143848613435,
+            "maximum": 0.1430970218261134
+          },
+          "absolute_crest_error_valid_joints": {
+            "samples": 599,
+            "minimum": 2.0808454225473838e-05,
+            "median": 0.04991659302764084,
+            "p90": 0.1007143848613435,
+            "maximum": 0.1430970218261134
+          },
+          "true_gravity_error_joints": {
+            "samples": 599,
+            "minimum": -0.12150043785092812,
+            "median": 0.19351195824186895,
+            "p90": 0.6225110708325087,
+            "maximum": 0.7343576137313281
+          },
+          "support_cycle_center_joint_bin": {
+            "samples": 76,
+            "minimum": 10.36020928950737,
+            "median": 10.392040302100485,
+            "p90": 10.408179913540796,
+            "maximum": 10.412433064250758
+          },
+          "current_support_coverage": {
+            "samples": 599,
+            "minimum": 1.0,
+            "median": 1.0,
+            "p90": 1.0,
+            "maximum": 1.0
+          },
+          "recommendation_support_coverage": null,
+          "recommendation_spans": []
+        },
+        "right_force": {
+          "frames": 700,
+          "valid_frames": 15,
+          "valid_fraction": 0.02142857142857143,
+          "recommendation_frames": 0,
+          "states": {
+            "retain": 15,
+            "unobservable": 685
+          },
+          "rejection_reasons": {
+            "passive ends disagree on down direction": 685
+          },
+          "raw_error_joints": {
+            "samples": 700,
+            "minimum": -1.9650411054907373,
+            "median": -0.8001675060464386,
+            "p90": -0.002908133000905928,
+            "maximum": 0.26180368784135766
+          },
+          "filtered_error_joints": {
+            "samples": 15,
+            "minimum": 0.1409504816325559,
+            "median": 0.18607847234874175,
+            "p90": 0.19832937071392218,
+            "maximum": 0.19908586329629333
+          },
+          "down_error_all_deg": {
+            "samples": 700,
+            "minimum": 2.5963528629436086,
+            "median": 16.514551646783875,
+            "p90": 19.971933001198877,
+            "maximum": 24.731799648819507
+          },
+          "down_error_valid_deg": {
+            "samples": 15,
+            "minimum": 2.5963528629436086,
+            "median": 8.65685235394789,
+            "p90": 16.419977139951225,
+            "maximum": 18.26521688918052
+          },
+          "absolute_crest_error_all_joints": {
+            "samples": 700,
+            "minimum": 0.07930325843440578,
+            "median": 0.47732739609894104,
+            "p90": 0.7615136303128454,
+            "maximum": 0.9962053980131351
+          },
+          "absolute_crest_error_valid_joints": {
+            "samples": 15,
+            "minimum": 0.07930325843440578,
+            "median": 0.28035667705300504,
+            "p90": 0.544820159828945,
+            "maximum": 0.6122561030604299
+          },
+          "true_gravity_error_joints": {
+            "samples": 700,
+            "minimum": -1.6350281778763183,
+            "median": -0.29079179751149375,
+            "p90": 0.21163387324801156,
+            "maximum": 0.8807044581676085
+          },
+          "support_cycle_center_joint_bin": {
+            "samples": 700,
+            "minimum": 9.00596362081364,
+            "median": 9.836144880212622,
+            "p90": 10.267695428074825,
+            "maximum": 10.359001917286626
+          },
+          "current_support_coverage": {
+            "samples": 700,
+            "minimum": 1.0,
+            "median": 1.0,
+            "p90": 1.0,
+            "maximum": 1.0
+          },
+          "recommendation_support_coverage": null,
+          "recommendation_spans": []
+        },
+        "recovery": {
+          "frames": 400,
+          "valid_frames": 330,
+          "valid_fraction": 0.825,
+          "recommendation_frames": 164,
+          "states": {
+            "unobservable": 70,
+            "confirming": 63,
+            "recommend_head": 164,
+            "blocked_candidate_shape": 47,
+            "retain": 56
+          },
+          "rejection_reasons": {
+            "passive ends disagree on down direction": 70
+          },
+          "raw_error_joints": {
+            "samples": 400,
+            "minimum": -1.9677819456914225,
+            "median": -0.6970477717120867,
+            "p90": -0.23030831839292892,
+            "maximum": 0.016475661098084515
+          },
+          "filtered_error_joints": {
+            "samples": 330,
+            "minimum": -1.897869879911191,
+            "median": -0.7118632218721468,
+            "p90": -0.2605255959261351,
+            "maximum": -0.02016271940901219
+          },
+          "down_error_all_deg": {
+            "samples": 400,
+            "minimum": 0.30047243667946566,
+            "median": 3.7117430750521687,
+            "p90": 5.75376418682152,
+            "maximum": 17.399077595203035
+          },
+          "down_error_valid_deg": {
+            "samples": 330,
+            "minimum": 0.3262140804840537,
+            "median": 3.70920500016478,
+            "p90": 5.076463735311937,
+            "maximum": 9.94766266077139
+          },
+          "absolute_crest_error_all_joints": {
+            "samples": 400,
+            "minimum": 0.0010135851484704972,
+            "median": 0.13083956849260936,
+            "p90": 0.23514802311579378,
+            "maximum": 0.32985770144875737
+          },
+          "absolute_crest_error_valid_joints": {
+            "samples": 330,
+            "minimum": 0.0212704197968403,
+            "median": 0.1383254716136193,
+            "p90": 0.2334003013806319,
+            "maximum": 0.2638238789050842
+          },
+          "true_gravity_error_joints": {
+            "samples": 400,
+            "minimum": -1.7340969913849769,
+            "median": -0.5454285276645994,
+            "p90": -0.10617277881841976,
+            "maximum": 0.041690580229525764
+          },
+          "support_cycle_center_joint_bin": {
+            "samples": 285,
+            "minimum": 8.732594408876574,
+            "median": 8.732594408876574,
+            "p90": 8.98592528787608,
+            "maximum": 9.004137839549724
+          },
+          "current_support_coverage": {
+            "samples": 400,
+            "minimum": 1.0,
+            "median": 1.0,
+            "p90": 1.0,
+            "maximum": 1.0
+          },
+          "recommendation_support_coverage": {
+            "samples": 164,
+            "minimum": 1.0,
+            "median": 1.0,
+            "p90": 1.0,
+            "maximum": 1.0
+          },
+          "recommendation_spans": [
+            {
+              "direction": -1,
+              "window": [
+                7,
+                12
+              ],
+              "start_s": 28.980000000012435,
+              "end_s": 30.1800000000139,
+              "frames": 61,
+              "support_coverage": {
+                "samples": 61,
+                "minimum": 1.0,
+                "median": 1.0,
+                "p90": 1.0,
+                "maximum": 1.0
+              }
+            },
+            {
+              "direction": -1,
+              "window": [
+                7,
+                12
+              ],
+              "start_s": 31.820000000015906,
+              "end_s": 33.86000000001179,
+              "frames": 103,
+              "support_coverage": {
+                "samples": 103,
+                "minimum": 1.0,
+                "median": 1.0,
+                "p90": 1.0,
+                "maximum": 1.0
+              }
+            }
+          ]
+        }
+      },
+      "before_original_handover": {
+        "frames": 1584,
+        "valid_frames": 829,
+        "valid_fraction": 0.5233585858585859,
+        "recommendation_frames": 164,
+        "states": {
+          "retain": 499,
+          "confirming": 85,
+          "blocked_candidate_shape": 81,
+          "unobservable": 755,
+          "recommend_head": 164
+        },
+        "rejection_reasons": {
+          "passive ends disagree on down direction": 755
+        },
+        "raw_error_joints": {
+          "samples": 1584,
+          "minimum": -1.9677819456914225,
+          "median": -0.3226186981112251,
+          "p90": 0.46284601158927857,
+          "maximum": 0.6779752391359004
+        },
+        "filtered_error_joints": {
+          "samples": 829,
+          "minimum": -1.897869879911191,
+          "median": 0.049500388085101016,
+          "p90": 0.6069993428276407,
+          "maximum": 0.6630209249968133
+        },
+        "down_error_all_deg": {
+          "samples": 1583,
+          "minimum": 0.06507959540079301,
+          "median": 4.562775151813176,
+          "p90": 18.57361952978586,
+          "maximum": 24.731799648819507
+        },
+        "down_error_valid_deg": {
+          "samples": 828,
+          "minimum": 0.06507959540079301,
+          "median": 2.878588301012691,
+          "p90": 4.454137612194082,
+          "maximum": 18.26521688918052
+        },
+        "absolute_crest_error_all_joints": {
+          "samples": 1583,
+          "minimum": 2.0808454225473838e-05,
+          "median": 0.1660495660830641,
+          "p90": 0.6743318843737484,
+          "maximum": 0.9962053980131351
+        },
+        "absolute_crest_error_valid_joints": {
+          "samples": 828,
+          "minimum": 2.0808454225473838e-05,
+          "median": 0.06950618413075027,
+          "p90": 0.20148994931752978,
+          "maximum": 0.6122561030604299
+        },
+        "true_gravity_error_joints": {
+          "samples": 1583,
+          "minimum": -1.7340969913849769,
+          "median": -0.09349829402804666,
+          "p90": 0.4984181158156651,
+          "maximum": 0.8807044581676085
+        },
+        "support_cycle_center_joint_bin": {
+          "samples": 1060,
+          "minimum": 8.732594408876574,
+          "median": 9.629895492383568,
+          "p90": 10.312621449159904,
+          "maximum": 10.412433064250758
+        },
+        "current_support_coverage": {
+          "samples": 1583,
+          "minimum": 1.0,
+          "median": 1.0,
+          "p90": 1.0,
+          "maximum": 1.0
+        },
+        "recommendation_support_coverage": {
+          "samples": 164,
+          "minimum": 1.0,
+          "median": 1.0,
+          "p90": 1.0,
+          "maximum": 1.0
+        },
+        "recommendation_spans": [
+          {
+            "direction": -1,
+            "window": [
+              7,
+              12
+            ],
+            "start_s": 28.980000000012435,
+            "end_s": 30.1800000000139,
+            "frames": 61,
+            "support_coverage": {
+              "samples": 61,
+              "minimum": 1.0,
+              "median": 1.0,
+              "p90": 1.0,
+              "maximum": 1.0
+            }
+          },
+          {
+            "direction": -1,
+            "window": [
+              7,
+              12
+            ],
+            "start_s": 31.820000000015906,
+            "end_s": 33.86000000001179,
+            "frames": 103,
+            "support_coverage": {
+              "samples": 103,
+              "minimum": 1.0,
+              "median": 1.0,
+              "p90": 1.0,
+              "maximum": 1.0
+            }
+          }
+        ]
+      },
+      "after_original_handover": {
+        "frames": 116,
+        "valid_frames": 116,
+        "valid_fraction": 1.0,
+        "recommendation_frames": 0,
+        "states": {
+          "blocked_candidate_shape": 47,
+          "confirming": 13,
+          "retain": 56
+        },
+        "rejection_reasons": {},
+        "raw_error_joints": {
+          "samples": 116,
+          "minimum": -0.5766105332754012,
+          "median": -0.45247405971372334,
+          "p90": -0.016833377328570265,
+          "maximum": 0.016475661098084515
+        },
+        "filtered_error_joints": {
+          "samples": 116,
+          "minimum": -0.5751219883264991,
+          "median": -0.5104110936277604,
+          "p90": -0.07755647987695538,
+          "maximum": -0.02016271940901219
+        },
+        "down_error_all_deg": {
+          "samples": 116,
+          "minimum": 1.506692287615671,
+          "median": 3.79680529362298,
+          "p90": 4.150128893571855,
+          "maximum": 4.222257510680595
+        },
+        "down_error_valid_deg": {
+          "samples": 116,
+          "minimum": 1.506692287615671,
+          "median": 3.79680529362298,
+          "p90": 4.150128893571855,
+          "maximum": 4.222257510680595
+        },
+        "absolute_crest_error_all_joints": {
+          "samples": 116,
+          "minimum": 0.022904117220537756,
+          "median": 0.13249183714723234,
+          "p90": 0.1846676995171519,
+          "maximum": 0.1977681278908392
+        },
+        "absolute_crest_error_valid_joints": {
+          "samples": 116,
+          "minimum": 0.022904117220537756,
+          "median": 0.13249183714723234,
+          "p90": 0.1846676995171519,
+          "maximum": 0.1977681278908392
+        },
+        "true_gravity_error_joints": {
+          "samples": 116,
+          "minimum": -0.44319913239034747,
+          "median": -0.308975288115767,
+          "p90": 0.013146381870391188,
+          "maximum": 0.041690580229525764
+        },
+        "support_cycle_center_joint_bin": {
+          "samples": 1,
+          "minimum": 8.732594408876574,
+          "median": 8.732594408876574,
+          "p90": 8.732594408876574,
+          "maximum": 8.732594408876574
+        },
+        "current_support_coverage": {
+          "samples": 116,
+          "minimum": 1.0,
+          "median": 1.0,
+          "p90": 1.0,
+          "maximum": 1.0
+        },
+        "recommendation_support_coverage": null,
+        "recommendation_spans": []
+      },
+      "max_motor_matching_error_rad": 1.1102230246251565e-16,
+      "max_fk_world_matching_error_m": 2.2725698534629935e-15,
+      "matched_frames": 1699,
+      "first_external_window_change_s": 33.88000000001174,
+      "old_controller_events": [
+        {
+          "time_s": 2.1999999999998687,
+          "kind": "acquire",
+          "to": [
+            8,
+            13
+          ],
+          "reason": "take over currently driven supported window"
+        },
+        {
+          "time_s": 27.460000000010577,
+          "kind": "prepare",
+          "old": [
+            8,
+            13
+          ],
+          "to": [
+            7,
+            12
+          ],
+          "reason": "persistent cycle-averaged load displacement",
+          "strategy": "unloaded phase gate"
+        },
+        {
+          "time_s": 30.960000000014855,
+          "kind": "phase_hold",
+          "phase_rad": 17.26800000000021,
+          "exiting_joint": 13,
+          "entering_joint": 7
+        },
+        {
+          "time_s": 33.88000000001174,
+          "kind": "complete",
+          "old": [
+            8,
+            13
+          ],
+          "to": [
+            7,
+            12
+          ],
+          "strategy": "unloaded phase gate",
+          "phase_rad": 17.26800000000021,
+          "switch_angles_deg": [
+            -0.653427219463267,
+            -3.9818133697303004
+          ],
+          "switch_velocity_deg_s": [
+            0.05273740979438445,
+            1.3200912038139143
+          ],
+          "exit_torque_nm": [
+            -0.009303036868556706
+          ],
+          "reason": "persistent cycle-averaged load displacement",
+          "support_coverage": 1.0000000000000002
+        }
+      ]
+    }
+  }
+}

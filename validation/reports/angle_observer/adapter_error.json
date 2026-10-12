@@ -1,0 +1,11 @@
+{
+  "analysis_attempt": 1,
+  "status": "stopped on first input before producing observer results",
+  "error": "TypeError: float() argument must be a string or a number, not 'dict'",
+  "cause": "measured_controller_deg is a J1..J20 dictionary; replay adapter expected a list",
+  "repair": "Explicitly decode J1 through J20, independent of dictionary iteration order",
+  "observer_rules_changed": false,
+  "thresholds_changed": false,
+  "new_dynamics_runs": 0,
+  "raw_records_modified": false
+}

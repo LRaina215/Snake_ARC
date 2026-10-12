@@ -1,0 +1,15 @@
+{
+  "repair": "Use midpoint arclength quadrature for the top-band weighted centroid",
+  "confirmed_bug": "Equal sample counts gave a tiny straight piece the same total weight as a long arc",
+  "invariance_check_before_repair": {
+    "same_curve_unsplit_joint_coordinate": 6.961538461538462,
+    "same_curve_split_joint_coordinate": 6.731544424567681,
+    "difference_joints": 0.2299940369707807,
+    "status": "failed"
+  },
+  "expected_physical_centroid_for_both_representations": 7.0,
+  "algorithm_thresholds_changed": false,
+  "first_complete_analysis_preserved_in": "first_pass_piece_weighting",
+  "second_complete_analysis": "same two archived trajectories after correcting numerical integration",
+  "new_dynamics_runs": 0
+}
