@@ -1,0 +1,115 @@
+{
+  "scene": "straight",
+  "duration_s": 36.200000000006334,
+  "samples": 1700,
+  "stages": {
+    "no_force": {
+      "samples": 600,
+      "first_time_s": 2.2199999999998665,
+      "last_time_s": 14.19999999999757,
+      "delta_y_m": 0.004761013990225472,
+      "phase_advance_rad": 7.187999999999888,
+      "windows": [
+        [
+          8,
+          13
+        ]
+      ],
+      "mode_states": [
+        "run"
+      ],
+      "blocked_samples": 0,
+      "body_turn_min_deg": 180.143988588707,
+      "body_turn_max_deg": 186.90396418486654,
+      "gap_min": 0.5538532653841354,
+      "plane_rms_max_m": 0.008440188414601374,
+      "cycle_center_range": [
+        10.359001917286626,
+        10.412433064250758
+      ]
+    },
+    "right_force": {
+      "samples": 700,
+      "first_time_s": 14.219999999997558,
+      "last_time_s": 28.20000000001148,
+      "delta_y_m": 0.045659178791392606,
+      "phase_advance_rad": 8.388000000000261,
+      "windows": [
+        [
+          8,
+          13
+        ]
+      ],
+      "mode_states": [
+        "run"
+      ],
+      "blocked_samples": 0,
+      "body_turn_min_deg": 180.3761375488607,
+      "body_turn_max_deg": 186.85236808383542,
+      "gap_min": 0.5538221016425495,
+      "plane_rms_max_m": 0.008436435156045795,
+      "cycle_center_range": [
+        10.124685088538955,
+        10.487303132106334
+      ]
+    },
+    "recovery": {
+      "samples": 400,
+      "first_time_s": 28.220000000011506,
+      "last_time_s": 36.200000000006334,
+      "delta_y_m": -0.0442762267155483,
+      "phase_advance_rad": 4.7880000000001814,
+      "windows": [
+        [
+          8,
+          13
+        ]
+      ],
+      "mode_states": [
+        "run"
+      ],
+      "blocked_samples": 0,
+      "body_turn_min_deg": 179.9342863976552,
+      "body_turn_max_deg": 186.9532922318717,
+      "gap_min": 0.5536097558149463,
+      "plane_rms_max_m": 0.008443937712281736,
+      "cycle_center_range": [
+        10.487812927425356,
+        10.641946471724397
+      ]
+    }
+  },
+  "final_sliding_events": [
+    {
+      "time_s": 2.1999999999998687,
+      "kind": "acquire",
+      "to": [
+        8,
+        13
+      ],
+      "reason": "take over currently driven supported window"
+    }
+  ],
+  "final_sim_events": [
+    {
+      "episode": 0,
+      "time_s": 2.1999999999998687,
+      "kind": "gait_change",
+      "phase_rad": 0.0,
+      "window": [
+        8,
+        13
+      ],
+      "to": "sliding"
+    }
+  ],
+  "enabled_counts": [
+    6
+  ],
+  "passive_actuator_force_max_nm": 0.0,
+  "finite_state": true,
+  "pipe_diameter_min_max_m": [
+    0.113,
+    0.113
+  ]
+}

@@ -1,0 +1,203 @@
+{
+  "scene": "straight",
+  "pipe_diameter_min_max_m": [
+    0.113,
+    0.113
+  ],
+  "model_joint_limits_deg": [
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ],
+    [
+      -90.0,
+      90.0
+    ]
+  ],
+  "whole_body": {
+    "samples": 1700,
+    "finite_actual_state": true,
+    "enabled_counts": [
+      6
+    ],
+    "passive_actuator_force_max_nm": 0.0,
+    "active_actuator_force_max_nm": 1.2232065063967417,
+    "torque_limit_nm": 2.355,
+    "saturated_saved_samples": 0,
+    "saturation_scope": "20 ms saved states; not all 1 ms physical substeps",
+    "joint_angle_abs_max_deg": 62.968247537845464,
+    "joint_limit_excess_max_deg": 0.0,
+    "joint_limit_margin_min_deg": 27.031752462154536,
+    "support_up_sum_min_max_n": [
+      24.66537276197404,
+      31.05086347620051
+    ],
+    "body_turn_min_max_deg": [
+      179.9342863976552,
+      186.9532922318717
+    ],
+    "body_gap_min": 0.5536097558149463,
+    "body_plane_rms_max_m": 0.008443937712281736,
+    "body_projected_smooth_curve_radius_min_m": 0.05266637515338108,
+    "sent_turn_max_deg": 186.69005794265888,
+    "sent_gap_min": 0.5555403123482319,
+    "sent_constraint_violations": 0,
+    "minimum_backbone_height_m": 0.6483252223004756,
+    "replay_floor_contact_samples": 0,
+    "replay_scope": "geometric contact/height after mj_forward of saved qpos; no original floor force log",
+    "displacement_start_end_m": [
+      0.6442617408157532,
+      0.006418346106734725,
+      0.0034573179555001943
+    ],
+    "stage_y_peak_to_peak_m": {
+      "no_force": 0.028439370998307893,
+      "right_force": 0.08606508253908121,
+      "recovery": 0.06517321836628168
+    },
+    "complete_events": []
+  },
+  "endpoint_pull": {
+    "samples": 1700,
+    "finite_actual_state": true,
+    "enabled_counts": [
+      6
+    ],
+    "passive_actuator_force_max_nm": 0.0,
+    "active_actuator_force_max_nm": 1.8828278095539033,
+    "torque_limit_nm": 2.355,
+    "saturated_saved_samples": 0,
+    "saturation_scope": "20 ms saved states; not all 1 ms physical substeps",
+    "joint_angle_abs_max_deg": 63.49639802995002,
+    "joint_limit_excess_max_deg": 0.0,
+    "joint_limit_margin_min_deg": 26.503601970049974,
+    "support_up_sum_min_max_n": [
+      25.395946808784725,
+      35.490122621362836
+    ],
+    "body_turn_min_max_deg": [
+      171.67801712784487,
+      187.39186741030414
+    ],
+    "body_gap_min": 0.545488015454696,
+    "body_plane_rms_max_m": 0.008440188414601374,
+    "body_projected_smooth_curve_radius_min_m": 0.05211931206379979,
+    "sent_turn_max_deg": 187.33407864633864,
+    "sent_gap_min": 0.5462192716235924,
+    "sent_constraint_violations": 0,
+    "minimum_backbone_height_m": 0.5964409288513255,
+    "replay_floor_contact_samples": 0,
+    "replay_scope": "geometric contact/height after mj_forward of saved qpos; no original floor force log",
+    "displacement_start_end_m": [
+      0.5943846339156085,
+      0.017069749196768128,
+      -0.004358345793612051
+    ],
+    "stage_y_peak_to_peak_m": {
+      "no_force": 0.028439370998307893,
+      "right_force": 0.07501504732029922,
+      "recovery": 0.04305795980084204
+    },
+    "complete_events": [
+      {
+        "time_s": 33.88000000001174,
+        "kind": "complete",
+        "old": [
+          8,
+          13
+        ],
+        "to": [
+          7,
+          12
+        ],
+        "strategy": "unloaded phase gate",
+        "phase_rad": 17.26800000000021,
+        "switch_angles_deg": [
+          -0.653427219463267,
+          -3.9818133697303004
+        ],
+        "switch_velocity_deg_s": [
+          0.05273740979438445,
+          1.3200912038139143
+        ],
+        "exit_torque_nm": [
+          -0.009303036868556706
+        ],
+        "reason": "persistent cycle-averaged load displacement",
+        "support_coverage": 1.0000000000000002
+      }
+    ]
+  }
+}

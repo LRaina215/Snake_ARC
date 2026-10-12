@@ -1,0 +1,15 @@
+基础圆弧 | 保持，正在形成基础圆弧 | J8–J13 | A=60° omega=0.6rad/s | phase=0.0000rad | delta=0.1rad
+基础圆弧 | 保持，静置余2.0s | J8–J13 | A=60° omega=0.6rad/s | phase=0.0000rad | delta=0.1rad
+基础圆弧 | 保持 | J8–J13 | A=60° omega=0.6rad/s | phase=0.0000rad | delta=0.1rad
+固定截面顺应 | 保持 | J8–J13 | A=60° omega=0.6rad/s | phase=0.0000rad | delta=0.1rad
+截面K=0.02 yielding=0.7 | 窗口固定 | 阻塞原因=无
+滑动窗口模式 | 自动=True | 交接保持=False | waiting for load-bearing supported shape
+固定截面顺应 | 连续 | J8–J13 | A=60° omega=0.6rad/s | phase=0.0000rad | delta=0.1rad
+截面K=0.02 yielding=0.7 | 窗口固定 | 阻塞原因=无
+滑动窗口模式 | 自动=True | 交接保持=False | waiting for load-bearing supported shape
+固定截面顺应 | 连续 | J8–J13 | A=60° omega=0.6rad/s | phase=7.2000rad | delta=0.1rad
+截面K=0.02 yielding=0.7 | 窗口固定 | 阻塞原因=无
+滑动窗口模式 | 自动=True | 交接保持=False | retain: cycle-averaged support remains inside window deadband
+固定截面顺应 | 连续 | J8–J13 | A=60° omega=0.6rad/s | phase=15.6000rad | delta=0.1rad
+截面K=0.02 yielding=0.7 | 窗口固定 | 阻塞原因=无
+滑动窗口模式 | 自动=True | 交接保持=False | retain: cycle-averaged support remains inside window deadband

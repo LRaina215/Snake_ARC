@@ -1,0 +1,10 @@
+{
+  "attempt": "first endpoint-pull check",
+  "status": "interrupted before external force was applied",
+  "approximate_simulation_time_s": 14.2,
+  "error": "KeyError: Invalid name link20; the reused model calls the last body tail",
+  "evidence": "unit-check and dynamics-process stderr",
+  "raw_trace_preserved": false,
+  "limitation": "The process exited before serializing its in-memory prefix. Another run's prefix is not substituted as this run's actual data.",
+  "repair": "Read the final actuator joint's body ID from model metadata instead of constructing a body name."
+}

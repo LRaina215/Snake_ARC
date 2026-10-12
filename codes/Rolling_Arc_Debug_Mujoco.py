@@ -1,6 +1,7 @@
-"""手动调试版MuJoCo：直接运行，Ctrl热键与实机完全共用。
+"""手动调试版MuJoCo：基本Ctrl操作共用，仿真额外支持三模式和物理扰动。
 
-仅把实机总线替换为MuJoCo关节读写，使用真实动力学反馈而非目标回显。
+基础与固定顺应共用实机控制器；滑动模式调用既有仿真研究核心。
+MuJoCo关节接口提供真实动力学反馈而非目标回显。
 修改下方场景参数；步态、顺应与键位修改Rolling_Arc_Real.py顶部。
 自动研究实验仍使用原入口。本文件不打开真实串口。
 """
@@ -8,6 +9,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from dataclasses import replace
+import copy
+import math
 import json
 import queue
 import threading
@@ -17,6 +20,8 @@ import mujoco
 from codes import Rolling_Arc_Real as real
 from snake_control.rolling_arc import ArcParameters
 from snake_control.simulation import ArcSimulation, ROOT, backbone
+from snake_control.sliding_section_compliance import SlidingSectionCompliance, WindowOptions
+from snake_control.sliding_section_simulation import upward_support
 
 
 # ==================== 1. 手动测试参数 ====================
@@ -25,9 +30,263 @@ START_X_M = -.5                 # 弯管常用-.35，急弯常用-.25
 SAVE_LOG = True
 LOG_DIRECTORY = Path(__file__).resolve().parent / 'logs'
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 800
+PUSH_FORCE_N = 8.0              # Ctrl+A/D按住拉动左/右悬垂端、松开停止；总力，单位N
+PUSH_FORCE_STEP_N = 2.0         # Ctrl+[ / ] 调整扰动力；不会直接移动窗口或qpos
+PUSH_WORLD_DIRECTION = np.array([0., 1., 0.])
+PUSH_DOWNWARD_RATIO = 1.0        # 水平向外+向下拉；0时只水平拉，均归一化为上面的总力
+
+SIM_HELP = '''MuJoCo新增操作：
+  Ctrl+1 / 2 / 3：基础圆弧 / 固定截面顺应 / 滑动窗口截面顺应
+  Ctrl+A / D：按住拉动左(-Y) / 右(+Y)悬垂端；松开字母或Ctrl即停止
+  Ctrl+[ / ]：扰动总力减小 / 增大；Ctrl+W：自动选窗开/关（仅滑动模式）
+  Ctrl+R：明确结束当前试验，重建初始预览；不是连续运动中的位姿修正
+窗口外头/尾关节数是使能窗口的分布，不等于实际接触/悬垂关节数。
+滑动模式自动判断是否移窗；本体位移、承重和交接事件均单独记录。
+'''
 
 
-# ==================== 2. 关节接口：真实状态读角，显式使能+位置目标 ====================
+# ==================== 2. 仿真扩展键位与三模式控制器 ====================
+def decode_sim_hotkey(vk, control_down):
+    if not control_down:
+        return None
+    extra = {49: 'gait_basic', 50: 'gait_fixed', 51: 'gait_sliding',
+             97: 'gait_basic', 98: 'gait_fixed', 99: 'gait_sliding',
+             65: 'push_left', 68: 'push_right', 82: 'reset_preview',
+             87: 'window_auto', 219: 'push_weaker', 221: 'push_stronger'}
+    return extra.get(vk) or real.decode_hotkey(vk, control_down)
+
+
+def decode_sim_release(vk, is_control):
+    if is_control:
+        return 'push_stop'
+    return {65: 'push_left_stop', 68: 'push_right_stop'}.get(vk)
+
+
+class DebugArcController(real.RollingArcController):
+    """基础/固定模式复用实机，滑动模式调用已有研究核心，不移植至实机。"""
+    def __init__(self, bus, session):
+        super().__init__(bus)
+        self.session = session
+        self.sliding = None
+        self.pending_gait = None
+        self.sliding_fault = False
+        self.help_text = real.HELP+'\n'+SIM_HELP
+
+    def select_gait(self, kind):
+        if kind not in ('basic', 'fixed', 'sliding'):
+            raise ValueError('未知模式')
+        if kind == 'basic':
+            self.pending_gait = None
+            if self.compliance is not None:
+                self.session.record_event('gait_change', to=kind)
+                self.sliding = None
+                self.sliding_fault = False
+                super().toggle_compliance()  # 保留相位/目标，限速恢复当前窗口基础波。
+            return
+        if self.mode == 'released' or self.forming or self.settle_remaining > 0:
+            self.pending_gait = kind
+            print(f'已选择{kind}，形成与静置完成后尝试接入。', flush=True)
+            return
+        if kind == 'fixed':
+            if self.sliding is None:
+                if self.compliance is None:
+                    super().toggle_compliance()
+                    self.pending_gait = None
+                    self.session.record_event('gait_change', to=kind)
+                return
+            # 先检查，再替换。失败时保留原滑动模式、窗口与目标。
+            measured = np.radians(list(self.bus.read_angles(range(real.NUM_JOINTS)).values()))
+            valid, _ = self.check_actual_section(np.degrees(measured))
+            if not valid:
+                raise ValueError('实际形态不满足固定截面条件，未切换')
+            reference = real.SectionReference(self.first, self.last, self.amplitude)
+            core = real.FixedSectionCompliance(reference, real.LINK_LENGTHS_M, self.options)
+            nominal = measured.copy()
+            nominal[core.enabled] = reference.targets(self.phase)[core.enabled]
+            if not core._check_goal(nominal)[0]:
+                raise ValueError('当前基础参考不满足开放约束，未切换')
+            core.targets = np.radians(self.targets)
+            core.next_geometry_s = self.section_clock_s
+            self.sliding, self.compliance = None, core
+            self.refresh_compliance_feedback()
+            self.section_checked_sequence = -1
+            self.sliding_fault = False
+        else:
+            if self.sliding is not None and not self.sliding_fault:
+                return
+            if self.last-self.first+1 != 6:
+                raise ValueError('当前滑动核心要求连续6关节')
+            measured = np.radians(list(self.bus.read_angles(range(real.NUM_JOINTS)).values()))
+            valid, _ = self.check_actual_section(np.degrees(measured))
+            if not valid:
+                raise ValueError('实际形态不满足开放圆弧条件，未切换')
+            p = replace(self.session.sim.p, first_joint=self.first, last_joint=self.last,
+                        amplitude_deg=self.amplitude, omega_rad_s=self.omega, direction=1)
+            slider = SlidingSectionCompliance(p, real.LINK_LENGTHS_M, self.options, WindowOptions())
+            support = upward_support(self.session.sim)
+            slider.window = (self.first, self.last)
+            slider.weights = np.asarray(self.enabled, float)
+            slider.support[:] = support
+            slider.raw_support[:] = support
+            if support.sum() < slider.options.minimum_support_n or slider._coverage(slider.window) < slider.options.minimum_support_coverage:
+                raise ValueError('当前窗口承重或覆盖不足，未切换到滑动模式')
+            slider._make_core(slider.window, measured)
+            slider.core.targets = np.radians(self.targets)
+            slider.core.next_geometry_s = self.section_clock_s
+            slider.last_measured = measured.copy()
+            slider._reset_phase_load(self.phase)
+            slider.events.append(dict(time_s=self.session.elapsed, kind='acquire',
+                                      to=list(slider.window), reason='take over currently driven supported window'))
+            slider.cooldown_until = self.session.elapsed+slider.options.cooldown_s
+            self.sliding, self.compliance = slider, slider.core
+            self.sliding_fault = False
+        self.pending_gait = None
+        self.section_block_reason = None
+        self.freeze_targets = False
+        self.session.record_event('gait_change', to=kind)
+
+    def toggle_compliance(self):
+        self.select_gait('fixed' if self.compliance is None else 'basic')
+
+    def release(self, verify=True):
+        self.sliding = None
+        self.pending_gait = None
+        self.sliding_fault = False
+        self.session.stop_push()
+        super().release(verify)
+
+    def assign_parameters(self, command):
+        if self.sliding is not None and any(token.split('=')[0] in ('amplitude', 'window') for token in command.split()):
+            raise ValueError('滑动模式使用半圆归一化预算；调幅值/窗口先切回基础模式')
+        super().assign_parameters(command)
+        if self.sliding is not None:
+            self.sliding.section_options = self.options
+            self.sliding.core.options = self.options
+
+    def command(self, command):
+        command = command.strip().lower()
+        if command.startswith('gait_'):
+            self.select_gait(command[5:])
+        elif command in ('push_left', 'push_right'):
+            if not self.session.physics_started:
+                raise ValueError('先Ctrl+U接管再做本体扰动')
+            self.session.begin_push(-1 if command == 'push_left' else 1)
+        elif command in ('push_left_stop', 'push_right_stop'):
+            self.session.push_keys.discard(-1 if command == 'push_left_stop' else 1)
+        elif command == 'push_stop':
+            self.session.stop_push()
+        elif command in ('push_weaker', 'push_stronger'):
+            step = -PUSH_FORCE_STEP_N if command == 'push_weaker' else PUSH_FORCE_STEP_N
+            self.session.push_force = max(0., self.session.push_force+step)
+        elif command == 'reset_preview':
+            self.session.reset_preview()
+        elif command == 'window_auto':
+            if self.sliding is None:
+                raise ValueError('先切换到滑动模式')
+            self.sliding.automatic = not self.sliding.automatic
+            self.sliding.pending = None
+        elif command in ('quit', 'exit'):
+            self.session.stop_push()
+            super().command(command)
+        else:
+            super().command(command)
+
+    def tick(self, dt):
+        if self.sliding is None:
+            super().tick(dt)
+        elif self.mode != 'released':
+            self.tick_sliding(min(dt, real.CONTROL_PERIOD_S))
+        if self.pending_gait and self.mode != 'released' and not self.forming and self.settle_remaining <= 0:
+            kind, self.pending_gait = self.pending_gait, None
+            try:
+                self.select_gait(kind)
+            except ValueError as exc:
+                print(f'模式接入未执行：{exc}；可再次按模式热键重试。', flush=True)
+
+    def tick_sliding(self, dt):
+        self.section_clock_s += dt
+        self.refresh_compliance_feedback()  # 新实际角，每20ms采集，不能拿保持读数假装卸载速度为0。
+        self.feedback_time_s = self.session.elapsed
+        measured = np.radians(self.measured_angles())
+        _, self.actual_section = self.check_actual_section(np.degrees(measured))
+        if self.freeze_targets or self.sliding_fault:
+            self.bus.send_targets(self.targets, self.enabled)
+            return
+        previous_phase, previous_pending = self.phase, self.pending_phase
+        previous_targets = self.targets.copy()
+        old = self.sliding
+        old_core, old_window, old_weights = old.core, old.window, old.weights.copy()
+        if not old.phase_hold:
+            if self.mode == 'run':
+                self.phase += self.direction*self.omega*dt
+            elif self.mode == 'step':
+                increment = max(-self.omega*dt, min(self.omega*dt, self.pending_phase))
+                self.phase += increment
+                self.pending_phase -= increment
+        try:
+            target, weights = old.update(measured, self.phase, upward_support(self.session.sim),
+                                         self.session.elapsed, dt, self.session.sim.data.actuator_force.copy())
+            enabled = weights > 1e-12
+            if enabled.sum() != 6 or old.core.status != 'running' or not old.core._check_goal(target)[0]:
+                raise ValueError('滑动模式发送目标或使能不满足开放约束')
+            targets = np.degrees(target).tolist()
+            for i in np.flatnonzero(enabled):
+                real.angle_to_raw(i, targets[i])
+        except (ValueError, np.linalg.LinAlgError) as exc:
+            old.window, old.weights, old.core = old_window, old_weights, old_core
+            old.core.targets = np.radians(previous_targets)
+            old.preparation = old.transfer = None
+            old.phase_hold = False
+            self.compliance = old_core
+            self.phase, self.pending_phase = previous_phase, previous_pending
+            self.sliding_fault = True
+            self.block_section(str(exc)+'，重新选择模式后才能继续')
+            self.session.record_event('sliding_guard_reject', reason=str(exc))
+            self.bus.send_targets(previous_targets, self.enabled)
+            return
+        if enabled.tolist() != self.enabled:
+            entering = enabled & ~np.asarray(self.enabled, bool)
+            self.bus.prepare_enabled(np.degrees(measured), enabled, configure_mask=entering)
+            self.first, self.last = old.window
+            self.enabled = enabled.tolist()
+        self.compliance = old.core
+        self.targets = targets
+        self.bus.send_targets(targets, self.enabled)
+        self.command_phase = self.phase
+        if self.mode == 'step' and abs(self.pending_phase) < 1e-10:
+            self.mode = 'hold'
+
+    def snapshot(self):
+        row = super().snapshot()
+        if self.sliding is not None:
+            row['gait'] = 'sliding_section_compliance'
+            if row['compliance'] is not None:
+                row['compliance']['window_fixed'] = False
+        row.update(pending_gait=self.pending_gait,
+                   outside_window_head_joints=self.first-1,
+                   outside_window_tail_joints=real.NUM_JOINTS-self.last,
+                   sliding=None if self.sliding is None else copy.deepcopy(self.sliding.snapshot()),
+                   sliding_events=[] if self.sliding is None else copy.deepcopy(self.sliding.events))
+        if row['sliding'] is not None:
+            row['sliding']['automatic'] = self.sliding.automatic
+        return row
+
+    def show_status(self, include_feedback=False):
+        if self.sliding is None:
+            super().show_status(include_feedback)
+            return
+        label = {'released': '已释放', 'hold': '保持', 'run': '连续', 'step': '单步'}[self.mode]
+        print(f'滑动窗口截面顺应 | {label} | J{self.first}–J{self.last} | phase={self.phase:.4f}rad | '
+              f'omega={self.omega:g}rad/s | 自动={self.sliding.automatic} | '
+              f'交接保持={self.sliding.phase_hold}', flush=True)
+        print(f'截面K={self.options.gain:g} yielding={self.options.yielding:g} | '
+              f'半圆预算={180*self.sliding.budget_scale:g}° | '
+              f'{self.sliding.selection_reason} | 阻塞原因={self.section_block_reason or "无"}', flush=True)
+        if include_feedback:
+            print('实测角：'+' '.join(f'J{i+1}={v:.1f}°' for i, v in self.last_feedback.items()), flush=True)
+
+
+# ==================== 3. 关节接口：真实状态读角，显式使能+位置目标 ====================
 class MujocoMotorBus:
     def __init__(self, sim):
         self.sim = sim
@@ -72,9 +331,11 @@ class MujocoMotorBus:
         self.sim.drive.apply_targets(self.sim.data, np.radians(self.targets_deg), self.enabled)
 
 
+# ==================== 4. 物理场景、端点扰动与记录 ====================
 class DebugSession:
-    """两端共用控制器、命令分派和反馈周期；仅后端执行器不同。"""
+    """共用基础/固定控制；仿真扩展滑动模式、物理扰动和实际状态记录。"""
     def __init__(self, scene=SCENE, start_x=START_X_M):
+        self.start_x = start_x
         real.validate_setup()
         p = replace(ArcParameters.load(ROOT/'configs/step1.json'),
                     joints=real.NUM_JOINTS, first_joint=real.FIRST_JOINT, last_joint=real.LAST_JOINT,
@@ -89,11 +350,76 @@ class DebugSession:
             raise ValueError('控制周期须是MuJoCo时间步长的整数倍')
         self.substeps = int(round(steps))
         self.bus = MujocoMotorBus(self.sim)
-        self.controller = real.RollingArcController(self.bus)
+        self.push_keys, self.push_force = set(), PUSH_FORCE_N
+        self.events, self.episode_index = [], 0
+        self._configure_perturbation()
+        self.controller = DebugArcController(self.bus, self)
         self.commands = queue.Queue()
         self.next_feedback, self.elapsed = 0., 0.
         self.start_wall = time.monotonic()
         self.physics_started = False
+        self.colour_active()
+
+    def _configure_perturbation(self):
+        direction = np.asarray(PUSH_WORLD_DIRECTION, float)
+        if not np.isfinite(direction).all() or direction.shape != (3,) or np.linalg.norm(direction) <= 1e-12:
+            raise ValueError('扰动方向必须是有限非零三维向量')
+        if not math.isfinite(self.push_force) or self.push_force < 0:
+            raise ValueError('扰动力必须有限且非负')
+        self.push_direction = direction/np.linalg.norm(direction)
+        self.robot_bodies = np.arange(self.sim.model.body('head').id, self.sim.model.nbody)
+        self.push_targets = {}
+        self.initial_center = backbone(self.sim.model, self.sim.data).mean(axis=0)
+
+    def stop_push(self):
+        self.push_keys.clear()
+        self.push_targets.clear()
+        self.sim.data.xfrc_applied[:] = 0.
+
+    def begin_push(self, sign):
+        model = self.sim.model
+        last_body = int(model.jnt_bodyid[model.actuator_trnid[-1, 0]])
+        endpoints = [model.body('head').id, last_body]
+        projected = [self.sim.data.xpos[b] @ self.push_direction for b in endpoints]
+        body = endpoints[int(np.argmin(projected) if sign < 0 else np.argmax(projected))]
+        direction = sign*self.push_direction+np.array([0., 0., -PUSH_DOWNWARD_RATIO])
+        if not np.isfinite(direction).all() or np.linalg.norm(direction) <= 1e-12:
+            raise ValueError('拉动方向配置退化')
+        self.push_targets[sign] = (body, direction/np.linalg.norm(direction))
+        self.push_keys.add(sign)  # 按下时选定物理端点，不在滚动中反复更换施力端。
+
+    def apply_push(self):
+        self.sim.data.xfrc_applied[:] = 0.
+        if len(self.push_keys) != 1:
+            return  # 同时按住两个相反方向时不产生额外向下合力。
+        for sign in self.push_keys:
+            body, direction = self.push_targets[sign]
+            self.sim.data.xfrc_applied[body, :3] += self.push_force*direction
+
+    def record_event(self, kind, **fields):
+        self.events.append(dict(episode=self.episode_index, time_s=self.elapsed, kind=kind,
+                                phase_rad=self.controller.phase,
+                                window=[self.controller.first, self.controller.last], **fields))
+
+    def reset_preview(self):
+        # 只有明确Ctrl+R才重新设置位姿，保存上一段终态，不能冒充连续运动。
+        before = dict(actual_qpos=self.sim.data.qpos.tolist(), actual_qvel=self.sim.data.qvel.tolist(),
+                      targets=self.controller.targets.copy(), enabled=self.controller.enabled.copy())
+        self.record_event('reset_episode', previous_state=before)
+        self.controller.release()
+        p = replace(ArcParameters.load(ROOT/'configs/step1.json'),
+                    joints=real.NUM_JOINTS, first_joint=real.FIRST_JOINT, last_joint=real.LAST_JOINT,
+                    amplitude_deg=real.AMPLITUDE_DEG, omega_rad_s=real.OMEGA_RAD_S,
+                    initial_phase_rad=real.INITIAL_PHASE_RAD, settle_s=real.SETTLE_S)
+        self.sim = ArcSimulation(self.sim.scene, p, self.start_x)
+        self.bus = MujocoMotorBus(self.sim)
+        self._configure_perturbation()
+        fresh = DebugArcController(self.bus, self)
+        self.controller.__dict__.clear()
+        self.controller.__dict__.update(fresh.__dict__)  # 保持队列分派中的对象身份。
+        self.next_feedback, self.elapsed = 0., 0.
+        self.physics_started = False
+        self.episode_index += 1
         self.colour_active()
 
     def advance(self):
@@ -107,11 +433,13 @@ class DebugSession:
         if not self.physics_started:
             return
         before = (c.mode, c.forming, c.settle_remaining > 0)
-        self.next_feedback = real.poll_control_feedback(c, self.elapsed, self.next_feedback)
+        if c.sliding is None:
+            self.next_feedback = real.poll_control_feedback(c, self.elapsed, self.next_feedback)
         c.tick(real.CONTROL_PERIOD_S)
         if before != (c.mode, c.forming, c.settle_remaining > 0):
             c.show_status()
         for _ in range(self.substeps):
+            self.apply_push()
             self.bus.apply_drive()
             mujoco.mj_step(self.sim.model, self.sim.data)
         self.elapsed = float(self.sim.data.time)
@@ -129,20 +457,32 @@ class DebugSession:
 
     def snapshot(self):
         data = self.sim.data
+        center = backbone(self.sim.model, data).mean(axis=0)
+        support = upward_support(self.sim)
         return dict(time_s=float(data.time), wall_elapsed_s=time.monotonic()-self.start_wall,
                     execution='mujoco_debug', scene=self.sim.scene,
                     physics_started=self.physics_started, **self.controller.snapshot(),
                     actual_qpos=data.qpos.tolist(), actual_qvel=data.qvel.tolist(),
                     actuator_force_nm=data.actuator_force.tolist(),
-                    motor_feedback='continuous_model_joint_angles')
+                    motor_feedback='continuous_model_joint_angles', episode=self.episode_index,
+                    events=copy.deepcopy(self.events), body_center_m=center.tolist(),
+                    body_displacement_m=(center-self.initial_center).tolist(),
+                    support_up_n=support.tolist(),
+                    instantaneous_support_center_joint=(None if support.sum() <= 1e-12 else
+                        float(support @ np.arange(1, real.NUM_JOINTS+1)/support.sum())),
+                    perturb_force_setting_n=self.push_force,
+                    perturb_active_bodies=([self.sim.model.body(self.push_targets[sign][0]).name
+                        for sign in sorted(self.push_keys)] if len(self.push_keys) == 1 else []),
+                    perturb_force_world_n=data.xfrc_applied[self.robot_bodies, :3].sum(axis=0).tolist())
 
     def close(self):
+        self.stop_push()
         self.controller.release()
         self.bus.apply_drive()
         mujoco.mj_forward(self.sim.model, self.sim.data)
 
 
-# ==================== 3. 三维查看器：只有鼠标相机，没有MuJoCo原生键盘菜单 ====================
+# ==================== 5. 三维查看器：只有鼠标相机，没有MuJoCo原生键盘菜单 ====================
 class DebugViewer:
     """使用MuJoCo渲染API，避开默认viewer的键盘快捷键；热键由实机监听器处理。"""
     def __init__(self, session, visible=True):
@@ -202,16 +542,33 @@ class DebugViewer:
                               mujoco.mjtCatBit.mjCAT_ALL, self.scene)
         viewport = mujoco.MjrRect(0, 0, width, height)
         mujoco.mjr_render(viewport, self.scene, self.context)
-        left = 'Gait\nMode\nWindow\nPhase\nPhysics\nTime'
-        right = (f'{"fixed section" if c.compliance else "basic arc"}\n{c.mode}'
-                 f'\nJ{c.first}-J{c.last}\n{c.phase:.3f} rad'
+        gait = 'sliding section' if c.sliding else 'fixed section' if c.compliance else 'basic arc'
+        delta = backbone(sim.model, sim.data).mean(axis=0)-self.session.initial_center
+        slider = c.sliding.snapshot() if c.sliding is not None else None
+        if slider is None:
+            cycle, handover = '-', '-'
+        else:
+            center = slider['cycle_support_center_joint']
+            cycle = f'J{center:.2f}' if center is not None else f"collecting {slider['load_observation_phase_rad']:.1f}/6.3 rad"
+            handover = 'unloading' if slider['phase_hold'] else 'waiting zero phase' if slider['preparation'] else 'none'
+        pull = 'off'
+        if len(self.session.push_keys) == 1:
+            sign = next(iter(self.session.push_keys))
+            body = self.session.sim.model.body(self.session.push_targets[sign][0]).name
+            pull = f'{"left" if sign < 0 else "right"} {self.session.push_force:.1f} N @{body}'
+        left = 'Gait\nMode\nWindow\nOutside joints\nPhase\nPhysics\nTime\nPull\nSide displacement\nCycle load center\nHandover'
+        right = (f'{gait}{" -> "+c.pending_gait if c.pending_gait else ""}\n{c.mode}'
+                 f'\nJ{c.first}-J{c.last}\nHead:{c.first-1}  Tail:{real.NUM_JOINTS-c.last}'
+                 f'\n{c.phase:.3f} rad'
                  f'\n{"running" if self.session.physics_started else "initial preview; Ctrl+U"}'
-                 f'\n{sim.data.time:.2f} s')
+                 f'\n{sim.data.time:.2f} s'
+                 f'\n{pull}\n{float(delta @ self.session.push_direction):+.3f} m'
+                 f'\n{cycle}\n{handover}')
         mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPLEFT,
                           viewport, left, right, self.context)
         mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT,
-                          viewport, 'Ctrl+U form | Ctrl+J/H step | Ctrl+G run/pause | Ctrl+E compliance\nCtrl+X release | Ctrl+Q quit',
-                          'Ctrl+Space pause | Ctrl+N freeze targets\nCtrl+T reverse | Ctrl+arrows tune', self.context)
+                          viewport, 'Ctrl+1/2/3: modes | Ctrl+U: form | Ctrl+G: run/pause\nHold Ctrl+A/D: pull left/right | Ctrl+[ / ]: force\nCtrl+W: auto window | Ctrl+R: reset preview',
+                          'Ctrl+J/H: step | Ctrl+E: compliance\nCtrl+Space: pause | Ctrl+N: freeze\nCtrl+X: release | Ctrl+Q: quit', self.context)
         self.glfw.swap_buffers(self.window)
         self.glfw.poll_events()
 
@@ -223,7 +580,7 @@ class DebugViewer:
         self.glfw.terminate()
 
 
-# ==================== 4. 直接运行；与实机共用Ctrl热键和控制台 ====================
+# ==================== 6. 直接运行；基本操作共用Ctrl热键和控制台 ====================
 def main():
     from pynput import keyboard
     session = DebugSession()
@@ -231,13 +588,14 @@ def main():
     stop = threading.Event()
     try:
         viewer = DebugViewer(session)
-        listener = real.global_key_listener(session.commands, keyboard)
+        listener = real.global_key_listener(session.commands, keyboard, decode_sim_hotkey, decode_sim_release)
         console = threading.Thread(target=real.console_listener, args=(session.commands, stop), daemon=True)
         console.start()
         if SAVE_LOG:
             path, log_file = real.open_run_log(LOG_DIRECTORY, prefix='mujoco_debug')
             print(f'MuJoCo调试日志：{path}', flush=True)
         print(real.HELP, flush=True)
+        print(SIM_HELP, flush=True)
         print('启动为静态预览；Ctrl+U接管或Ctrl+X释放后开始物理，暂停相位不暂停物理。蓝色使能，紫色失能。', flush=True)
         next_log = 0.
         while viewer.running() and not session.controller.quit:

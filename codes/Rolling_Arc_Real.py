@@ -1227,7 +1227,7 @@ def decode_hotkey(vk, control_down):
     return special.get(vk) or HOTKEY_COMMANDS.get(chr(vk) if vk is not None and 65 <= vk <= 90 else '')
 
 
-def global_key_listener(commands, keyboard):
+def global_key_listener(commands, keyboard, command_decoder=decode_hotkey, release_decoder=None):
     held = set()
     control_keys = {keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r}
 
@@ -1238,12 +1238,19 @@ def global_key_listener(commands, keyboard):
         vk = getattr(key, 'vk', None)
         if vk is None:
             vk = getattr(getattr(key, 'value', None), 'vk', None)
-        command = decode_hotkey(vk, bool(held & control_keys))
+        command = command_decoder(vk, bool(held & control_keys))
         if command:
             commands.put(command)
 
     def on_release(key):
         held.discard(key)
+        if release_decoder is not None:
+            vk = getattr(key, 'vk', None)
+            if vk is None:
+                vk = getattr(getattr(key, 'value', None), 'vk', None)
+            command = release_decoder(vk, key in control_keys)
+            if command:
+                commands.put(command)
 
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.daemon = True
@@ -1329,7 +1336,7 @@ def process_control_commands(controller, commands, elapsed):
         command = commands.get_nowait()
         try:
             if command.strip().lower() == 'help':
-                print(HELP, flush=True)
+                print(getattr(controller, 'help_text', HELP), flush=True)
                 continue
             controller.command(command)
             if command.strip().lower() == 'status':
