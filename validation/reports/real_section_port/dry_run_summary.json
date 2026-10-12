@@ -1,0 +1,25 @@
+{
+  "execution": "memory_serial",
+  "real_hardware_connected": false,
+  "physical_motion_simulated": false,
+  "software_duration_s": 8,
+  "logged_samples": 74,
+  "modes": [
+    "basic_arc",
+    "fixed_section_compliance"
+  ],
+  "windows": [
+    [
+      8,
+      13
+    ]
+  ],
+  "enabled_counts": [
+    6
+  ],
+  "section_samples": 17,
+  "section_blocked_samples": 0,
+  "full_feedback_reads": 11,
+  "geometry_calculations": 34,
+  "max_goal_section_turn_deg": 185.7542167774734
+}

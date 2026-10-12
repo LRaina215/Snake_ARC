@@ -1,6 +1,6 @@
 # Snake_ARC
 
-圆弧滚动管外运动研究。当前新增局部实际形状截面顺应与滑动窗口仿真：固定6关节、整周期承重定位、卸载相位交接，其余关节主动失能。已完成有限实验计划，包含110→210 mm连续90°急弯变径，全身通过且观察内未累计收紧。急弯严格管轴覆盖、4 N载荷触发迁移仍有未通过项，详见逐轮报告。实机代码仍为旧版本，等待用户验收后再移植。
+圆弧滚动管外运动研究。已完成局部实际形状截面顺应与滑动窗口的有限仿真实验，包含110→210 mm连续90°急弯变径；运动和身体开放通过，严格管轴覆盖及4 N载荷迁移仍有未通过项。实机现已移植固定窗口截面顺应，Ctrl+E开关，默认基础圆弧、J8–J13固定使能；滑动窗口保留在仿真，真实效果尚待用户实验验证。
 
 参考 `Snake_Robot_Gait` 的目录结构：`codes/` 为入口，`snake_control/` 为共享控制模块，`mujoco_model/` 为模型，`tools/` 为模型构建工具，`validation/` 为验证，`configs/` 为参数，`docs/` 为交接和复用说明。
 
@@ -35,7 +35,7 @@ py -3.12 -X utf8 validation/render_sliding_section.py --labels s4_sliding_cyclem
 
 已运行18次动力学实验：原计划16次，另加2次替换不合格的90°相位初始化。没有追加反馈延迟、低阻尼或统计重复。通过的变化场景全身越过后观察至少3个周期；急弯也保留完整出口记录和未验收原因。基础对照同样通过直管变径，尚未证明顺应控制的性能优势或精确管径跟踪。
 
-方法、参数和与2023方法的区别见[固定窗口截面顺应设计](docs/固定窗口截面顺应设计.md)，逐轮问题、实际状态和复现命令见[实验记录](validation/reports/fixed_section/README.md)。新方法尚未移植到实机，以下入口只运行MuJoCo。
+方法、参数和与2023方法的区别见[固定窗口截面顺应设计](docs/固定窗口截面顺应设计.md)，逐轮问题、实际状态和复现命令见[实验记录](validation/reports/fixed_section/README.md)。下面入口运行MuJoCo；固定截面实机入口另见下一段。
 
 ```powershell
 # 三维交互：空格冻结相位，E切换几何增益，R反向；物理和顺应仍运行
@@ -47,6 +47,17 @@ py -3.12 -X utf8 validation/render_fixed_section.py --labels r5_taper90 r5_elbow
 ```
 
 ![真90°变径弯完整时程](validation/reports/fixed_section/r5_taper90_review.png)
+
+## 实机固定窗口截面顺应：当前入口
+
+运行一份`codes/Rolling_Arc_Real.py`，不需要MuJoCo或EXE。默认基础圆弧，Ctrl+U形成后Ctrl+J/H单步、Ctrl+G连续；**Ctrl+E开关固定截面顺应**，保留相位与固定6关节使能范围。暂停相位仍做顺应，Ctrl+N冻结目标；关闭顺应会限速回到基础圆弧。本版使用实测角重建截面，原始负载/电流只记录，不自动选窗或扩缩。
+
+```powershell
+py -3.12 -m pip install -r requirements-real.txt
+py -3.12 -X utf8 codes/Rolling_Arc_Real.py --port COM9 --log logs/rolling_arc_real.jsonl
+```
+
+顶部可改K、yielding、滤波、连杆长度和反馈间隔；运行中可输入`gain=0.02 yielding=0.7 filter=0.15`。15项离线检查及单文件内存串口入口流程通过，没有连接真实机器人。[操作与常改位置](docs/实机调试代码说明.md) · [本轮离线记录](validation/reports/real_section_port/README.md)
 
 ## 首版 Step2 历史结果与运行
 
@@ -67,7 +78,7 @@ py -3.12 -X utf8 validation/step2_experiment.py
 py -3.12 -X utf8 validation/step2_experiment.py --baseline --cases straight bend90 elbow90 taper_straight taper_bend90
 ```
 
-实机仍运行 `codes/Rolling_Arc_Real.py`：Ctrl+U 基础形成，Ctrl+E 接入顺应性，Ctrl+J/H 单步，Ctrl+G 连续。输入 `gain=0.02 load=40` 调参；`support=auto` 用原始负载+姿态估计，无法保证失能区域真实接触可观测；`support=9:11` 按实物人工给定支撑。详细操作见 [实机说明](docs/实机调试代码说明.md)。代码移植和离线协议检查已完成，本轮没有连接真实机器人。
+早期实机的原始负载/姿态估计与自动窗口接口已经从当前运行流程移除；`support`/`load`不适用于当前固定截面入口。旧核心仅为历史仿真对照保留在单文件第3A段，当前Ctrl+E使用第3B段完整截面重建。
 
 ## Step1 基础结果
 
@@ -103,8 +114,8 @@ py -3.12 validation/step1_experiment.py
 # 只重跑选定场景，单独输出，避免覆盖完整验收报告
 py -3.12 validation/step1_experiment.py --cases elbow90 --output validation/results/elbow90_repeat
 
-# 控制/失能/配置和实机映射的必要检查
-py -3.12 -m unittest discover -s validation -p "test_*.py" -v
+# 当前实机基础/固定截面的必要离线检查
+py -3.12 -m unittest validation.test_real_controller validation.test_real_step2 -v
 
 # 从已保存实际状态渲染截图；不会重新执行试验
 py -3.12 validation/render_step1.py
@@ -138,7 +149,7 @@ py -3.12 codes/Rolling_Arc_Real.py --dry-run
 | `validation/sliding_section_experiment.py` | 单次动力学运行、实际状态存档及分项判定 |
 | `validation/reports/sliding_section/` | 当前17次运行证据、全时程、视频与复盘 |
 | `codes/Rolling_Arc_Adaptive_Mujoco.py` | Step2 交互/无窗口仿真、已有姿态接管入口 |
-| `snake_control/arc_compliance.py` | 导出实机文件中的同一顺应性核心，避免双份公式 |
+| `snake_control/arc_compliance.py` | 历史仿真原型；与当前固定截面实机入口分开 |
 | `snake_control/adaptive_simulation.py` | 管道接触支撑提取、动态驱动掩码与相位推进 |
 | `mujoco_model/` | 复用的 20 关节机器人、网格和三种管道 |
 | `tools/build_step1_scenes.py` | 保留原碰撞几何，生成水平管场景 |
@@ -149,6 +160,8 @@ py -3.12 codes/Rolling_Arc_Real.py --dry-run
 | `codes/Rolling_Arc_Real_Preview.py` | 原设备档案对应的离线报文预览 |
 | `codes/Rolling_Arc_Real.py` | 独立实机串口入口，参数/公式集中，Ctrl 热键和控制台调试 |
 | `docs/实机调试代码说明.md` | 真实运行、调试键位、常改位置、反馈与验证边界 |
+| `tools/build_real_section_core.py` | 显式同步已验证数学核心至实机单文件第3B段，不是运行依赖 |
+| `validation/reports/real_section_port/` | 当前固定截面移植的15项离线检查和入口统计 |
 | `docs/Step1设计说明.md` | 步态公式、失能含义、初始化及验证边界 |
 | `docs/复用来源.md` | 源仓库文件与修改说明 |
 | `交接记录.md` | 当前完成内容、命令、未完成部分和后续接口 |
