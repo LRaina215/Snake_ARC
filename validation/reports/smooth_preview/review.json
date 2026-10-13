@@ -1,0 +1,14 @@
+{
+  "source": "display_pull_20261013_165050_222158",
+  "control_frames": 1250,
+  "display_frames": 125,
+  "cached_curve_frames": 114,
+  "maximum_target_error_rad": 1.1102230246251565e-16,
+  "hardware_connections": 0,
+  "new_dynamics": 0,
+  "passed": true,
+  "adapter_curve_parity": true,
+  "control_curves_match_archive": true,
+  "display_does_not_mutate_control": true,
+  "fallback_labels_checked": true
+}

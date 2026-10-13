@@ -2945,6 +2945,24 @@ class DualEndGravityPreview:
         return self.result
 # END GRAVITY_PREVIEW_CORE
 
+def preview_section_geometry(geometry):
+    """只复制控制器已有的线/圆弧与截面坐标；采样留给显示进程。"""
+    if geometry is None:
+        return None
+    return dict(origin=geometry['axis']['point'].tolist(),
+                basis=geometry['axis']['basis'][:, :2].tolist(),
+                segments=[dict(start=s.start.tolist(), tangent=s.tangent.tolist(),
+                               length=s.length, radius=s.radius, turn=s.turn,
+                               joint=s.joint, kind=s.kind) for s in geometry['curve']])
+
+
+def preview_smooth_points(geometry):
+    """把控制截面的采样点还原到头部坐标，再交由共同的显示投影处理。"""
+    segments = [Segment(np.array(s['start']), np.array(s['tangent']), s['length'],
+                        s['radius'], s['turn'], s['joint'], s['kind']) for s in geometry['segments']]
+    return sample_section(segments)@np.array(geometry['basis']).T+np.array(geometry['origin'])
+
+
 def preview_payload(controller):
     """仅拷贝显示所需数据；目标线在失能段沿用实测角，不画虚假的零角尾部。"""
     complete = set(controller.states) == set(range(NUM_JOINTS))
@@ -2955,7 +2973,13 @@ def preview_payload(controller):
     slider = controller.sliding
     selection = getattr(slider, 'selection', None) or {}
     observation = getattr(slider, 'observation', None) or {}
+    core = controller.compliance
+    section = None if core is None else dict(
+        source='control', window=[core.first, core.last], updates=core.updates,
+        measured=preview_section_geometry(core.geometry),
+        candidate=preview_section_geometry(core.target_geometry))
     return dict(angles_deg=angles, target_deg=target, enabled=enabled,
+        smooth_section=section,
         gravity_time_s=controller.motor_sample_clock()[1],
         enable_known=controller.touched_hardware, feedback_wall_s=controller.feedback_wall_s,
         window=[controller.first, controller.last], phase_rad=controller.phase,
@@ -2982,7 +3006,7 @@ class JointPreviewFigure:
         self.mask = self.figure.add_subplot(grid[2, 1])
         self.header = self.figure.suptitle('等待实测角度；预览不会使能或驱动舵机', fontsize=12)
         self.note = self.figure.text(.04, .04, '', fontsize=10, va='bottom')
-        self.figure.subplots_adjust(left=.05, right=.97, top=.88, bottom=.20, wspace=.24, hspace=.65)
+        self.figure.subplots_adjust(left=.05, right=.97, top=.88, bottom=.24, wspace=.24, hspace=.65)
         self.section_horizontal = None
         from matplotlib.widgets import Button
         self.gravity = DualEndGravityPreview(LINK_LENGTHS_M)
@@ -3034,7 +3058,7 @@ class JointPreviewFigure:
                   'unobservable_hold': '无可信悬垂段，保留方向', 'reacquiring': '重新获取', 'waiting': '等待悬垂参考'}
         view_label = '重力对齐' if aligned else '头部坐标'
         gravity_label = '反馈陈旧' if stale else states[gravity['state']]
-        self.note.set_text(f'{view_label}截面 | {gravity_label}；蓝/紫实线：实测，橙色虚线：目标。\n'
+        self.note.set_text(f'{view_label}截面 | {gravity_label}；折线：实测 / 已发目标。\n'
             f"自动={row['automatic']} | 决策={decision} {direction} | 数量估计={count_text}\n"
             f"状态：{row['block_reason'] or ', '.join(row['reasons']) or '正常'}；关闭此窗口不停止控制，Ctrl+X失能。")
         if row['angles_deg'] is not None:
@@ -3062,10 +3086,38 @@ class JointPreviewFigure:
             points, target = points@projection.T, target@projection.T
             for i in range(NUM_JOINTS+1):
                 colour = colours[max(0, i-1)]
-                self.body.plot(*points[i:i+2].T, color=colour, lw=3, alpha=.45 if stale else 1.)
-            self.body.plot([], [], color='#147bb5', lw=3, label='实测（紫色为失能段）')
-            self.body.plot(*target.T, '--', color='#e38b27', lw=2, label='目标（失能段沿用实测角）')
-            self.body.legend(loc='best', fontsize=9)
+                self.body.plot(*points[i:i+2].T, color=colour, lw=1.5, alpha=.35 if stale else .65)
+            self.body.plot([], [], color='#147bb5', lw=1.5, label='实测连杆（紫：失能）')
+            self.body.plot(*target.T, '--', color='#e38b27', lw=1.5, label='已发目标连杆')
+            smooth_points, smooth_note = [], '平滑截面：等待控制器更新'
+            section = row.get('smooth_section')
+            self.smooth_display = {}  # 便于离线核对；不传回控制线程。
+            try:
+                if section is None:
+                    # 基础步态没有顺应控制截面，必须标注为同法重建而非控制输入。
+                    section = dict(source='reconstructed', window=window,
+                        measured=preview_section_geometry(local_section(np.radians(row['angles_deg']), row['lengths'], *window)),
+                        candidate=preview_section_geometry(local_section(np.radians(row['target_deg']), row['lengths'], *window)))
+                if list(section['window']) != list(window):
+                    smooth_note = '平滑截面：等待新窗口几何，暂不显示旧窗口曲线'
+                else:
+                    used = section['source'] == 'control'
+                    smooth_note = (f"平滑截面：控制缓存 #{section.get('updates', '?')}；洋红为滤波前候选，橙色折线为已发目标。"
+                                   if used else '平滑截面：同法重建，当前未参与顺应控制。')
+                    for key, color, style, label in (
+                        ('measured', '#008d82', '-', '实测平滑（控制输入）' if used else '实测平滑（重建）'),
+                        ('candidate', '#c33786', '--', '顺应目标平滑（滤波前）' if used else '已发目标平滑（重建）')):
+                        if section.get(key) is not None:
+                            curve = preview_smooth_points(section[key])@projection.T
+                            self.smooth_display[key] = curve
+                            smooth_points.append(curve)
+                            self.body.plot(*curve.T, style, color=color, lw=2.3, alpha=.4 if stale else 1., label=label)
+                    if not smooth_points:
+                        smooth_note = '平滑截面：等待控制器更新'
+            except (ValueError, np.linalg.LinAlgError) as exc:
+                smooth_note = '平滑截面不可用：'+str(exc)
+            self.note.set_text(self.note.get_text()+'\n'+smooth_note)
+            self.body.legend(loc='best', fontsize=8)
             self.body.scatter(*points[1:-1].T, c=colours, s=24)
             for j, point in enumerate(points[1:-1], 1):
                 self.body.text(*point, str(j), fontsize=8)
@@ -3075,7 +3127,7 @@ class JointPreviewFigure:
                 a = points[window[0]:window[1]+2].mean(axis=0)
                 b = points[candidate[0]:candidate[1]+2].mean(axis=0)
                 self.body.annotate('', xy=b, xytext=a, arrowprops=dict(arrowstyle='->', color='#e38b27', lw=2))
-            both = np.r_[points, target]
+            both = np.concatenate([points, target]+smooth_points)
             center = (both.min(axis=0)+both.max(axis=0))/2
             radius = max(.1, float(np.ptp(both, axis=0).max())*.55)
             self.body.set(xlim=(center[0]-radius, center[0]+radius),
