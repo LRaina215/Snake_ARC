@@ -2,7 +2,7 @@
 
 直接运行本文件，自动查找CH340串口；所有实验配置在文件顶部修改。
 DRY_RUN=True时使用内存串口，不连接机器人；日志自动保存在本文件旁的logs目录。
-默认启动只读全身预览；显示实测角、使能和算法候选，不重建世界位置或朝向。
+默认启动只读全身预览；显示实测角、使能和算法候选，估计上下方向，不测世界位置或水平朝向。
 Ctrl+U 形成圆弧，Ctrl+J/H 正/反单步，Ctrl+G 连续/暂停，Ctrl+X 全部失能。
 Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动移窗与数量自适应。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
@@ -27,6 +27,7 @@ BAUD_RATE = 115200
 DRY_RUN = False                # False：真实机器人；True：内存串口演练，不打开设备
 SAVE_LOG = True                # 自动保存实测角、目标、使能与模式；每次运行生成新文件
 SHOW_PREVIEW = True            # 随实机脚本启动全身构型窗口；关闭窗口不停止控制
+PREVIEW_GRAVITY_ALIGN = True    # 双侧重力代理对齐；窗口按钮可切回头部坐标
 PREVIEW_PERIOD_S = .2          # 独立进程刷新，绘图不占用串口控制循环
 LOG_DIRECTORY = Path(__file__).resolve().parent / 'logs'  # 不依赖终端/IDE工作目录
 NUM_JOINTS = 20
@@ -2824,6 +2825,126 @@ class RollingArcController:
 
 
 # ==================== 6. 实测全身构型预览（单独进程，无控制输出） ====================
+# BEGIN GRAVITY_PREVIEW_CORE
+def gravity_unit(v):
+    return np.asarray(v, float)/max(float(np.linalg.norm(v)), 1e-12)
+
+
+def gravity_angle(a, b):
+    return math.degrees(math.acos(float(np.clip(np.dot(gravity_unit(a), gravity_unit(b)), -1., 1.))))
+
+
+def gravity_link_frames(q):
+    frames = [np.eye(3)]
+    for i, angle in enumerate(q):
+        a = angle if i % 2 == 0 else -angle
+        c, s = math.cos(a), math.sin(a)
+        rotation = (np.array([[c, -s, 0.], [s, c, 0.], [0., 0., 1.]]) if i % 2 == 0 else
+                    np.array([[c, 0., s], [0., 1., 0.], [-s, 0., c]]))
+        frames.append(frames[-1]@rotation)
+    return frames
+
+
+@dataclass(frozen=True)
+class GravityPreviewOptions:
+    maximum_end_links: int = 4
+    minimum_end_links: int = 3
+    minimum_straightness: float = .98
+    maximum_disagreement_deg: float = 25.
+    filter_time_s: float = .4
+    correction_rate_deg_s: float = 30.
+    maximum_feedback_gap_s: float = .8
+
+
+class DualEndGravityPreview:
+    def __init__(self, lengths, options=GravityPreviewOptions()):
+        self.lengths = np.asarray(lengths, float)
+        self.options = options
+        self.down = self.basis = self.last_time = None
+        self.previous_frames = self.previous_candidates = None
+        self.result = dict(state='waiting', reliable=False, down_head=None, basis=None)
+
+    def update(self, angles_deg, window, feedback_time_s):
+        q = np.radians(angles_deg)
+        if q.shape != (len(self.lengths)-1,) or not np.isfinite(q).all() or not math.isfinite(feedback_time_s):
+            raise ValueError('Finite full-body angles and sample time required')
+        if self.last_time is not None and feedback_time_s <= self.last_time:
+            return self.result  # Repainting an old sample must not advance the estimator.
+        dt = 0. if self.last_time is None else feedback_time_s-self.last_time
+        gap = dt > self.options.maximum_feedback_gap_s
+        points, frames = forward(q, self.lengths), gravity_link_frames(q)
+        arc = points[window[0]:window[1]+2]
+        opening = (arc[0]+arc[-1])*.5-arc.mean(axis=0)
+        opening_valid = np.linalg.norm(opening) > 1e-6
+        opening = gravity_unit(opening)
+        candidates = {}
+        for name, available, anchor in (('head', window[0]-1, 0), ('tail', len(q)-window[1], len(q))):
+            count = min(self.options.maximum_end_links, available)
+            if count < self.options.minimum_end_links:
+                continue
+            samples = points[:count+1][::-1] if name == 'head' else points[-count-1:]
+            chord = samples[-1]-samples[0]
+            straight = float(np.linalg.norm(chord)/np.linalg.norm(np.diff(samples, axis=0), axis=1).sum())
+            direction = gravity_unit(chord)
+            alignment = float(direction@opening)
+            eligible = opening_valid and straight >= self.options.minimum_straightness and alignment >= .5
+            weight = count/self.options.maximum_end_links * float(np.clip((straight-.97)/.03, 0., 1.)) if eligible else 0.
+            # Curvature/bending change in that end's own frame discounts an unstable end.
+            instability = 0.
+            old = (self.previous_candidates or {}).get(name)
+            if old and self.previous_frames is not None and not gap:
+                transported = frames[anchor]@self.previous_frames[anchor].T@np.array(old['direction'])
+                instability = gravity_angle(transported, direction)
+                weight /= 1.+(instability/8.)**2
+            candidates[name] = dict(direction=direction.tolist(), count=count, anchor=anchor,
+                straightness=straight, alignment=alignment, weight=weight, instability_deg=instability)
+        usable = [c for c in candidates.values() if c['weight'] > 0.]
+        disagreement = None if len(usable) != 2 else gravity_angle(usable[0]['direction'], usable[1]['direction'])
+        consistent = disagreement is None or disagreement <= self.options.maximum_disagreement_deg
+        # Both ends predict the previous estimate in today's head frame. No root pose is used.
+        predictions, weights = [], []
+        if self.down is not None and self.previous_frames is not None and not gap:
+            for name, c in candidates.items():
+                old = (self.previous_candidates or {}).get(name)
+                if old and c['weight'] > 0. and old['weight'] > 0.:
+                    predictions.append(frames[c['anchor']]@self.previous_frames[c['anchor']].T@self.down)
+                    weights.append(min(c['weight'], old['weight']))
+        prediction = self.down
+        if predictions and consistent:
+            prediction = gravity_unit(np.average(predictions, axis=0, weights=weights))
+        raw = gravity_unit(sum(c['weight']*np.array(c['direction']) for c in usable)) if usable and consistent else None
+        state = 'conflict_hold' if not consistent else 'unobservable_hold'
+        reliable = raw is not None
+        if raw is not None:
+            state = 'dual' if len(usable) == 2 else 'single_degraded'
+            if self.down is None:
+                self.down = raw
+            else:
+                # After a gap, keep the visible history but explicitly reacquire slowly.
+                reference = prediction if prediction is not None else self.down
+                alpha = 1.-math.exp(-min(dt, .2)/self.options.filter_time_s)
+                angle = gravity_angle(reference, raw)
+                alpha = min(alpha, self.options.correction_rate_deg_s*min(dt, .2)/max(angle, 1e-9))
+                self.down = gravity_unit((1.-alpha)*reference+alpha*raw)
+                if gap:
+                    state, reliable = 'reacquiring', False
+        if self.down is not None:
+            up = -self.down
+            # Horizontal heading is an arbitrary display convention, NOT magnetic/world yaw.
+            x = np.array([0., 1., 0.]) if self.basis is None else self.basis[0].copy()
+            x -= (x@up)*up
+            if np.linalg.norm(x) < .1:
+                x = np.eye(3)[int(np.argmin(abs(up)))]; x -= (x@up)*up
+            x = gravity_unit(x)
+            self.basis = np.array([x, gravity_unit(np.cross(up, x)), up])
+        self.last_time, self.previous_frames, self.previous_candidates = feedback_time_s, frames, candidates
+        self.result = dict(state=state, reliable=reliable, down_head=None if self.down is None else self.down.tolist(),
+            raw_down_head=None if raw is None else raw.tolist(), basis=None if self.basis is None else self.basis.tolist(),
+            candidates=candidates, disagreement_deg=disagreement, feedback_time_s=feedback_time_s,
+            observes_world_pose=False, conditional_transport=True)
+        return self.result
+# END GRAVITY_PREVIEW_CORE
+
 def preview_payload(controller):
     """仅拷贝显示所需数据；目标线在失能段沿用实测角，不画虚假的零角尾部。"""
     complete = set(controller.states) == set(range(NUM_JOINTS))
@@ -2835,6 +2956,7 @@ def preview_payload(controller):
     selection = getattr(slider, 'selection', None) or {}
     observation = getattr(slider, 'observation', None) or {}
     return dict(angles_deg=angles, target_deg=target, enabled=enabled,
+        gravity_time_s=controller.motor_sample_clock()[1],
         enable_known=controller.touched_hardware, feedback_wall_s=controller.feedback_wall_s,
         window=[controller.first, controller.last], phase_rad=controller.phase,
         mode=controller.mode, gait='自动位置/数量' if slider else '固定顺应' if controller.compliance else '基础圆弧',
@@ -2846,7 +2968,7 @@ def preview_payload(controller):
 
 
 class JointPreviewFigure:
-    """头部坐标系中的实测骨架、目标骨架与逐关节使能；没有世界定位输入。"""
+    """实测/目标骨架与使能；可选双侧重力对齐，始终没有世界定位输入。"""
     def __init__(self):
         import matplotlib.pyplot as plt
         plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'DejaVu Sans']
@@ -2862,8 +2984,20 @@ class JointPreviewFigure:
         self.note = self.figure.text(.04, .04, '', fontsize=10, va='bottom')
         self.figure.subplots_adjust(left=.05, right=.97, top=.88, bottom=.20, wspace=.24, hspace=.65)
         self.body.view_init(elev=22, azim=-65)
+        from matplotlib.widgets import Button
+        self.gravity = DualEndGravityPreview(LINK_LENGTHS_M)
+        self.gravity_align = PREVIEW_GRAVITY_ALIGN
+        self.latest_row = None
+        self.view_button = Button(self.figure.add_axes([.79, .93, .16, .035]), 'Gravity / Head')
+        self.view_button.on_clicked(self.toggle_view)
+
+    def toggle_view(self, _event):
+        self.gravity_align = not self.gravity_align
+        if self.latest_row is not None:
+            self.update(self.latest_row)
 
     def update(self, row):
+        self.latest_row = row
         elev, azim = self.body.elev, self.body.azim
         self.body.clear(); self.angles.clear(); self.mask.clear()
         self.body.view_init(elev=elev, azim=azim)
@@ -2890,12 +3024,26 @@ class JointPreviewFigure:
             shift = sum(candidate)-sum(window)
             direction = '向头端' if shift < 0 else '向尾端' if shift > 0 else '中心不变'
             direction += f' → J{candidate[0]}–J{candidate[1]}'
-        self.note.set_text('头部坐标重建；不是实际世界位置/朝向。实线：实测；灰虚线：目标+失能实测。\n'
+        gravity = self.gravity.result
+        sample_time = row.get('gravity_time_s', row['feedback_wall_s'])
+        if row['angles_deg'] is not None and sample_time is not None and not stale:
+            if self.gravity.last_time is not None and sample_time < self.gravity.last_time:
+                self.gravity = DualEndGravityPreview(row['lengths'])  # 仿真明确重置为新episode。
+            gravity = self.gravity.update(row['angles_deg'], window, sample_time)
+        aligned = self.gravity_align and gravity['basis'] is not None
+        states = {'dual': '双侧融合', 'single_degraded': '单侧补充（降级）', 'conflict_hold': '双侧冲突，保留方向',
+                  'unobservable_hold': '无可信悬垂段，保留方向', 'reacquiring': '重新获取', 'waiting': '等待悬垂参考'}
+        view_label = '重力对齐' if aligned else '头部坐标'
+        gravity_label = '反馈陈旧' if stale else states[gravity['state']]
+        self.note.set_text(f'{view_label} | {gravity_label}；仅估计上下，不测世界位置/水平朝向。实线实测，虚线目标。\n'
             f"自动={row['automatic']} | 决策={decision} {direction} | 数量估计={count_text}\n"
             f"状态：{row['block_reason'] or ', '.join(row['reasons']) or '正常'}；关闭此窗口不停止控制，Ctrl+X失能。")
         if row['angles_deg'] is not None:
             points = forward(np.radians(row['angles_deg']), row['lengths'])
             target = forward(np.radians(row['target_deg']), row['lengths'])
+            if aligned:
+                basis = np.array(gravity['basis'])
+                points, target = points@basis.T, target@basis.T
             self.body.plot(*target.T, '--', color='#a3a9b2', lw=1.5, label='目标')
             for i in range(NUM_JOINTS+1):
                 colour = colours[max(0, i-1)]
@@ -2921,7 +3069,9 @@ class JointPreviewFigure:
             self.angles.legend(loc='upper right')
         else:
             self.body.text2D(.15, .5, '等待全20关节实测角，不用目标伪装实测', transform=self.body.transAxes)
-        self.body.set(xlabel='X head / m', ylabel='Y head / m', zlabel='Z head / m')
+        frame_label = 'display' if aligned else 'head'
+        self.body.set(xlabel=f'X {frame_label} / m', ylabel=f'Y {frame_label} / m',
+                      zlabel='Z up (estimated) / m' if aligned else 'Z head / m')
         self.body.set_box_aspect((1, 1, 1))
         self.angles.set(ylabel='控制器坐标角度 / °', xticks=ids, ylim=(-100, 100))
         self.angles.grid(alpha=.2)

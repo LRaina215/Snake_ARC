@@ -1,0 +1,24 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\physics\\display_pull_20261013_165050_222158.mp4",
+  "frames": 251,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    25.00000000000757
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    20.580000000002194,
+    20.620000000002193,
+    10.0,
+    11.0,
+    12.0,
+    14.0,
+    50.0,
+    7.940000000000986,
+    8.200000000000895,
+    25.00000000000757
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}

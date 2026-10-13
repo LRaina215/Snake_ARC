@@ -1,0 +1,136 @@
+{
+  "source": "display_pull_20261013_165050_222158",
+  "feedbacks": 125,
+  "states": {
+    "dual": 122,
+    "conflict_hold": 3
+  },
+  "dual_error_deg": {
+    "samples": 111,
+    "median": 2.35911888062492,
+    "p95": 12.354372868178729,
+    "maximum": 15.257231988171814
+  },
+  "all_error_deg": {
+    "samples": 125,
+    "median": 2.287809332769706,
+    "p95": 14.469928231903628,
+    "maximum": 17.537844642357722
+  },
+  "world_step_deg": {
+    "samples": 124,
+    "median": 1.0507782929014113,
+    "p95": 2.6822847828488863,
+    "maximum": 7.291432562534356
+  },
+  "raw_world_step_deg": {
+    "samples": 120,
+    "median": 1.0869517255662546,
+    "p95": 2.240594163357038,
+    "maximum": 6.846856909301168
+  },
+  "raw_dual_error_deg": {
+    "samples": 111,
+    "median": 2.5892090768671836,
+    "p95": 11.955347639910478,
+    "maximum": 15.684291841145521
+  },
+  "no_flip": true,
+  "last_state": {
+    "time_s": 24.800000000007326,
+    "estimate": {
+      "state": "dual",
+      "reliable": true,
+      "down_head": [
+        0.9972182189385979,
+        -0.07451259621558447,
+        -0.001922712184362271
+      ],
+      "raw_down_head": [
+        0.997344022269905,
+        -0.07281757385476716,
+        0.0015818281804923842
+      ],
+      "basis": [
+        [
+          0.07451722519085678,
+          0.9972166924100424,
+          0.002459985493879756
+        ],
+        [
+          -0.001734060779144574,
+          0.0025964175296408847,
+          -0.9999951258127342
+        ],
+        [
+          -0.9972182189385979,
+          0.07451259621558447,
+          0.001922712184362271
+        ]
+      ],
+      "candidates": {
+        "head": {
+          "direction": [
+            0.9995464121275431,
+            -0.029226986935991635,
+            0.007263142405238657
+          ],
+          "count": 4,
+          "anchor": 0,
+          "straightness": 0.9994909129461998,
+          "alignment": 0.992954329110445,
+          "weight": 0.9829236847327859,
+          "instability_deg": 0.08336956472842062
+        },
+        "tail": {
+          "direction": [
+            0.9932888475467125,
+            -0.11559045913887468,
+            -0.004013862900978809
+          ],
+          "count": 4,
+          "anchor": 20,
+          "straightness": 0.9999553028797749,
+          "alignment": 0.9794456670783721,
+          "weight": 0.9984980964627898,
+          "instability_deg": 0.027733103916445
+        }
+      },
+      "disagreement_deg": 5.00472230427751,
+      "feedback_time_s": 24.800000000007326,
+      "observes_world_pose": false,
+      "conditional_transport": true
+    },
+    "truth_error_deg": 2.2431004804138075,
+    "world_step_deg": 1.64131595883421,
+    "raw_error_deg": 2.452327372017073,
+    "raw_step_deg": 1.648228389738092,
+    "individual_error_deg": {
+      "head": 4.713395377149728,
+      "tail": 1.577003296858146
+    }
+  },
+  "passed": true,
+  "segments": {
+    "before_pull": {
+      "samples": 40,
+      "median": 1.6070284314235863,
+      "p95": 4.076604962842149,
+      "maximum": 4.5169629709039345
+    },
+    "during_pull": {
+      "samples": 10,
+      "median": 14.598222306314097,
+      "p95": 16.756378010511014,
+      "maximum": 17.537844642357722
+    },
+    "after_pull": {
+      "samples": 65,
+      "median": 2.44558181902491,
+      "p95": 5.6720732915887675,
+      "maximum": 17.39781428658702
+    }
+  },
+  "full_run_dual_p95_under_12": false,
+  "acceptance_scope": "Frozen normal accuracy and no-flip/recovery test; no 12deg promise while externally pulled"
+}

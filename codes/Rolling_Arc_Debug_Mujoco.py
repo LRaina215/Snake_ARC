@@ -34,6 +34,7 @@ SIM_AMPLITUDE_DEG = 60.0         # 与本轮冻结基准一致；独立于用户
 SIM_OMEGA_RAD_S = .6
 SLIDING_FEEDBACK = 'motor_angles'  # motor_angles：自动位置+数量；contact：历史固定宽度接触版本
 SAVE_LOG = True
+SHOW_SHAPE_PREVIEW = True       # 与实机相同的角度重建/双侧重力对齐窗口，无世界位姿输入
 LOG_DIRECTORY = Path(__file__).resolve().parent / 'logs'
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 800
 PUSH_FORCE_N = 8.0              # Ctrl+A/D按住拉动左/右悬垂端、松开停止；总力，单位N
@@ -654,10 +655,12 @@ class DebugViewer:
 def main():
     from pynput import keyboard
     session = DebugSession()
-    viewer = listener = console = log_file = None
+    viewer = listener = console = log_file = shape_preview = None
     stop = threading.Event()
     try:
         viewer = DebugViewer(session)
+        if SHOW_SHAPE_PREVIEW:
+            shape_preview = real.JointPreviewWindow()
         listener = real.global_key_listener(session.commands, keyboard, decode_sim_hotkey, decode_sim_release)
         console = threading.Thread(target=real.console_listener, args=(session.commands, stop), daemon=True)
         console.start()
@@ -670,7 +673,14 @@ def main():
         next_log = 0.
         while viewer.running() and not session.controller.quit:
             started = time.monotonic()
+            if shape_preview is not None:
+                session.controller.preview_feedback = shape_preview.active
+                if shape_preview.active and session.controller.feedback_time_s is None:
+                    session.controller.refresh_compliance_feedback()
             session.advance()
+            if shape_preview is not None:
+                # 独立显示仅接收读角快照；主MuJoCo查看器仍显示实际世界场景。
+                shape_preview.publish(session.controller)
             viewer.render()
             wall_elapsed = time.monotonic()-session.start_wall
             if log_file and wall_elapsed >= next_log:
@@ -694,6 +704,8 @@ def main():
                 log_file.close()
             if viewer:
                 viewer.close()
+            if shape_preview is not None:
+                shape_preview.close()
 
 
 if __name__ == '__main__':
