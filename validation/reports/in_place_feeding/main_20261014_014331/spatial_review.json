@@ -1,0 +1,196 @@
+{
+  "baseline_time_s": 6.000000000000338,
+  "all_feedback_angles_only": true,
+  "hardware_run": false,
+  "physics_statistics": {
+    "steps": 40840,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 2,
+    "floor_contact_steps": 0,
+    "maximum_enabled_count": 7,
+    "maximum_shared_target_step_deg": 0.9000000000003007
+  },
+  "support_point_world_m": {
+    "maximum_displacement_mm": 26.25921991251497,
+    "maximum_absolute_axis_displacement_mm": [
+      2.9436234182608767,
+      25.47239283554195,
+      6.379729822111102
+    ],
+    "final_delta_mm": [
+      -1.02290707840208,
+      -1.8306763806495199,
+      0.38944388358586046
+    ],
+    "missing_samples": 0
+  },
+  "crown_world_m": {
+    "maximum_displacement_mm": 40.10939221853895,
+    "maximum_absolute_axis_displacement_mm": [
+      0.49669606968427704,
+      39.21987951954281,
+      12.91829369994102
+    ],
+    "final_delta_mm": [
+      -0.2496477378409745,
+      3.0144762531291787,
+      -0.02779398535746047
+    ],
+    "missing_samples": 0
+  },
+  "mean_body_world_m": {
+    "maximum_displacement_mm": 31.92416374512149,
+    "maximum_absolute_axis_displacement_mm": [
+      0.45751229522639214,
+      30.595166740042078,
+      9.340832814762612
+    ],
+    "final_delta_mm": [
+      -0.2413652569988045,
+      -1.6254867031775153,
+      0.09667933754387015
+    ],
+    "missing_samples": 0
+  },
+  "stages": [
+    {
+      "stage": "feed_out",
+      "end_s": 14.399999999997458,
+      "last_material_delta": {
+        "crown_joint": -1.1369050437036297,
+        "head_hanging_m": -0.07034480913072877,
+        "tail_hanging_m": 0.07247342661055789
+      },
+      "goal_delta_joints": -1.0,
+      "net_hanging_transfer_mm": -71.40911787064333,
+      "total_hanging_length_change_mm": 2.12861747982912,
+      "final_true_goal_error_joints": -0.13690504370362966,
+      "true_goal_error_range_joints": [
+        -0.13690504370362966,
+        1.0000030371171995
+      ],
+      "final_progress": 0.8793141173382473
+    },
+    {
+      "stage": "review_out",
+      "end_s": 17.399999999998283,
+      "last_material_delta": {
+        "crown_joint": -1.6490283231048668,
+        "head_hanging_m": -0.07905133092969358,
+        "tail_hanging_m": 0.08285250448658288
+      },
+      "goal_delta_joints": -1.0,
+      "net_hanging_transfer_mm": -80.95191770813823,
+      "total_hanging_length_change_mm": 3.8011735568893035,
+      "final_true_goal_error_joints": -0.6490283231048668,
+      "true_goal_error_range_joints": [
+        -0.6490341688787105,
+        -0.14307642106980012
+      ],
+      "final_progress": 0.7870646039054514
+    },
+    {
+      "stage": "feed_return",
+      "end_s": 37.800000000002605,
+      "last_material_delta": {
+        "crown_joint": -0.018345934555380694,
+        "head_hanging_m": -0.006358371210392955,
+        "tail_hanging_m": 0.006632974166231431
+      },
+      "goal_delta_joints": 0.0,
+      "net_hanging_transfer_mm": -6.495672688312193,
+      "total_hanging_length_change_mm": 0.2746029558384766,
+      "final_true_goal_error_joints": -0.018345934555380694,
+      "true_goal_error_range_joints": [
+        -1.656245429279629,
+        -0.018345934555380694
+      ],
+      "final_progress": 0.0
+    },
+    {
+      "stage": "review_return",
+      "end_s": 40.81999999999557,
+      "last_material_delta": {
+        "crown_joint": -0.011705348729266873,
+        "head_hanging_m": -0.004141289672744186,
+        "tail_hanging_m": 0.004313462715664351
+      },
+      "goal_delta_joints": 0.0,
+      "net_hanging_transfer_mm": -4.227376194204268,
+      "total_hanging_length_change_mm": 0.1721730429201651,
+      "final_true_goal_error_joints": -0.011705348729266873,
+      "true_goal_error_range_joints": [
+        -0.018288834537202092,
+        -0.011705348729266873
+      ],
+      "final_progress": 0.0
+    },
+    {
+      "stage": "complete",
+      "end_s": 40.83999999999552,
+      "last_material_delta": {
+        "crown_joint": -0.011672388030547154,
+        "head_hanging_m": -0.0041302697866021365,
+        "tail_hanging_m": 0.004301942763205835
+      },
+      "goal_delta_joints": 0.0,
+      "net_hanging_transfer_mm": -4.216106274903986,
+      "total_hanging_length_change_mm": 0.1716729766036984,
+      "final_true_goal_error_joints": -0.011672388030547154,
+      "true_goal_error_range_joints": [
+        -0.011672388030547154,
+        -0.011672388030547154
+      ],
+      "final_progress": 0.0
+    }
+  ],
+  "goal_events": [
+    {
+      "time_s": 14.399999999997458,
+      "goal_delta_joints": -1.0,
+      "actual_delta_joints": -1.1369050437036297,
+      "true_goal_error_joints": -0.13690504370362966,
+      "observed_error_joints": 0.009170956381380435
+    },
+    {
+      "time_s": 37.800000000002605,
+      "goal_delta_joints": 0.0,
+      "actual_delta_joints": -0.018345934555380694,
+      "true_goal_error_joints": -0.018345934555380694,
+      "observed_error_joints": -0.055064589998279345
+    }
+  ],
+  "invalid_observation_samples": 0,
+  "external_force_max": 0.0,
+  "phase_max_absolute_rad": 0.0,
+  "actual_bend": {
+    "wrap_deg": {
+      "min": 180.25069347621687,
+      "max": 273.3396842644323
+    },
+    "gap_fraction": {
+      "min": 0.41987799327366476,
+      "max": 0.6995128260387536
+    },
+    "total_turn_deg": {
+      "min": 175.40732357563397,
+      "max": 201.24626203224724
+    },
+    "invalid_samples": 0,
+    "maximum_wrap_time_s": 7.560000000000859
+  },
+  "acceptance": {
+    "support_stationary": false,
+    "support_axial_stationary": false,
+    "body_axial_stationary": true,
+    "material_outbound": false,
+    "material_return": true,
+    "open_smooth_section": true,
+    "actual_pipe_wrap_le218": false,
+    "no_floor_or_limits": true,
+    "passive_active_torque_zero": true,
+    "all_passed": false
+  }
+}
