@@ -1,0 +1,66 @@
+{
+  "dynamics_runs": 2,
+  "budget_maximum": 3,
+  "unused_repair_runs": 1,
+  "physical_steps": 83460,
+  "saved_actual_states": 4175,
+  "control_frames_replayed": 4173,
+  "hardware_runs": 0,
+  "real_and_manual_entries_updated": false,
+  "preferred_count": null,
+  "stable_count_whitelist": null,
+  "main_cases_passed": true,
+  "all_widths_dynamically_verified": false,
+  "contraction_and_rollback_dynamically_verified": false,
+  "quantity_optimality_verified": false,
+  "cases": [
+    {
+      "source": "acute_20261013_134937_702758",
+      "case": "acute",
+      "final_time_s": 41.95999999999291,
+      "passed": true,
+      "body_shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": false,
+      "phase_continuity_pass": true,
+      "count_chain": [
+        6,
+        6,
+        7
+      ],
+      "operation_counts": {
+        "slide": 1,
+        "expand": 1
+      },
+      "post_last_change_cycles": 1.0637916396240206,
+      "post_exit_cycles": 1.0007662821596277,
+      "final_selection": "expand",
+      "trial_pending": false,
+      "transaction_pending": false
+    },
+    {
+      "source": "straight_20261013_134637_090762",
+      "case": "straight",
+      "final_time_s": 41.49999999999398,
+      "passed": true,
+      "body_shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": true,
+      "phase_continuity_pass": true,
+      "count_chain": [
+        6,
+        6,
+        6,
+        6
+      ],
+      "operation_counts": {
+        "slide": 3
+      },
+      "post_last_change_cycles": 1.0007662821597316,
+      "post_exit_cycles": null,
+      "final_selection": "retain_untrusted_shape_or_down",
+      "trial_pending": false,
+      "transaction_pending": false
+    }
+  ]
+}

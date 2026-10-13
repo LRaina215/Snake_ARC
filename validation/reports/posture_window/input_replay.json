@@ -1,0 +1,34 @@
+[
+  {
+    "source": "acute_20261013_134937_702758",
+    "control_frames": 2098,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "event_sequence_matches": true,
+    "input_fields": [
+      "angles_deg",
+      "feedback_time_s",
+      "phase_rad",
+      "control_time_s"
+    ],
+    "physics_steps": 0,
+    "passed": true
+  },
+  {
+    "source": "straight_20261013_134637_090762",
+    "control_frames": 2075,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "event_sequence_matches": true,
+    "input_fields": [
+      "angles_deg",
+      "feedback_time_s",
+      "phase_rad",
+      "control_time_s"
+    ],
+    "physics_steps": 0,
+    "passed": true
+  }
+]

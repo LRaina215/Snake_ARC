@@ -1,0 +1,83 @@
+{
+  "mechanical": [
+    {
+      "width": 5,
+      "feasible": false,
+      "peak_joint_deg": 90.0
+    },
+    {
+      "width": 6,
+      "feasible": true,
+      "peak_joint_deg": 59.99999999999999
+    },
+    {
+      "width": 7,
+      "feasible": true,
+      "peak_joint_deg": 59.99999999999999
+    },
+    {
+      "width": 8,
+      "feasible": true,
+      "peak_joint_deg": 45.0
+    },
+    {
+      "width": 9,
+      "feasible": true,
+      "peak_joint_deg": 45.0
+    },
+    {
+      "width": 12,
+      "feasible": true,
+      "peak_joint_deg": 29.999999999999996
+    },
+    {
+      "width": 18,
+      "feasible": true,
+      "peak_joint_deg": 20.0
+    }
+  ],
+  "feedback_checks": [
+    {
+      "source": "natural_repair_20261013_113711_001298",
+      "by_width": {
+        "6": {
+          "samples": 197,
+          "valid": 197,
+          "trusted_down": 178,
+          "recommendations": 47,
+          "no_reference": 0
+        }
+      },
+      "execution": "observation only; not a new motion"
+    },
+    {
+      "source": "combined_repair_20261013_120622_382379",
+      "by_width": {
+        "6": {
+          "samples": 222,
+          "valid": 222,
+          "trusted_down": 222,
+          "recommendations": 15,
+          "no_reference": 0
+        },
+        "7": {
+          "samples": 27,
+          "valid": 27,
+          "trusted_down": 27,
+          "recommendations": 0,
+          "no_reference": 0
+        },
+        "8": {
+          "samples": 79,
+          "valid": 79,
+          "trusted_down": 79,
+          "recommendations": 24,
+          "no_reference": 0
+        }
+      },
+      "execution": "observation only; not a new motion"
+    }
+  ],
+  "physics_steps": 0,
+  "hardware_runs": 0
+}
