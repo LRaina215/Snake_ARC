@@ -1,0 +1,322 @@
+{
+  "case": "natural",
+  "source": "natural_20261013_112105_172339",
+  "shape_pass": true,
+  "mechanics_pass": true,
+  "strict_pipe_pass": true,
+  "resize_pass": false,
+  "completed_widths": [],
+  "summary": {
+    "samples": 4101,
+    "body_turn_range_deg": [
+      176.45940806101999,
+      186.01603123481317
+    ],
+    "minimum_gap": 0.5602013315001653,
+    "maximum_plane_rms_m": 0.008501577998849335,
+    "body_violations": 0,
+    "command_violations": 0,
+    "pipe_unobservable": 0,
+    "contact_axis_conflict_frames": 0,
+    "pipe_wrap_range_deg": [
+      200.2394861221042,
+      214.84042777132055
+    ],
+    "pipe_violations": 0,
+    "minimum_support_n": 26.455247530293597,
+    "minimum_support_coverage": 1.0,
+    "widths": {
+      "6": 4000
+    },
+    "observation_states": {
+      "none": 10,
+      "retain": 3990
+    },
+    "length_states": {
+      "none": 4000
+    },
+    "displacement_m": [
+      1.5287719758621288,
+      -0.006987857554827228,
+      -0.007705978088614951
+    ],
+    "events": [],
+    "statistics_1ms": {
+      "physical_steps": 82000,
+      "passive_torque_max_nm": 0.0,
+      "active_torque_max_nm": 2.355,
+      "joint_limit_excess_max_rad": 0.0,
+      "saturation_joint_steps": 341,
+      "mask_violation_steps": 0,
+      "floor_contact_steps": 0,
+      "maximum_external_force_sum_n": 0.0,
+      "finite": true
+    },
+    "post_exit_cycles": null,
+    "continuous_exit_start_s": 0.02000000000000001,
+    "continuous_exit_cycles": 7.63752740908642,
+    "post_last_change_cycles": 7.63752740908642,
+    "orphan_seven_frames": 0
+  },
+  "resize_mechanism_pass": false,
+  "exit_duration_pass": true,
+  "passed": false,
+  "moving_exchange_pass": false,
+  "phase_continuity_pass": true,
+  "maximum_phase_error_rad": 6.326672519207932e-11,
+  "transfers": 0,
+  "visited_windows": [
+    [
+      6,
+      11
+    ]
+  ],
+  "window_index_return_observed": false,
+  "bidirectional_return_on_pipe_observed": false,
+  "short_passive_states": 0,
+  "minimum_passive_joint_count": 5,
+  "full_phase_sampling_coverage": true,
+  "full_phase_reliable_position_pass": false,
+  "location": {
+    "new_observations": 399,
+    "phase_bins": [
+      {
+        "samples": 16,
+        "position_valid": 16,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.323225869723935,
+        "migration_error_max_joints": 0.35307263655598914
+      },
+      {
+        "samples": 19,
+        "position_valid": 19,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.4360296298046694,
+        "migration_error_max_joints": 0.4726303685525732
+      },
+      {
+        "samples": 16,
+        "position_valid": 16,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.5695184688225462,
+        "migration_error_max_joints": 0.6136213291533226
+      },
+      {
+        "samples": 19,
+        "position_valid": 19,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.799144647891875,
+        "migration_error_max_joints": 0.9248442600946954
+      },
+      {
+        "samples": 16,
+        "position_valid": 16,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.8252702619310627,
+        "migration_error_max_joints": 0.882829990077973
+      },
+      {
+        "samples": 18,
+        "position_valid": 18,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.859763901194854,
+        "migration_error_max_joints": 0.884540530196217
+      },
+      {
+        "samples": 15,
+        "position_valid": 15,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.9743049260703179,
+        "migration_error_max_joints": 1.002762628427885
+      },
+      {
+        "samples": 15,
+        "position_valid": 15,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.9695580277880711,
+        "migration_error_max_joints": 0.9716930773877753
+      },
+      {
+        "samples": 16,
+        "position_valid": 16,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.840203996354613,
+        "migration_error_max_joints": 0.8596858733350081
+      },
+      {
+        "samples": 15,
+        "position_valid": 15,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.5991167995247513,
+        "migration_error_max_joints": 0.6437084319602462
+      },
+      {
+        "samples": 16,
+        "position_valid": 16,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.3546473270055047,
+        "migration_error_max_joints": 0.3866512547626337
+      },
+      {
+        "samples": 14,
+        "position_valid": 14,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.225327642977377,
+        "migration_error_max_joints": 0.23262617115657003
+      },
+      {
+        "samples": 16,
+        "position_valid": 16,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.2451730992596351,
+        "migration_error_max_joints": 0.2633325031956667
+      },
+      {
+        "samples": 14,
+        "position_valid": 14,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.3562596573525781,
+        "migration_error_max_joints": 0.3738206336992661
+      },
+      {
+        "samples": 17,
+        "position_valid": 17,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.5074193846820035,
+        "migration_error_max_joints": 0.5238328869426476
+      },
+      {
+        "samples": 16,
+        "position_valid": 16,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.6641339406533187,
+        "migration_error_max_joints": 0.7366671186949488
+      },
+      {
+        "samples": 19,
+        "position_valid": 19,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.794187333919409,
+        "migration_error_max_joints": 0.9372758125009792
+      },
+      {
+        "samples": 17,
+        "position_valid": 17,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.930077681913598,
+        "migration_error_max_joints": 1.0554555944103483
+      },
+      {
+        "samples": 17,
+        "position_valid": 17,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.0016151233548891,
+        "migration_error_max_joints": 1.014159985729826
+      },
+      {
+        "samples": 18,
+        "position_valid": 18,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.0030906704073146,
+        "migration_error_max_joints": 1.0063021514262758
+      },
+      {
+        "samples": 17,
+        "position_valid": 17,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.8813557528360356,
+        "migration_error_max_joints": 0.927445836046074
+      },
+      {
+        "samples": 18,
+        "position_valid": 18,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.6808178241211718,
+        "migration_error_max_joints": 0.841627670834247
+      },
+      {
+        "samples": 17,
+        "position_valid": 17,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.47647826406854005,
+        "migration_error_max_joints": 0.4852427648802041
+      },
+      {
+        "samples": 18,
+        "position_valid": 18,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.34319009453354166,
+        "migration_error_max_joints": 0.3521692686866209
+      }
+    ],
+    "all_phase_bins_observed": true,
+    "all_phase_bins_have_valid_position": true,
+    "position_valid_samples": 399,
+    "supported_samples": 399,
+    "unsupported_samples": 0,
+    "supported_sources": {
+      "no_position": {
+        "samples": 399,
+        "recommendations": 0,
+        "maximum_migration_error_joints": 1.0554555944103483
+      }
+    },
+    "supported_recommendations": 0,
+    "supported_direction_agrees": 0,
+    "recommendations": 0,
+    "direction_agrees": 0,
+    "opposite_direction": 0,
+    "true_tail_displacement_samples": 0,
+    "true_head_displacement_samples": 353
+  },
+  "handovers": [],
+  "complete_single_pipe_axis_validation": true
+}

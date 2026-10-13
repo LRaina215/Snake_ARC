@@ -102,7 +102,9 @@ def main():
             mujoco.mjr_render(viewport, scene, context)
             o = row['controller']['observation']
             text = f"t={row['time_s']:.2f}s | enabled J{active[0]}-J{active[-1]} | {len(active)} joints\n"
-            text += f"observer: {'settle' if o is None else o['state']} | hold={row['controller']['phase_hold']}"
+            text += f"observer: {'settle' if o is None else o['state']} | handover hold={row['controller']['phase_hold']}"
+            c = row['controller']
+            text += f"\nphase={c['phase_rad']:.3f}rad | fault={c.get('fault') or c.get('resize_fault') or 'none'}"
             force = np.asarray(row.get('external_force_world', []))
             magnitude = float(np.linalg.norm(force[:, :3], axis=1).sum()) if force.size else 0.
             text += f"\nApplied force sum={magnitude:.1f}N | feedback={status.get('motor_feedback_period_s', .02):g}s"

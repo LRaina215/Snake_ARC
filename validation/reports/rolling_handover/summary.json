@@ -1,0 +1,276 @@
+{
+  "dynamics_attempts": 5,
+  "amended_budget_maximum": 5,
+  "hardware_runs": 0,
+  "real_and_manual_entries_updated": false,
+  "all_requested_scope_complete": false,
+  "future_driver_termination_revision_dynamics_verified": false,
+  "cases": [
+    {
+      "source": "natural_20261013_112105_172339",
+      "case": "natural",
+      "time_s": 82.00000000002748,
+      "moving_case_pass": false,
+      "body_shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": true,
+      "continuous_phase_pass": true,
+      "position_transfers": 0,
+      "visited_windows": [
+        [
+          6,
+          11
+        ]
+      ],
+      "bidirectional_return_on_pipe": false,
+      "full_phase_reliable_position_pass": false,
+      "minimum_passive_joint_count": 5,
+      "final_six_trial": null,
+      "prefer_feasible_six": false,
+      "first_support_below_2n_s": null,
+      "first_floor_contact_saved_time_s": null,
+      "first_controller_fault_s": null,
+      "initial_short_unforced_prefix": null,
+      "actual_width_chain": [],
+      "continuous_exit_cycles": 7.63752740908642,
+      "post_last_change_cycles": 7.63752740908642,
+      "curvature_review": {
+        "fitted_body_radius_range_m": [
+          0.11163517538813349,
+          0.12068801633411108
+        ],
+        "minimum_projected_smooth_curve_radius_m": 0.05244759820609091,
+        "worst_local_curvature_time_s": 17.919999999998918,
+        "unobservable_frames": 0,
+        "definition": "actual angle reconstructed plane/smooth-curve proxy; not pipe radius or solid-link bend radius"
+      }
+    },
+    {
+      "source": "natural_repair_20261013_113711_001298",
+      "case": "natural",
+      "time_s": 41.49999999999398,
+      "moving_case_pass": true,
+      "body_shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": true,
+      "continuous_phase_pass": true,
+      "position_transfers": 3,
+      "visited_windows": [
+        [
+          6,
+          11
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          4,
+          9
+        ],
+        [
+          3,
+          8
+        ]
+      ],
+      "bidirectional_return_on_pipe": false,
+      "full_phase_reliable_position_pass": false,
+      "minimum_passive_joint_count": 2,
+      "final_six_trial": null,
+      "prefer_feasible_six": false,
+      "first_support_below_2n_s": null,
+      "first_floor_contact_saved_time_s": null,
+      "first_controller_fault_s": null,
+      "initial_short_unforced_prefix": null,
+      "actual_width_chain": [],
+      "continuous_exit_cycles": 3.77006229195831,
+      "post_last_change_cycles": 1.0007662821597316,
+      "curvature_review": {
+        "fitted_body_radius_range_m": [
+          0.11163517538813349,
+          0.12353741594474033
+        ],
+        "minimum_projected_smooth_curve_radius_m": 0.052527640818308664,
+        "worst_local_curvature_time_s": 12.639999999998434,
+        "unobservable_frames": 0,
+        "definition": "actual angle reconstructed plane/smooth-curve proxy; not pipe radius or solid-link bend radius"
+      }
+    },
+    {
+      "source": "short_return_20261013_114112_437283",
+      "case": "short_return",
+      "time_s": 120.00000000020893,
+      "moving_case_pass": false,
+      "body_shape_pass": false,
+      "mechanics_pass": false,
+      "strict_pipe_pass": false,
+      "continuous_phase_pass": false,
+      "position_transfers": 2,
+      "visited_windows": [
+        [
+          3,
+          8
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          3,
+          8
+        ]
+      ],
+      "bidirectional_return_on_pipe": false,
+      "full_phase_reliable_position_pass": false,
+      "minimum_passive_joint_count": 1,
+      "final_six_trial": null,
+      "prefer_feasible_six": false,
+      "first_support_below_2n_s": 25.72000000000845,
+      "first_floor_contact_saved_time_s": 26.320000000009184,
+      "first_controller_fault_s": 38.860000000000134,
+      "initial_short_unforced_prefix": {
+        "time_interval_s": [
+          2.0,
+          24.0
+        ],
+        "body_turn_range_deg": [
+          169.02321066157378,
+          184.32339553596185
+        ],
+        "minimum_support_n": 25.796673692451396,
+        "minimum_gap": 0.5734842862099773,
+        "pipe_wrap_range_deg": [
+          191.3394433786248,
+          213.9776345614261
+        ],
+        "body_violations": 0,
+        "maximum_plane_rms_m": 0.008416408578423278
+      },
+      "actual_width_chain": [],
+      "continuous_exit_cycles": null,
+      "post_last_change_cycles": 0.003819718634196586,
+      "curvature_review": {
+        "fitted_body_radius_range_m": [
+          0.11047419292996347,
+          0.35712376741950347
+        ],
+        "minimum_projected_smooth_curve_radius_m": 0.046629052212985314,
+        "worst_local_curvature_time_s": 71.89999999997926,
+        "unobservable_frames": 0,
+        "definition": "actual angle reconstructed plane/smooth-curve proxy; not pipe radius or solid-link bend radius"
+      }
+    },
+    {
+      "source": "combined_20261013_115002_906774",
+      "case": "combined",
+      "time_s": 150.00000000035217,
+      "moving_case_pass": false,
+      "body_shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": false,
+      "continuous_phase_pass": false,
+      "position_transfers": 3,
+      "visited_windows": [
+        [
+          8,
+          13
+        ],
+        [
+          7,
+          12
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          7,
+          12
+        ]
+      ],
+      "bidirectional_return_on_pipe": true,
+      "full_phase_reliable_position_pass": true,
+      "minimum_passive_joint_count": 5,
+      "final_six_trial": null,
+      "prefer_feasible_six": false,
+      "first_support_below_2n_s": null,
+      "first_floor_contact_saved_time_s": null,
+      "first_controller_fault_s": 57.219999999957345,
+      "initial_short_unforced_prefix": null,
+      "actual_width_chain": [
+        8,
+        6
+      ],
+      "continuous_exit_cycles": 2.13713257583299,
+      "post_last_change_cycles": 0.0,
+      "curvature_review": {
+        "fitted_body_radius_range_m": [
+          0.1109908582219643,
+          0.15879932337623448
+        ],
+        "minimum_projected_smooth_curve_radius_m": 0.05278897238621708,
+        "worst_local_curvature_time_s": 4.799999999999938,
+        "unobservable_frames": 0,
+        "definition": "actual angle reconstructed plane/smooth-curve proxy; not pipe radius or solid-link bend radius"
+      }
+    },
+    {
+      "source": "combined_repair_20261013_120622_382379",
+      "case": "combined",
+      "time_s": 67.6999999999592,
+      "moving_case_pass": true,
+      "body_shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": false,
+      "continuous_phase_pass": true,
+      "position_transfers": 3,
+      "visited_windows": [
+        [
+          8,
+          13
+        ],
+        [
+          7,
+          12
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          7,
+          12
+        ]
+      ],
+      "bidirectional_return_on_pipe": true,
+      "full_phase_reliable_position_pass": true,
+      "minimum_passive_joint_count": 5,
+      "final_six_trial": {
+        "start_phase": 33.11999999996227,
+        "good": true,
+        "samples": 53
+      },
+      "prefer_feasible_six": false,
+      "first_support_below_2n_s": null,
+      "first_floor_contact_saved_time_s": null,
+      "first_controller_fault_s": null,
+      "initial_short_unforced_prefix": null,
+      "actual_width_chain": [
+        8,
+        6
+      ],
+      "continuous_exit_cycles": 3.137898857993328,
+      "post_last_change_cycles": 1.0007662821603378,
+      "curvature_review": {
+        "fitted_body_radius_range_m": [
+          0.1109908582219643,
+          0.15879932337623448
+        ],
+        "minimum_projected_smooth_curve_radius_m": 0.05278897238621708,
+        "worst_local_curvature_time_s": 4.799999999999938,
+        "unobservable_frames": 0,
+        "definition": "actual angle reconstructed plane/smooth-curve proxy; not pipe radius or solid-link bend radius"
+      }
+    }
+  ]
+}

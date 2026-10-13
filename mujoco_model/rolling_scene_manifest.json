@@ -1,0 +1,11 @@
+{
+  "scene": "rolling_straight_long",
+  "source": "straight",
+  "exit_extension_m": 2.0,
+  "bend_heading_deg": 0.0,
+  "feature_span_m": [
+    0.0,
+    0.0
+  ],
+  "route_end_m": 4.999999999999999
+}

@@ -1,0 +1,18 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\rolling_handover\\natural_20261013_112105_172339.mp4",
+  "frames": 821,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    82.00000000002748
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    82.00000000002748,
+    7.980000000001,
+    8.220000000000883,
+    82.00000000002748
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}

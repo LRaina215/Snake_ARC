@@ -1,0 +1,1676 @@
+{
+  "case": "natural",
+  "source": "natural_repair_20261013_113711_001298",
+  "shape_pass": true,
+  "mechanics_pass": true,
+  "strict_pipe_pass": true,
+  "resize_pass": false,
+  "completed_widths": [],
+  "summary": {
+    "samples": 2076,
+    "body_turn_range_deg": [
+      168.0917436185356,
+      186.01603123481317
+    ],
+    "minimum_gap": 0.5602013315001653,
+    "maximum_plane_rms_m": 0.008501577998849335,
+    "body_violations": 0,
+    "command_violations": 0,
+    "pipe_unobservable": 0,
+    "contact_axis_conflict_frames": 0,
+    "pipe_wrap_range_deg": [
+      194.51999881255273,
+      215.3835163340461
+    ],
+    "pipe_violations": 0,
+    "minimum_support_n": 25.67347839643319,
+    "minimum_support_coverage": 1.0,
+    "widths": {
+      "6": 1975
+    },
+    "observation_states": {
+      "none": 40,
+      "retain": 935,
+      "confirming": 250,
+      "recommend_head": 440,
+      "blocked_candidate_shape": 310
+    },
+    "length_states": {
+      "none": 1975
+    },
+    "displacement_m": [
+      0.76263154561992,
+      -0.02427698567145324,
+      -0.08555783064149303
+    ],
+    "events": [
+      {
+        "kind": "prepare",
+        "time_s": 11.399999999999121,
+        "old": [
+          6,
+          11
+        ],
+        "to": [
+          5,
+          10
+        ],
+        "observation": {
+          "feedback_time_s": 11.399999999999121,
+          "current_window": [
+            6,
+            11
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": -1,
+          "suggested_window": [
+            5,
+            10
+          ],
+          "state": "recommend_head",
+          "localisation": "conditional_crest_with_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 183.75695237784092,
+            "fit_rms_m": 0.008138030185028202,
+            "gap_fraction": 0.6109155010931698
+          },
+          "features": {
+            "bending_center_joint": 8.371856123649199,
+            "head_boundary_turn_deg": 3.770636675433731,
+            "tail_boundary_turn_deg": 0.0,
+            "reverse_boundary_turn_deg": 8.35506998308539
+          },
+          "phase_reference": [
+            0.09084021524363455,
+            6.120987821105554
+          ],
+          "feature_error": [
+            -0.21898409159443594,
+            -9.891624496539285
+          ],
+          "filtered_feature_error": [
+            -0.21753594826391648,
+            -9.802442423422901
+          ],
+          "filtered_error_joints": -0.6698594566371932,
+          "estimated_bending_center_joint": 8.282464051736083,
+          "position_valid": true,
+          "end_quality": {
+            "source": "two_consistent_ends",
+            "end_disagreement_deg": 15.995431992556147,
+            "candidates": [
+              {
+                "name": "head",
+                "count": 4,
+                "straightness": 0.9997135616002127,
+                "opening_alignment": 0.883193554668108,
+                "direction": [
+                  0.9998279438150904,
+                  0.017121204272109437,
+                  0.0071377258816023035
+                ]
+              },
+              {
+                "name": "tail",
+                "count": 4,
+                "straightness": 0.9999788918068049,
+                "opening_alignment": 0.8684806817312453,
+                "direction": [
+                  0.9662024233942903,
+                  -0.24743547249191608,
+                  -0.07230880983464436
+                ]
+              }
+            ]
+          },
+          "down_head": [
+            0.9926702760280686,
+            -0.11628819779191618,
+            -0.032905594428097096
+          ],
+          "crest": {
+            "joint_coordinate": 8.100960319449973,
+            "point_head_m": [
+              -0.450560522533856,
+              -0.07320493526521059,
+              0.08075434041082613
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9930365950325766,
+            "top_coordinate_span": [
+              7.376607433582532,
+              8.79212773306459
+            ]
+          },
+          "gravity_proxy_assumption": "qualified passive end hangs down",
+          "candidate_window": [
+            5,
+            10
+          ],
+          "candidate_geometry": {
+            "turn_deg": 158.43882522427614,
+            "fit_rms_m": 0.008499471602995499,
+            "gap_fraction": 0.5970837273764477
+          },
+          "persistence_s": 0.5999999999996675
+        }
+      },
+      {
+        "kind": "complete",
+        "time_s": 15.199999999997015,
+        "old": [
+          6,
+          11
+        ],
+        "to": [
+          5,
+          10
+        ],
+        "gate": {
+          "time_s": 15.199999999997015,
+          "candidate_geometry": {
+            "turn_deg": 180.48126883916018,
+            "fit_rms_m": 0.0007237767464321155,
+            "gap_fraction": 0.5719534865023056
+          },
+          "command_open": true,
+          "next_command_open": true,
+          "next_target_step_deg": 0.9000000000000012,
+          "entering_joint": [
+            5
+          ],
+          "exiting_joint": [
+            11
+          ],
+          "entering_angle_deg": [
+            17.34599347201471
+          ],
+          "exiting_angle_deg": [
+            3.115728705114164
+          ],
+          "entering_velocity_deg_s": [
+            -10.524268561639499
+          ],
+          "exiting_velocity_deg_s": [
+            -37.393963596633945
+          ],
+          "phase_compatible": true,
+          "evidence_valid": true,
+          "shared_preload_jump_rad": 0.0,
+          "feedback_age_s": 0.0,
+          "unloading_observed": false,
+          "phase_paused": false,
+          "strategy": "rolling_angle_geometry"
+        },
+        "phase_rad": 7.91999999999741,
+        "observation": {
+          "feedback_time_s": 15.199999999997015,
+          "current_window": [
+            6,
+            11
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": -1,
+          "suggested_window": [
+            5,
+            10
+          ],
+          "state": "recommend_head",
+          "localisation": "conditional_crest_with_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 179.8509279434252,
+            "fit_rms_m": 0.0008119435243123949,
+            "gap_fraction": 0.6485204187046113
+          },
+          "features": {
+            "bending_center_joint": 7.935408068631476,
+            "head_boundary_turn_deg": 5.867055039353603,
+            "tail_boundary_turn_deg": 0.0,
+            "reverse_boundary_turn_deg": 8.778546472619094
+          },
+          "phase_reference": [
+            -0.08953355312263345,
+            16.815669659275482
+          ],
+          "feature_error": [
+            -0.47505837824589026,
+            -22.682724698629084
+          ],
+          "filtered_feature_error": [
+            -0.47579841387803157,
+            -23.122950343034272
+          ],
+          "filtered_error_joints": -0.7840910519195207,
+          "estimated_bending_center_joint": 8.024201586121968,
+          "position_valid": true,
+          "end_quality": {
+            "source": "two_consistent_ends",
+            "end_disagreement_deg": 24.005313891207063,
+            "candidates": [
+              {
+                "name": "head",
+                "count": 4,
+                "straightness": 0.999482770568025,
+                "opening_alignment": 0.7808145557988132,
+                "direction": [
+                  0.9996846651515939,
+                  0.021077803578527364,
+                  0.01364904601246564
+                ]
+              },
+              {
+                "name": "tail",
+                "count": 4,
+                "straightness": 0.9999674211935634,
+                "opening_alignment": 0.7502171805534273,
+                "direction": [
+                  0.9069902199307793,
+                  0.40267460264967114,
+                  -0.12337708592297923
+                ]
+              }
+            ]
+          },
+          "down_head": [
+            0.9746451760142537,
+            0.21661177885442334,
+            -0.056090267726823934
+          ],
+          "crest": {
+            "joint_coordinate": 7.87989904007414,
+            "point_head_m": [
+              -0.42485470236568756,
+              -0.05699678157088124,
+              -0.1245136789785165
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9931542400073088,
+            "top_coordinate_span": [
+              7.375013193932485,
+              8.374982160276158
+            ]
+          },
+          "gravity_proxy_assumption": "qualified passive end hangs down",
+          "candidate_window": [
+            5,
+            10
+          ],
+          "candidate_geometry": {
+            "turn_deg": 180.48126883916018,
+            "fit_rms_m": 0.0007237767464321155,
+            "gap_fraction": 0.5719534865023056
+          },
+          "persistence_s": 1.9999999999988916
+        },
+        "strategy": "rolling_angle_geometry"
+      },
+      {
+        "kind": "prepare",
+        "time_s": 22.20000000000415,
+        "old": [
+          5,
+          10
+        ],
+        "to": [
+          4,
+          9
+        ],
+        "observation": {
+          "feedback_time_s": 22.20000000000415,
+          "current_window": [
+            5,
+            10
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": -1,
+          "suggested_window": [
+            4,
+            9
+          ],
+          "state": "recommend_head",
+          "localisation": "conditional_crest_with_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 180.7803312571708,
+            "fit_rms_m": 0.007687796726857879,
+            "gap_fraction": 0.6210254896153634
+          },
+          "features": {
+            "bending_center_joint": 7.172669994893314,
+            "head_boundary_turn_deg": 9.5232448984063,
+            "tail_boundary_turn_deg": 0.0,
+            "reverse_boundary_turn_deg": 10.854984816202924
+          },
+          "phase_reference": [
+            -0.05079535259539473,
+            16.214763366290036
+          ],
+          "feature_error": [
+            -0.2765346525112909,
+            -25.738008264696337
+          ],
+          "filtered_feature_error": [
+            -0.25283228345237185,
+            -25.480775868761913
+          ],
+          "filtered_error_joints": -0.7412220106619347,
+          "estimated_bending_center_joint": 7.2471677165476285,
+          "position_valid": true,
+          "end_quality": {
+            "source": "two_consistent_ends",
+            "end_disagreement_deg": 3.438939959159751,
+            "candidates": [
+              {
+                "name": "head",
+                "count": 4,
+                "straightness": 0.9994085162467405,
+                "opening_alignment": 0.8633895459548792,
+                "direction": [
+                  0.999536922115356,
+                  0.014849791263840445,
+                  -0.02655983862114085
+                ]
+              },
+              {
+                "name": "tail",
+                "count": 4,
+                "straightness": 0.9999926147335394,
+                "opening_alignment": 0.8317144425964064,
+                "direction": [
+                  0.9989753579477191,
+                  -0.043492663807888264,
+                  -0.012514887459353197
+                ]
+              }
+            ]
+          },
+          "down_head": [
+            0.9997062864129149,
+            -0.014327887813781536,
+            -0.019546164260396588
+          ],
+          "crest": {
+            "joint_coordinate": 6.995706215352952,
+            "point_head_m": [
+              -0.3747104064401967,
+              -0.10186760327242152,
+              0.07426089927904103
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.99901776183902,
+            "top_coordinate_span": [
+              6.458800851593877,
+              7.541615008754718
+            ]
+          },
+          "gravity_proxy_assumption": "qualified passive end hangs down",
+          "candidate_window": [
+            4,
+            9
+          ],
+          "candidate_geometry": {
+            "turn_deg": 170.02421088977067,
+            "fit_rms_m": 0.007153327073564493,
+            "gap_fraction": 0.5980980909979607
+          },
+          "persistence_s": 0.6000000000007333
+        }
+      },
+      {
+        "kind": "complete",
+        "time_s": 23.20000000000537,
+        "old": [
+          5,
+          10
+        ],
+        "to": [
+          4,
+          9
+        ],
+        "gate": {
+          "time_s": 23.20000000000537,
+          "candidate_geometry": {
+            "turn_deg": 180.7274884926362,
+            "fit_rms_m": 0.0006080237319314436,
+            "gap_fraction": 0.5704303925223495
+          },
+          "command_open": true,
+          "next_command_open": true,
+          "next_target_step_deg": 0.8999999999999997,
+          "entering_joint": [
+            4
+          ],
+          "exiting_joint": [
+            10
+          ],
+          "entering_angle_deg": [
+            -11.375647052112352
+          ],
+          "exiting_angle_deg": [
+            2.2567810924627683
+          ],
+          "entering_velocity_deg_s": [
+            6.089117011699417
+          ],
+          "exiting_velocity_deg_s": [
+            36.69947488843707
+          ],
+          "phase_compatible": true,
+          "evidence_valid": true,
+          "shared_preload_jump_rad": 0.0,
+          "feedback_age_s": 0.0,
+          "unloading_observed": false,
+          "phase_paused": false,
+          "strategy": "rolling_angle_geometry"
+        },
+        "phase_rad": 12.719999999997308,
+        "observation": {
+          "feedback_time_s": 23.20000000000537,
+          "current_window": [
+            5,
+            10
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": -1,
+          "suggested_window": [
+            4,
+            9
+          ],
+          "state": "recommend_head",
+          "localisation": "conditional_crest_with_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 180.38936588433305,
+            "fit_rms_m": 0.000645913918893486,
+            "gap_fraction": 0.6496725352202908
+          },
+          "features": {
+            "bending_center_joint": 6.95496081474815,
+            "head_boundary_turn_deg": 4.683644327449782,
+            "tail_boundary_turn_deg": 0.32863875415376875,
+            "reverse_boundary_turn_deg": 9.338249034589406
+          },
+          "phase_reference": [
+            -0.06328913767490725,
+            15.6514670375214
+          ],
+          "feature_error": [
+            -0.4817500475769431,
+            -20.00647261081741
+          ],
+          "filtered_feature_error": [
+            -0.4646960112263712,
+            -20.84170630090933
+          ],
+          "filtered_error_joints": -0.7610080664221145,
+          "estimated_bending_center_joint": 7.035303988773629,
+          "position_valid": true,
+          "end_quality": {
+            "source": "two_consistent_ends",
+            "end_disagreement_deg": 22.288497107821726,
+            "candidates": [
+              {
+                "name": "head",
+                "count": 4,
+                "straightness": 0.9991790015944103,
+                "opening_alignment": 0.8236762839613783,
+                "direction": [
+                  0.999499778895421,
+                  0.025105142570402195,
+                  -0.01923340335261979
+                ]
+              },
+              {
+                "name": "tail",
+                "count": 4,
+                "straightness": 0.9999569947695732,
+                "opening_alignment": 0.7277518992127102,
+                "direction": [
+                  0.9231176566583775,
+                  -0.16229858917840648,
+                  -0.34858709086287826
+                ]
+              }
+            ]
+          },
+          "down_head": [
+            0.9797838253779687,
+            -0.06991506341752263,
+            -0.18744476369063462
+          ],
+          "crest": {
+            "joint_coordinate": 6.889060163873971,
+            "point_head_m": [
+              -0.36888347694836937,
+              -0.11892976936552363,
+              0.031637115901915425
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9974772279220653,
+            "top_coordinate_span": [
+              6.375005582552278,
+              7.37497360239328
+            ]
+          },
+          "gravity_proxy_assumption": "qualified passive end hangs down",
+          "candidate_window": [
+            4,
+            9
+          ],
+          "candidate_geometry": {
+            "turn_deg": 180.7274884926362,
+            "fit_rms_m": 0.0006080237319314436,
+            "gap_fraction": 0.5704303925223495
+          },
+          "persistence_s": 1.6000000000019554
+        },
+        "strategy": "rolling_angle_geometry"
+      },
+      {
+        "kind": "prepare",
+        "time_s": 30.00000000001368,
+        "old": [
+          4,
+          9
+        ],
+        "to": [
+          3,
+          8
+        ],
+        "observation": {
+          "feedback_time_s": 30.00000000001368,
+          "current_window": [
+            4,
+            9
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": -1,
+          "suggested_window": [
+            3,
+            8
+          ],
+          "state": "recommend_head",
+          "localisation": "conditional_crest_with_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 178.69994093736352,
+            "fit_rms_m": 0.007793978400763926,
+            "gap_fraction": 0.6313084516779087
+          },
+          "features": {
+            "bending_center_joint": 6.151823930597984,
+            "head_boundary_turn_deg": 11.723493771660937,
+            "tail_boundary_turn_deg": 0.0,
+            "reverse_boundary_turn_deg": 25.335496478246938
+          },
+          "phase_reference": [
+            -0.005609019015576387,
+            5.913621610970725
+          ],
+          "feature_error": [
+            -0.3425670503864398,
+            -17.637115382631663
+          ],
+          "filtered_feature_error": [
+            -0.33802695725615267,
+            -17.31765437550104
+          ],
+          "filtered_error_joints": -1.5263549939811107,
+          "estimated_bending_center_joint": 6.161973042743847,
+          "position_valid": true,
+          "end_quality": {
+            "source": "single_tail",
+            "candidates": [
+              {
+                "name": "head",
+                "count": 3,
+                "straightness": 0.999733255927879,
+                "opening_alignment": 0.8649476115956747,
+                "direction": [
+                  0.9995567894806788,
+                  -0.028740352952797914,
+                  -0.007759942991199364
+                ]
+              },
+              {
+                "name": "tail",
+                "count": 4,
+                "straightness": 0.9999919890122907,
+                "opening_alignment": 0.537071796233835,
+                "direction": [
+                  0.8957789747157336,
+                  0.16088147809517866,
+                  0.4143635824528256
+                ]
+              }
+            ],
+            "does_not_prove_gravity": true
+          },
+          "down_head": [
+            0.8957789747157336,
+            0.16088147809517866,
+            0.4143635824528256
+          ],
+          "crest": {
+            "joint_coordinate": 5.140241848235355,
+            "point_head_m": [
+              -0.29299685510868717,
+              0.05965859033946042,
+              0.05332487513428032
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9995366330382546,
+            "top_coordinate_span": [
+              4.368549243307802,
+              5.872447456232561
+            ]
+          },
+          "gravity_proxy_assumption": "qualified passive end hangs down",
+          "candidate_window": [
+            3,
+            8
+          ],
+          "candidate_geometry": {
+            "turn_deg": 169.8291391092091,
+            "fit_rms_m": 0.007283600644961955,
+            "gap_fraction": 0.6094664979473683
+          },
+          "persistence_s": 0.6000000000007333
+        }
+      },
+      {
+        "kind": "complete",
+        "time_s": 31.000000000014904,
+        "old": [
+          4,
+          9
+        ],
+        "to": [
+          3,
+          8
+        ],
+        "gate": {
+          "time_s": 31.000000000014904,
+          "candidate_geometry": {
+            "turn_deg": 178.6971023249207,
+            "fit_rms_m": 9.837856938634567e-05,
+            "gap_fraction": 0.5771197936390333
+          },
+          "command_open": true,
+          "next_command_open": true,
+          "next_target_step_deg": 0.9000000000000012,
+          "entering_joint": [
+            3
+          ],
+          "exiting_joint": [
+            9
+          ],
+          "entering_angle_deg": [
+            -18.71594751475586
+          ],
+          "exiting_angle_deg": [
+            0.21680609497621228
+          ],
+          "entering_velocity_deg_s": [
+            4.028851432318593
+          ],
+          "exiting_velocity_deg_s": [
+            36.21708624686625
+          ],
+          "phase_compatible": true,
+          "evidence_valid": true,
+          "shared_preload_jump_rad": 0.0,
+          "feedback_age_s": 0.0,
+          "unloading_observed": false,
+          "phase_paused": false,
+          "strategy": "rolling_angle_geometry"
+        },
+        "phase_rad": 17.399999999997483,
+        "observation": {
+          "feedback_time_s": 31.000000000014904,
+          "current_window": [
+            4,
+            9
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": -1,
+          "suggested_window": [
+            3,
+            8
+          ],
+          "state": "recommend_head",
+          "localisation": "conditional_crest_with_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 178.58370947757103,
+            "fit_rms_m": 9.834392566492418e-05,
+            "gap_fraction": 0.6578537938716451
+          },
+          "features": {
+            "bending_center_joint": 5.9464566829961445,
+            "head_boundary_turn_deg": 4.256276159768795,
+            "tail_boundary_turn_deg": 0.0789972069745476,
+            "reverse_boundary_turn_deg": 20.47954127453551
+          },
+          "phase_reference": [
+            -0.20343441474158058,
+            11.56742423016439
+          ],
+          "feature_error": [
+            -0.3501089022622749,
+            -15.744703182958638
+          ],
+          "filtered_feature_error": [
+            -0.3540519672306858,
+            -16.132738652921116
+          ],
+          "filtered_error_joints": -1.3594819102993596,
+          "estimated_bending_center_joint": 6.145948032769314,
+          "position_valid": true,
+          "end_quality": {
+            "source": "single_tail",
+            "candidates": [
+              {
+                "name": "head",
+                "count": 3,
+                "straightness": 0.9992732518258408,
+                "opening_alignment": 0.8120917498007537,
+                "direction": [
+                  0.9993708027845923,
+                  -0.026618972902051685,
+                  -0.023439898108126096
+                ]
+              },
+              {
+                "name": "tail",
+                "count": 4,
+                "straightness": 0.9999883824033061,
+                "opening_alignment": 0.5083953506924558,
+                "direction": [
+                  0.7981988291149497,
+                  -0.3810808352949131,
+                  0.4665362002786652
+                ]
+              }
+            ],
+            "does_not_prove_gravity": true
+          },
+          "down_head": [
+            0.7981988291149497,
+            -0.3810808352949131,
+            0.4665362002786652
+          ],
+          "crest": {
+            "joint_coordinate": 5.078086546385396,
+            "point_head_m": [
+              -0.28413559985940595,
+              0.04134661201263212,
+              0.06953533357986069
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9970744957245635,
+            "top_coordinate_span": [
+              4.1250015226162535,
+              5.958332477275819
+            ]
+          },
+          "gravity_proxy_assumption": "qualified passive end hangs down",
+          "candidate_window": [
+            3,
+            8
+          ],
+          "candidate_geometry": {
+            "turn_deg": 178.6971023249207,
+            "fit_rms_m": 9.837856938634567e-05,
+            "gap_fraction": 0.5771197936390333
+          },
+          "persistence_s": 1.6000000000019554
+        },
+        "strategy": "rolling_angle_geometry"
+      }
+    ],
+    "statistics_1ms": {
+      "physical_steps": 41500,
+      "passive_torque_max_nm": 0.0,
+      "active_torque_max_nm": 2.355,
+      "joint_limit_excess_max_rad": 0.0,
+      "saturation_joint_steps": 796,
+      "mask_violation_steps": 0,
+      "floor_contact_steps": 0,
+      "maximum_external_force_sum_n": 0.0,
+      "finite": true
+    },
+    "post_exit_cycles": null,
+    "continuous_exit_start_s": 0.02000000000000001,
+    "continuous_exit_cycles": 3.77006229195831,
+    "post_last_change_cycles": 1.0007662821597316,
+    "orphan_seven_frames": 0,
+    "post_last_change_phase_basis": "recorded_event_phase"
+  },
+  "resize_mechanism_pass": false,
+  "exit_duration_pass": false,
+  "passed": true,
+  "moving_exchange_pass": true,
+  "phase_continuity_pass": true,
+  "maximum_phase_error_rad": 1.2168044349891716e-11,
+  "transfers": 3,
+  "visited_windows": [
+    [
+      6,
+      11
+    ],
+    [
+      5,
+      10
+    ],
+    [
+      4,
+      9
+    ],
+    [
+      3,
+      8
+    ]
+  ],
+  "window_index_return_observed": false,
+  "bidirectional_return_on_pipe_observed": false,
+  "short_passive_states": 525,
+  "minimum_passive_joint_count": 2,
+  "full_phase_sampling_coverage": true,
+  "full_phase_reliable_position_pass": false,
+  "location": {
+    "new_observations": 197,
+    "phase_bins": [
+      {
+        "samples": 10,
+        "position_valid": 10,
+        "recommendations": 8,
+        "direction_agrees": 8,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.09720749977827793,
+        "migration_error_max_joints": 0.11394371227191435
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 5,
+        "direction_agrees": 5,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.10526312167630308,
+        "migration_error_max_joints": 0.12513081752283128
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 4,
+        "direction_agrees": 4,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.16422661722355342,
+        "migration_error_max_joints": 0.1871174295771827
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 3,
+        "direction_agrees": 3,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.17112063769982885,
+        "migration_error_max_joints": 0.19835466804493918
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.12212675688599829,
+        "migration_error_max_joints": 0.13101090337679394
+      },
+      {
+        "samples": 7,
+        "position_valid": 7,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.12632925419848615,
+        "migration_error_max_joints": 0.17112240077165608
+      },
+      {
+        "samples": 5,
+        "position_valid": 5,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.40325508577381003,
+        "migration_error_max_joints": 0.4399731376120497
+      },
+      {
+        "samples": 6,
+        "position_valid": 6,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.3741458344448357,
+        "migration_error_max_joints": 0.41648305481645953
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.21681232163780895,
+        "migration_error_max_joints": 0.24808952164145914
+      },
+      {
+        "samples": 6,
+        "position_valid": 6,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.11144445858507535,
+        "migration_error_max_joints": 0.12303400483155702
+      },
+      {
+        "samples": 7,
+        "position_valid": 7,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.3464201985780526,
+        "migration_error_max_joints": 1.371715828930922
+      },
+      {
+        "samples": 7,
+        "position_valid": 7,
+        "recommendations": 1,
+        "direction_agrees": 1,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.3661739703653735,
+        "migration_error_max_joints": 1.3805626938058744
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 3,
+        "direction_agrees": 3,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.35038722183574,
+        "migration_error_max_joints": 1.3566646921051804
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.3653691019495917,
+        "migration_error_max_joints": 1.3791539339081713
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.405275816850073,
+        "migration_error_max_joints": 1.4312639236011822
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.5528337940173786,
+        "migration_error_max_joints": 1.6125075737382994
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.6966735570831557,
+        "migration_error_max_joints": 1.734557871212701
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 1.7864023114822323,
+        "migration_error_max_joints": 1.8130205493283602
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.6599339236526061,
+        "migration_error_max_joints": 1.846427632236704
+      },
+      {
+        "samples": 10,
+        "position_valid": 10,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.14514235002685502,
+        "migration_error_max_joints": 0.1475439123990307
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.09948728086471544,
+        "migration_error_max_joints": 0.11690845904408331
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.08167355693876444,
+        "migration_error_max_joints": 0.08856647776611748
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 4,
+        "direction_agrees": 4,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.07328645944065502,
+        "migration_error_max_joints": 0.08357408944156208
+      },
+      {
+        "samples": 11,
+        "position_valid": 11,
+        "recommendations": 9,
+        "direction_agrees": 9,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.0890980042466124,
+        "migration_error_max_joints": 0.12094937613813339
+      }
+    ],
+    "all_phase_bins_observed": true,
+    "all_phase_bins_have_valid_position": true,
+    "position_valid_samples": 197,
+    "supported_samples": 197,
+    "unsupported_samples": 0,
+    "supported_sources": {
+      "two_consistent_ends": {
+        "samples": 120,
+        "recommendations": 24,
+        "maximum_migration_error_joints": 0.4399731376120497
+      },
+      "single_tail": {
+        "samples": 58,
+        "recommendations": 23,
+        "maximum_migration_error_joints": 0.1560504909415037
+      },
+      "no_trusted_passive_end": {
+        "samples": 19,
+        "recommendations": 0,
+        "maximum_migration_error_joints": 1.846427632236704
+      }
+    },
+    "supported_recommendations": 47,
+    "supported_direction_agrees": 47,
+    "recommendations": 47,
+    "direction_agrees": 47,
+    "opposite_direction": 0,
+    "true_tail_displacement_samples": 0,
+    "true_head_displacement_samples": 133
+  },
+  "handovers": [
+    {
+      "time_s": 15.199999999997015,
+      "phase_rad": 7.907999999997417,
+      "window": [
+        6,
+        11
+      ],
+      "observation": {
+        "feedback_time_s": 15.199999999997015,
+        "current_window": [
+          6,
+          11
+        ],
+        "external_window_change": false,
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "valid": true,
+        "reasons": [],
+        "direction": -1,
+        "suggested_window": [
+          5,
+          10
+        ],
+        "state": "recommend_head",
+        "localisation": "conditional_crest_with_bending",
+        "observes_absolute_down": false,
+        "current_geometry": {
+          "turn_deg": 179.8509279434252,
+          "fit_rms_m": 0.0008119435243123949,
+          "gap_fraction": 0.6485204187046113
+        },
+        "features": {
+          "bending_center_joint": 7.935408068631476,
+          "head_boundary_turn_deg": 5.867055039353603,
+          "tail_boundary_turn_deg": 0.0,
+          "reverse_boundary_turn_deg": 8.778546472619094
+        },
+        "phase_reference": [
+          -0.08953355312263345,
+          16.815669659275482
+        ],
+        "feature_error": [
+          -0.47505837824589026,
+          -22.682724698629084
+        ],
+        "filtered_feature_error": [
+          -0.47579841387803157,
+          -23.122950343034272
+        ],
+        "filtered_error_joints": -0.7840910519195207,
+        "estimated_bending_center_joint": 8.024201586121968,
+        "position_valid": true,
+        "end_quality": {
+          "source": "two_consistent_ends",
+          "end_disagreement_deg": 24.005313891207063,
+          "candidates": [
+            {
+              "name": "head",
+              "count": 4,
+              "straightness": 0.999482770568025,
+              "opening_alignment": 0.7808145557988132,
+              "direction": [
+                0.9996846651515939,
+                0.021077803578527364,
+                0.01364904601246564
+              ]
+            },
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.9999674211935634,
+              "opening_alignment": 0.7502171805534273,
+              "direction": [
+                0.9069902199307793,
+                0.40267460264967114,
+                -0.12337708592297923
+              ]
+            }
+          ]
+        },
+        "down_head": [
+          0.9746451760142537,
+          0.21661177885442334,
+          -0.056090267726823934
+        ],
+        "crest": {
+          "joint_coordinate": 7.87989904007414,
+          "point_head_m": [
+            -0.42485470236568756,
+            -0.05699678157088124,
+            -0.1245136789785165
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.9931542400073088,
+          "top_coordinate_span": [
+            7.375013193932485,
+            8.374982160276158
+          ]
+        },
+        "gravity_proxy_assumption": "qualified passive end hangs down",
+        "candidate_window": [
+          5,
+          10
+        ],
+        "candidate_geometry": {
+          "turn_deg": 180.48126883916018,
+          "fit_rms_m": 0.0007237767464321155,
+          "gap_fraction": 0.5719534865023056
+        },
+        "persistence_s": 1.9999999999988916
+      },
+      "true_gravity_crest_offset": -0.7966607563412349,
+      "candidate_support_coverage": 1.0,
+      "support_n": 27.94263515003682,
+      "floor_contact": false,
+      "supported_on_pipe": true,
+      "crest_proxy_available": true,
+      "direction_agrees": true,
+      "opposite_direction": false,
+      "migration_error_abs": 0.012569704421714234,
+      "kind": "complete",
+      "old": [
+        6,
+        11
+      ],
+      "to": [
+        5,
+        10
+      ],
+      "gate": {
+        "time_s": 15.199999999997015,
+        "candidate_geometry": {
+          "turn_deg": 180.48126883916018,
+          "fit_rms_m": 0.0007237767464321155,
+          "gap_fraction": 0.5719534865023056
+        },
+        "command_open": true,
+        "next_command_open": true,
+        "next_target_step_deg": 0.9000000000000012,
+        "entering_joint": [
+          5
+        ],
+        "exiting_joint": [
+          11
+        ],
+        "entering_angle_deg": [
+          17.34599347201471
+        ],
+        "exiting_angle_deg": [
+          3.115728705114164
+        ],
+        "entering_velocity_deg_s": [
+          -10.524268561639499
+        ],
+        "exiting_velocity_deg_s": [
+          -37.393963596633945
+        ],
+        "phase_compatible": true,
+        "evidence_valid": true,
+        "shared_preload_jump_rad": 0.0,
+        "feedback_age_s": 0.0,
+        "unloading_observed": false,
+        "phase_paused": false,
+        "strategy": "rolling_angle_geometry"
+      },
+      "entering_passive_torque_nm": [
+        0.0
+      ],
+      "exiting_active_torque_nm": [
+        -0.6514453609330508
+      ]
+    },
+    {
+      "time_s": 23.20000000000537,
+      "phase_rad": 12.707999999997307,
+      "window": [
+        5,
+        10
+      ],
+      "observation": {
+        "feedback_time_s": 23.20000000000537,
+        "current_window": [
+          5,
+          10
+        ],
+        "external_window_change": false,
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "valid": true,
+        "reasons": [],
+        "direction": -1,
+        "suggested_window": [
+          4,
+          9
+        ],
+        "state": "recommend_head",
+        "localisation": "conditional_crest_with_bending",
+        "observes_absolute_down": false,
+        "current_geometry": {
+          "turn_deg": 180.38936588433305,
+          "fit_rms_m": 0.000645913918893486,
+          "gap_fraction": 0.6496725352202908
+        },
+        "features": {
+          "bending_center_joint": 6.95496081474815,
+          "head_boundary_turn_deg": 4.683644327449782,
+          "tail_boundary_turn_deg": 0.32863875415376875,
+          "reverse_boundary_turn_deg": 9.338249034589406
+        },
+        "phase_reference": [
+          -0.06328913767490725,
+          15.6514670375214
+        ],
+        "feature_error": [
+          -0.4817500475769431,
+          -20.00647261081741
+        ],
+        "filtered_feature_error": [
+          -0.4646960112263712,
+          -20.84170630090933
+        ],
+        "filtered_error_joints": -0.7610080664221145,
+        "estimated_bending_center_joint": 7.035303988773629,
+        "position_valid": true,
+        "end_quality": {
+          "source": "two_consistent_ends",
+          "end_disagreement_deg": 22.288497107821726,
+          "candidates": [
+            {
+              "name": "head",
+              "count": 4,
+              "straightness": 0.9991790015944103,
+              "opening_alignment": 0.8236762839613783,
+              "direction": [
+                0.999499778895421,
+                0.025105142570402195,
+                -0.01923340335261979
+              ]
+            },
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.9999569947695732,
+              "opening_alignment": 0.7277518992127102,
+              "direction": [
+                0.9231176566583775,
+                -0.16229858917840648,
+                -0.34858709086287826
+              ]
+            }
+          ]
+        },
+        "down_head": [
+          0.9797838253779687,
+          -0.06991506341752263,
+          -0.18744476369063462
+        ],
+        "crest": {
+          "joint_coordinate": 6.889060163873971,
+          "point_head_m": [
+            -0.36888347694836937,
+            -0.11892976936552363,
+            0.031637115901915425
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.9974772279220653,
+          "top_coordinate_span": [
+            6.375005582552278,
+            7.37497360239328
+          ]
+        },
+        "gravity_proxy_assumption": "qualified passive end hangs down",
+        "candidate_window": [
+          4,
+          9
+        ],
+        "candidate_geometry": {
+          "turn_deg": 180.7274884926362,
+          "fit_rms_m": 0.0006080237319314436,
+          "gap_fraction": 0.5704303925223495
+        },
+        "persistence_s": 1.6000000000019554
+      },
+      "true_gravity_crest_offset": -0.8749517786940288,
+      "candidate_support_coverage": 1.0,
+      "support_n": 28.161800154847,
+      "floor_contact": false,
+      "supported_on_pipe": true,
+      "crest_proxy_available": true,
+      "direction_agrees": true,
+      "opposite_direction": false,
+      "migration_error_abs": 0.11394371227191435,
+      "kind": "complete",
+      "old": [
+        5,
+        10
+      ],
+      "to": [
+        4,
+        9
+      ],
+      "gate": {
+        "time_s": 23.20000000000537,
+        "candidate_geometry": {
+          "turn_deg": 180.7274884926362,
+          "fit_rms_m": 0.0006080237319314436,
+          "gap_fraction": 0.5704303925223495
+        },
+        "command_open": true,
+        "next_command_open": true,
+        "next_target_step_deg": 0.8999999999999997,
+        "entering_joint": [
+          4
+        ],
+        "exiting_joint": [
+          10
+        ],
+        "entering_angle_deg": [
+          -11.375647052112352
+        ],
+        "exiting_angle_deg": [
+          2.2567810924627683
+        ],
+        "entering_velocity_deg_s": [
+          6.089117011699417
+        ],
+        "exiting_velocity_deg_s": [
+          36.69947488843707
+        ],
+        "phase_compatible": true,
+        "evidence_valid": true,
+        "shared_preload_jump_rad": 0.0,
+        "feedback_age_s": 0.0,
+        "unloading_observed": false,
+        "phase_paused": false,
+        "strategy": "rolling_angle_geometry"
+      },
+      "entering_passive_torque_nm": [
+        0.0
+      ],
+      "exiting_active_torque_nm": [
+        0.6575972348805504
+      ]
+    },
+    {
+      "time_s": 31.000000000014904,
+      "phase_rad": 17.387999999997483,
+      "window": [
+        4,
+        9
+      ],
+      "observation": {
+        "feedback_time_s": 31.000000000014904,
+        "current_window": [
+          4,
+          9
+        ],
+        "external_window_change": false,
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "valid": true,
+        "reasons": [],
+        "direction": -1,
+        "suggested_window": [
+          3,
+          8
+        ],
+        "state": "recommend_head",
+        "localisation": "conditional_crest_with_bending",
+        "observes_absolute_down": false,
+        "current_geometry": {
+          "turn_deg": 178.58370947757103,
+          "fit_rms_m": 9.834392566492418e-05,
+          "gap_fraction": 0.6578537938716451
+        },
+        "features": {
+          "bending_center_joint": 5.9464566829961445,
+          "head_boundary_turn_deg": 4.256276159768795,
+          "tail_boundary_turn_deg": 0.0789972069745476,
+          "reverse_boundary_turn_deg": 20.47954127453551
+        },
+        "phase_reference": [
+          -0.20343441474158058,
+          11.56742423016439
+        ],
+        "feature_error": [
+          -0.3501089022622749,
+          -15.744703182958638
+        ],
+        "filtered_feature_error": [
+          -0.3540519672306858,
+          -16.132738652921116
+        ],
+        "filtered_error_joints": -1.3594819102993596,
+        "estimated_bending_center_joint": 6.145948032769314,
+        "position_valid": true,
+        "end_quality": {
+          "source": "single_tail",
+          "candidates": [
+            {
+              "name": "head",
+              "count": 3,
+              "straightness": 0.9992732518258408,
+              "opening_alignment": 0.8120917498007537,
+              "direction": [
+                0.9993708027845923,
+                -0.026618972902051685,
+                -0.023439898108126096
+              ]
+            },
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.9999883824033061,
+              "opening_alignment": 0.5083953506924558,
+              "direction": [
+                0.7981988291149497,
+                -0.3810808352949131,
+                0.4665362002786652
+              ]
+            }
+          ],
+          "does_not_prove_gravity": true
+        },
+        "down_head": [
+          0.7981988291149497,
+          -0.3810808352949131,
+          0.4665362002786652
+        ],
+        "crest": {
+          "joint_coordinate": 5.078086546385396,
+          "point_head_m": [
+            -0.28413559985940595,
+            0.04134661201263212,
+            0.06953533357986069
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.9970744957245635,
+          "top_coordinate_span": [
+            4.1250015226162535,
+            5.958332477275819
+          ]
+        },
+        "gravity_proxy_assumption": "qualified passive end hangs down",
+        "candidate_window": [
+          3,
+          8
+        ],
+        "candidate_geometry": {
+          "turn_deg": 178.6971023249207,
+          "fit_rms_m": 9.837856938634567e-05,
+          "gap_fraction": 0.5771197936390333
+        },
+        "persistence_s": 1.6000000000019554
+      },
+      "true_gravity_crest_offset": -1.203431419357856,
+      "candidate_support_coverage": 1.0,
+      "support_n": 27.272217739257325,
+      "floor_contact": false,
+      "supported_on_pipe": true,
+      "crest_proxy_available": true,
+      "direction_agrees": true,
+      "opposite_direction": false,
+      "migration_error_abs": 0.1560504909415037,
+      "kind": "complete",
+      "old": [
+        4,
+        9
+      ],
+      "to": [
+        3,
+        8
+      ],
+      "gate": {
+        "time_s": 31.000000000014904,
+        "candidate_geometry": {
+          "turn_deg": 178.6971023249207,
+          "fit_rms_m": 9.837856938634567e-05,
+          "gap_fraction": 0.5771197936390333
+        },
+        "command_open": true,
+        "next_command_open": true,
+        "next_target_step_deg": 0.9000000000000012,
+        "entering_joint": [
+          3
+        ],
+        "exiting_joint": [
+          9
+        ],
+        "entering_angle_deg": [
+          -18.71594751475586
+        ],
+        "exiting_angle_deg": [
+          0.21680609497621228
+        ],
+        "entering_velocity_deg_s": [
+          4.028851432318593
+        ],
+        "exiting_velocity_deg_s": [
+          36.21708624686625
+        ],
+        "phase_compatible": true,
+        "evidence_valid": true,
+        "shared_preload_jump_rad": 0.0,
+        "feedback_age_s": 0.0,
+        "unloading_observed": false,
+        "phase_paused": false,
+        "strategy": "rolling_angle_geometry"
+      },
+      "entering_passive_torque_nm": [
+        0.0
+      ],
+      "exiting_active_torque_nm": [
+        0.6478453189404645
+      ]
+    }
+  ],
+  "complete_single_pipe_axis_validation": true
+}

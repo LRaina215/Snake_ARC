@@ -1,0 +1,787 @@
+[
+  {
+    "source": "natural_20261013_010202_444234",
+    "samples": 242,
+    "valid": 242,
+    "legacy_valid": 179,
+    "recommendations": 88,
+    "direction_agrees": 88,
+    "opposite_crest_direction": 0,
+    "weak_crest_displacement": 0,
+    "minimum_candidate_support": 0.9999999999999999,
+    "phase_bins": [
+      {
+        "samples": 23,
+        "valid": 23,
+        "recommendations": 21,
+        "crest_direction_agrees": 21
+      },
+      {
+        "samples": 10,
+        "valid": 10,
+        "recommendations": 4,
+        "crest_direction_agrees": 4
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 3,
+        "crest_direction_agrees": 3
+      },
+      {
+        "samples": 10,
+        "valid": 10,
+        "recommendations": 1,
+        "crest_direction_agrees": 1
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 9,
+        "valid": 9,
+        "recommendations": 3,
+        "crest_direction_agrees": 3
+      },
+      {
+        "samples": 9,
+        "valid": 9,
+        "recommendations": 3,
+        "crest_direction_agrees": 3
+      },
+      {
+        "samples": 9,
+        "valid": 9,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 9,
+        "valid": 9,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 3,
+        "crest_direction_agrees": 3
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 4,
+        "crest_direction_agrees": 4
+      },
+      {
+        "samples": 10,
+        "valid": 10,
+        "recommendations": 1,
+        "crest_direction_agrees": 1
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 10,
+        "valid": 10,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 8,
+        "valid": 8,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 9,
+        "valid": 9,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 9,
+        "valid": 9,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 9,
+        "valid": 9,
+        "recommendations": 5,
+        "crest_direction_agrees": 5
+      },
+      {
+        "samples": 9,
+        "valid": 9,
+        "recommendations": 7,
+        "crest_direction_agrees": 7
+      },
+      {
+        "samples": 27,
+        "valid": 27,
+        "recommendations": 25,
+        "crest_direction_agrees": 25
+      }
+    ]
+  },
+  {
+    "source": "return_repair_20261013_012403_696880",
+    "samples": 399,
+    "valid": 399,
+    "legacy_valid": 263,
+    "recommendations": 161,
+    "direction_agrees": 161,
+    "opposite_crest_direction": 0,
+    "weak_crest_displacement": 0,
+    "minimum_candidate_support": 1.0,
+    "phase_bins": [
+      {
+        "samples": 30,
+        "valid": 30,
+        "recommendations": 28,
+        "crest_direction_agrees": 28
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 10,
+        "crest_direction_agrees": 10
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 4,
+        "crest_direction_agrees": 4
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 1,
+        "crest_direction_agrees": 1
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 14,
+        "valid": 14,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 6,
+        "crest_direction_agrees": 6
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 9,
+        "crest_direction_agrees": 9
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 8,
+        "crest_direction_agrees": 8
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 10,
+        "crest_direction_agrees": 10
+      },
+      {
+        "samples": 14,
+        "valid": 14,
+        "recommendations": 8,
+        "crest_direction_agrees": 8
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 9,
+        "crest_direction_agrees": 9
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 1,
+        "crest_direction_agrees": 1
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 9,
+        "crest_direction_agrees": 9
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 11,
+        "crest_direction_agrees": 11
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 14,
+        "crest_direction_agrees": 14
+      },
+      {
+        "samples": 33,
+        "valid": 33,
+        "recommendations": 31,
+        "crest_direction_agrees": 31
+      }
+    ]
+  },
+  {
+    "source": "baseline_20261013_081646_022244",
+    "samples": 550,
+    "valid": 550,
+    "legacy_valid": 512,
+    "recommendations": 151,
+    "direction_agrees": 145,
+    "opposite_crest_direction": 0,
+    "weak_crest_displacement": 6,
+    "minimum_candidate_support": 0.6806640128150951,
+    "phase_bins": [
+      {
+        "samples": 23,
+        "valid": 23,
+        "recommendations": 12,
+        "crest_direction_agrees": 11
+      },
+      {
+        "samples": 25,
+        "valid": 25,
+        "recommendations": 11,
+        "crest_direction_agrees": 11
+      },
+      {
+        "samples": 23,
+        "valid": 23,
+        "recommendations": 9,
+        "crest_direction_agrees": 9
+      },
+      {
+        "samples": 25,
+        "valid": 25,
+        "recommendations": 4,
+        "crest_direction_agrees": 4
+      },
+      {
+        "samples": 23,
+        "valid": 23,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 25,
+        "valid": 25,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 21,
+        "valid": 21,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 22,
+        "valid": 22,
+        "recommendations": 6,
+        "crest_direction_agrees": 6
+      },
+      {
+        "samples": 22,
+        "valid": 22,
+        "recommendations": 5,
+        "crest_direction_agrees": 5
+      },
+      {
+        "samples": 22,
+        "valid": 22,
+        "recommendations": 5,
+        "crest_direction_agrees": 5
+      },
+      {
+        "samples": 22,
+        "valid": 22,
+        "recommendations": 4,
+        "crest_direction_agrees": 4
+      },
+      {
+        "samples": 21,
+        "valid": 21,
+        "recommendations": 4,
+        "crest_direction_agrees": 4
+      },
+      {
+        "samples": 22,
+        "valid": 22,
+        "recommendations": 5,
+        "crest_direction_agrees": 4
+      },
+      {
+        "samples": 21,
+        "valid": 21,
+        "recommendations": 10,
+        "crest_direction_agrees": 6
+      },
+      {
+        "samples": 23,
+        "valid": 23,
+        "recommendations": 7,
+        "crest_direction_agrees": 7
+      },
+      {
+        "samples": 21,
+        "valid": 21,
+        "recommendations": 5,
+        "crest_direction_agrees": 5
+      },
+      {
+        "samples": 23,
+        "valid": 23,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 22,
+        "valid": 22,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 24,
+        "valid": 24,
+        "recommendations": 3,
+        "crest_direction_agrees": 3
+      },
+      {
+        "samples": 24,
+        "valid": 24,
+        "recommendations": 7,
+        "crest_direction_agrees": 7
+      },
+      {
+        "samples": 24,
+        "valid": 24,
+        "recommendations": 12,
+        "crest_direction_agrees": 12
+      },
+      {
+        "samples": 24,
+        "valid": 24,
+        "recommendations": 10,
+        "crest_direction_agrees": 10
+      },
+      {
+        "samples": 24,
+        "valid": 24,
+        "recommendations": 12,
+        "crest_direction_agrees": 12
+      },
+      {
+        "samples": 24,
+        "valid": 24,
+        "recommendations": 10,
+        "crest_direction_agrees": 10
+      }
+    ]
+  },
+  {
+    "source": "combined_20261013_083240_926004",
+    "samples": 691,
+    "valid": 691,
+    "legacy_valid": 680,
+    "recommendations": 107,
+    "direction_agrees": 107,
+    "opposite_crest_direction": 0,
+    "weak_crest_displacement": 0,
+    "minimum_candidate_support": 0.6091756602537102,
+    "phase_bins": [
+      {
+        "samples": 86,
+        "valid": 86,
+        "recommendations": 74,
+        "crest_direction_agrees": 74
+      },
+      {
+        "samples": 20,
+        "valid": 20,
+        "recommendations": 4,
+        "crest_direction_agrees": 4
+      },
+      {
+        "samples": 20,
+        "valid": 20,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 22,
+        "valid": 22,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 19,
+        "valid": 19,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 117,
+        "valid": 117,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 18,
+        "valid": 18,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 19,
+        "valid": 19,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 21,
+        "valid": 21,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 21,
+        "valid": 21,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 20,
+        "valid": 20,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 37,
+        "valid": 37,
+        "recommendations": 21,
+        "crest_direction_agrees": 21
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 18,
+        "valid": 18,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 18,
+        "valid": 18,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 19,
+        "valid": 19,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 17,
+        "valid": 17,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 81,
+        "valid": 81,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 20,
+        "valid": 20,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 19,
+        "valid": 19,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 17,
+        "valid": 17,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 17,
+        "valid": 17,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 14,
+        "valid": 14,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      }
+    ]
+  },
+  {
+    "source": "natural_20261013_112105_172339",
+    "samples": 399,
+    "valid": 399,
+    "legacy_valid": 399,
+    "recommendations": 178,
+    "direction_agrees": 177,
+    "opposite_crest_direction": 0,
+    "weak_crest_displacement": 1,
+    "minimum_candidate_support": 1.0,
+    "phase_bins": [
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 14,
+        "crest_direction_agrees": 14
+      },
+      {
+        "samples": 19,
+        "valid": 19,
+        "recommendations": 16,
+        "crest_direction_agrees": 16
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 13,
+        "crest_direction_agrees": 13
+      },
+      {
+        "samples": 19,
+        "valid": 19,
+        "recommendations": 1,
+        "crest_direction_agrees": 1
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 18,
+        "valid": 18,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 13,
+        "crest_direction_agrees": 13
+      },
+      {
+        "samples": 15,
+        "valid": 15,
+        "recommendations": 8,
+        "crest_direction_agrees": 8
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 14,
+        "valid": 14,
+        "recommendations": 5,
+        "crest_direction_agrees": 5
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 14,
+        "crest_direction_agrees": 13
+      },
+      {
+        "samples": 14,
+        "valid": 14,
+        "recommendations": 12,
+        "crest_direction_agrees": 12
+      },
+      {
+        "samples": 17,
+        "valid": 17,
+        "recommendations": 13,
+        "crest_direction_agrees": 13
+      },
+      {
+        "samples": 16,
+        "valid": 16,
+        "recommendations": 1,
+        "crest_direction_agrees": 1
+      },
+      {
+        "samples": 19,
+        "valid": 19,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 17,
+        "valid": 17,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 17,
+        "valid": 17,
+        "recommendations": 0,
+        "crest_direction_agrees": 0
+      },
+      {
+        "samples": 18,
+        "valid": 18,
+        "recommendations": 2,
+        "crest_direction_agrees": 2
+      },
+      {
+        "samples": 17,
+        "valid": 17,
+        "recommendations": 15,
+        "crest_direction_agrees": 15
+      },
+      {
+        "samples": 18,
+        "valid": 18,
+        "recommendations": 16,
+        "crest_direction_agrees": 16
+      },
+      {
+        "samples": 17,
+        "valid": 17,
+        "recommendations": 15,
+        "crest_direction_agrees": 15
+      },
+      {
+        "samples": 18,
+        "valid": 18,
+        "recommendations": 16,
+        "crest_direction_agrees": 16
+      }
+    ]
+  }
+]

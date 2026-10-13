@@ -1,0 +1,1068 @@
+{
+  "case": "short_return",
+  "source": "short_return_20261013_114112_437283",
+  "shape_pass": false,
+  "mechanics_pass": false,
+  "strict_pipe_pass": false,
+  "resize_pass": false,
+  "completed_widths": [],
+  "summary": {
+    "samples": 6001,
+    "body_turn_range_deg": [
+      92.29804255447523,
+      190.33466700711696
+    ],
+    "minimum_gap": 0.5487851282395421,
+    "maximum_plane_rms_m": 0.008416408578423278,
+    "body_violations": 391,
+    "command_violations": 0,
+    "pipe_unobservable": 0,
+    "contact_axis_conflict_frames": 0,
+    "pipe_wrap_range_deg": [
+      1.606821568868236,
+      213.9776345614261
+    ],
+    "pipe_violations": 4720,
+    "minimum_support_n": 0.0,
+    "minimum_support_coverage": 0.0,
+    "widths": {
+      "6": 5900
+    },
+    "observation_states": {
+      "none": 30,
+      "confirming": 150,
+      "recommend_head": 90,
+      "blocked_candidate_shape": 100,
+      "retain": 3740,
+      "blocked_robot_boundary": 290,
+      "unobservable": 390,
+      "recommend_tail": 1110
+    },
+    "length_states": {
+      "none": 5900
+    },
+    "displacement_m": [
+      -1.1003158138467786,
+      -1.46768547197286,
+      -0.8788677932940155
+    ],
+    "events": [
+      {
+        "kind": "prepare",
+        "time_s": 2.7999999999998026,
+        "old": [
+          3,
+          8
+        ],
+        "to": [
+          2,
+          7
+        ],
+        "observation": {
+          "feedback_time_s": 2.7999999999998026,
+          "current_window": [
+            3,
+            8
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": -1,
+          "suggested_window": [
+            2,
+            7
+          ],
+          "state": "recommend_head",
+          "localisation": "conditional_crest_with_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 183.68869096355746,
+            "fit_rms_m": 0.005469961877797503,
+            "gap_fraction": 0.6496146963223765
+          },
+          "features": {
+            "bending_center_joint": 5.05270177840262,
+            "head_boundary_turn_deg": 1.4322292888937262,
+            "tail_boundary_turn_deg": 0.0,
+            "reverse_boundary_turn_deg": 22.078085060983383
+          },
+          "phase_reference": [
+            0.0665173054802772,
+            11.022165704946461
+          ],
+          "feature_error": [
+            -0.5138155270776577,
+            -12.454394993840188
+          ],
+          "filtered_feature_error": [
+            -0.5048400893902885,
+            -13.327625259286782
+          ],
+          "filtered_error_joints": -1.3754477819334892,
+          "estimated_bending_center_joint": 4.995159910609711,
+          "position_valid": true,
+          "end_quality": {
+            "source": "single_tail",
+            "candidates": [
+              {
+                "name": "tail",
+                "count": 4,
+                "straightness": 0.9999973771160346,
+                "opening_alignment": 0.5711692569578638,
+                "direction": [
+                  0.8647967736450909,
+                  -0.29557762508123575,
+                  -0.40590689553686815
+                ]
+              }
+            ],
+            "does_not_prove_gravity": true
+          },
+          "down_head": [
+            0.8647967736450909,
+            -0.29557762508123575,
+            -0.40590689553686815
+          ],
+          "crest": {
+            "joint_coordinate": 4.272686251247195,
+            "point_head_m": [
+              -0.232895063691363,
+              -0.0718236139017247,
+              -0.011719746303324528
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9932386957147132,
+            "top_coordinate_span": [
+              3.370861356655718,
+              5.0401440949902065
+            ]
+          },
+          "gravity_proxy_assumption": "qualified passive end hangs down",
+          "candidate_window": [
+            2,
+            7
+          ],
+          "candidate_geometry": {
+            "turn_deg": 176.93226120081468,
+            "fit_rms_m": 0.005300493051314693,
+            "gap_fraction": 0.5725010498906616
+          },
+          "persistence_s": 0.5999999999999339
+        }
+      },
+      {
+        "kind": "complete",
+        "time_s": 7.400000000000806,
+        "old": [
+          3,
+          8
+        ],
+        "to": [
+          2,
+          7
+        ],
+        "gate": {
+          "time_s": 7.400000000000806,
+          "candidate_geometry": {
+            "turn_deg": 178.1357901514359,
+            "fit_rms_m": 0.00023280492069166622,
+            "gap_fraction": 0.5796816150489994
+          },
+          "command_open": true,
+          "next_command_open": true,
+          "next_target_step_deg": 0.8999999999999997,
+          "entering_joint": [
+            2
+          ],
+          "exiting_joint": [
+            8
+          ],
+          "entering_angle_deg": [
+            13.802674039790983
+          ],
+          "exiting_angle_deg": [
+            1.104741538216601
+          ],
+          "entering_velocity_deg_s": [
+            -1.3135139792741644
+          ],
+          "exiting_velocity_deg_s": [
+            -36.79437410469548
+          ],
+          "phase_compatible": true,
+          "evidence_valid": true,
+          "shared_preload_jump_rad": 0.0,
+          "feedback_age_s": 0.0,
+          "unloading_observed": false,
+          "phase_paused": false,
+          "strategy": "rolling_angle_geometry"
+        },
+        "phase_rad": 3.239999999999804,
+        "observation": {
+          "feedback_time_s": 7.400000000000806,
+          "current_window": [
+            3,
+            8
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": -1,
+          "suggested_window": [
+            2,
+            7
+          ],
+          "state": "recommend_head",
+          "localisation": "conditional_crest_with_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 177.95653402013494,
+            "fit_rms_m": 0.00027413249664551184,
+            "gap_fraction": 0.6589090883082552
+          },
+          "features": {
+            "bending_center_joint": 5.040421895256244,
+            "head_boundary_turn_deg": 0.18953559851983373,
+            "tail_boundary_turn_deg": 0.0,
+            "reverse_boundary_turn_deg": 17.834356602463323
+          },
+          "phase_reference": [
+            -0.17892122042072747,
+            10.393574417496112
+          ],
+          "feature_error": [
+            -0.28065688432302893,
+            -10.583110016015945
+          ],
+          "filtered_feature_error": [
+            -0.26862494467783954,
+            -11.817020778671974
+          ],
+          "filtered_error_joints": -1.0930189617009207,
+          "estimated_bending_center_joint": 5.23137505532216,
+          "position_valid": true,
+          "end_quality": {
+            "source": "single_tail",
+            "candidates": [
+              {
+                "name": "tail",
+                "count": 4,
+                "straightness": 0.9999925908134439,
+                "opening_alignment": 0.5795222575119918,
+                "direction": [
+                  0.8521234630574561,
+                  0.4613755379823667,
+                  0.24701865649875454
+                ]
+              }
+            ],
+            "does_not_prove_gravity": true
+          },
+          "down_head": [
+            0.8521234630574561,
+            0.4613755379823667,
+            0.24701865649875454
+          ],
+          "crest": {
+            "joint_coordinate": 4.391986825724306,
+            "point_head_m": [
+              -0.23869011013703456,
+              0.07425904823476344,
+              -0.02734015210475265
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9986823841202039,
+            "top_coordinate_span": [
+              3.4583161118425148,
+              5.041666252424253
+            ]
+          },
+          "gravity_proxy_assumption": "qualified passive end hangs down",
+          "candidate_window": [
+            2,
+            7
+          ],
+          "candidate_geometry": {
+            "turn_deg": 178.1357901514359,
+            "fit_rms_m": 0.00023280492069166622,
+            "gap_fraction": 0.5796816150489994
+          },
+          "persistence_s": 1.4000000000004675
+        },
+        "strategy": "rolling_angle_geometry"
+      },
+      {
+        "kind": "prepare",
+        "time_s": 36.0000000000068,
+        "old": [
+          2,
+          7
+        ],
+        "to": [
+          3,
+          8
+        ],
+        "observation": {
+          "feedback_time_s": 36.0000000000068,
+          "current_window": [
+            2,
+            7
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": 1,
+          "suggested_window": [
+            3,
+            8
+          ],
+          "state": "recommend_tail",
+          "localisation": "intrinsic_same_winding_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 177.28101880209852,
+            "fit_rms_m": 0.0022238248177089037,
+            "gap_fraction": 0.6546382327301563
+          },
+          "features": {
+            "bending_center_joint": 5.032625895933902,
+            "head_boundary_turn_deg": 0.0,
+            "tail_boundary_turn_deg": 56.79606335730406,
+            "reverse_boundary_turn_deg": 10.382347603200673
+          },
+          "phase_reference": [
+            -0.07904496723353033,
+            16.336897361126695
+          ],
+          "feature_error": [
+            0.6116708631674319,
+            40.45916599617736
+          ],
+          "filtered_feature_error": [
+            0.5900013749914181,
+            38.72579370459808
+          ],
+          "filtered_error_joints": 0.5900013749914181,
+          "estimated_bending_center_joint": 5.090001374991418,
+          "position_valid": true,
+          "end_quality": {
+            "source": "no_trusted_passive_end",
+            "candidates": []
+          },
+          "candidate_window": [
+            3,
+            8
+          ],
+          "candidate_geometry": {
+            "turn_deg": 179.85259760639826,
+            "fit_rms_m": 0.0020953543263856947,
+            "gap_fraction": 0.5764693720842129
+          },
+          "persistence_s": 0.5999999999986017
+        }
+      },
+      {
+        "kind": "complete",
+        "time_s": 38.800000000000274,
+        "old": [
+          2,
+          7
+        ],
+        "to": [
+          3,
+          8
+        ],
+        "gate": {
+          "time_s": 38.800000000000274,
+          "candidate_geometry": {
+            "turn_deg": 189.55276435914018,
+            "fit_rms_m": 0.007538876060402942,
+            "gap_fraction": 0.6226656428727996
+          },
+          "command_open": true,
+          "next_command_open": true,
+          "next_target_step_deg": 0.9000000000000012,
+          "entering_joint": [
+            8
+          ],
+          "exiting_joint": [
+            2
+          ],
+          "entering_angle_deg": [
+            33.47079888276696
+          ],
+          "exiting_angle_deg": [
+            1.9727416608160222
+          ],
+          "entering_velocity_deg_s": [
+            -43.531144821259694
+          ],
+          "exiting_velocity_deg_s": [
+            -37.59405808943732
+          ],
+          "phase_compatible": true,
+          "evidence_valid": true,
+          "shared_preload_jump_rad": 0.0,
+          "feedback_age_s": 0.0,
+          "unloading_observed": false,
+          "phase_paused": false,
+          "strategy": "rolling_angle_geometry"
+        },
+        "phase_rad": 22.079999999987997,
+        "observation": {
+          "feedback_time_s": 38.800000000000274,
+          "current_window": [
+            2,
+            7
+          ],
+          "external_window_change": false,
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "valid": true,
+          "reasons": [],
+          "direction": 1,
+          "suggested_window": [
+            3,
+            8
+          ],
+          "state": "recommend_tail",
+          "localisation": "intrinsic_same_winding_bending",
+          "observes_absolute_down": false,
+          "current_geometry": {
+            "turn_deg": 188.84833444717216,
+            "fit_rms_m": 0.0005496436833057458,
+            "gap_fraction": 0.5487969169881252
+          },
+          "features": {
+            "bending_center_joint": 6.087680036566789,
+            "head_boundary_turn_deg": 7.032073152132385,
+            "tail_boundary_turn_deg": 80.07442742965631,
+            "reverse_boundary_turn_deg": 0.0
+          },
+          "phase_reference": [
+            0.46423862393257925,
+            0.11758939613559899
+          ],
+          "feature_error": [
+            1.12344141263421,
+            72.92476488138833
+          ],
+          "filtered_feature_error": [
+            1.1153647118822385,
+            72.8892111269891
+          ],
+          "filtered_error_joints": 1.1153647118822385,
+          "estimated_bending_center_joint": 5.615364711882238,
+          "position_valid": true,
+          "end_quality": {
+            "source": "no_trusted_passive_end",
+            "candidates": []
+          },
+          "candidate_window": [
+            3,
+            8
+          ],
+          "candidate_geometry": {
+            "turn_deg": 189.55276435914018,
+            "fit_rms_m": 0.007538876060402942,
+            "gap_fraction": 0.6226656428727996
+          },
+          "persistence_s": 3.399999999992076
+        },
+        "strategy": "rolling_angle_geometry"
+      },
+      {
+        "kind": "shape_hold",
+        "time_s": 38.84000000000018,
+        "reason": "running"
+      }
+    ],
+    "statistics_1ms": {
+      "physical_steps": 120000,
+      "passive_torque_max_nm": 0.0,
+      "active_torque_max_nm": 2.355,
+      "joint_limit_excess_max_rad": 0.00911808668717562,
+      "saturation_joint_steps": 36516,
+      "mask_violation_steps": 0,
+      "floor_contact_steps": 93639,
+      "maximum_external_force_sum_n": 60.0,
+      "finite": true
+    },
+    "post_exit_cycles": null,
+    "continuous_exit_start_s": null,
+    "continuous_exit_cycles": null,
+    "post_last_change_cycles": 0.003819718634196586,
+    "orphan_seven_frames": 0,
+    "post_last_change_phase_basis": "recorded_event_phase"
+  },
+  "resize_mechanism_pass": false,
+  "exit_duration_pass": false,
+  "passed": false,
+  "moving_exchange_pass": false,
+  "phase_continuity_pass": false,
+  "maximum_phase_error_rad": 48.68400000013735,
+  "transfers": 2,
+  "visited_windows": [
+    [
+      3,
+      8
+    ],
+    [
+      2,
+      7
+    ],
+    [
+      3,
+      8
+    ]
+  ],
+  "window_index_return_observed": true,
+  "bidirectional_return_on_pipe_observed": false,
+  "short_passive_states": 5900,
+  "minimum_passive_joint_count": 1,
+  "full_phase_sampling_coverage": true,
+  "full_phase_reliable_position_pass": false,
+  "location": {
+    "new_observations": 589,
+    "phase_bins": [
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 1,
+        "direction_agrees": 0,
+        "opposite_direction": 1,
+        "migration_error_p90_joints": 0.8771199398309205,
+        "migration_error_max_joints": 0.9691981172513433
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 1,
+        "direction_agrees": 1,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 0.8218402110838703,
+        "migration_error_max_joints": 1.6257834928941932
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 2.2016434756313537,
+        "migration_error_max_joints": 2.5433567634865555
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.660972816791218,
+        "migration_error_max_joints": 4.710038768257428
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.80664337973064,
+        "migration_error_max_joints": 4.880142409140874
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.997342307923886,
+        "migration_error_max_joints": 5.066048448820934
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 5.0836481081803555,
+        "migration_error_max_joints": 5.084209454059883
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.706781707175972,
+        "migration_error_max_joints": 4.786859983115545
+      },
+      {
+        "samples": 9,
+        "position_valid": 9,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.602495911637125,
+        "migration_error_max_joints": 4.6103170561866635
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.645635517585441,
+        "migration_error_max_joints": 4.704945307368222
+      },
+      {
+        "samples": 10,
+        "position_valid": 10,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.856755314347477,
+        "migration_error_max_joints": 5.038180142985292
+      },
+      {
+        "samples": 8,
+        "position_valid": 8,
+        "recommendations": 2,
+        "direction_agrees": 2,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 5.382069637540423,
+        "migration_error_max_joints": 5.566172624381481
+      },
+      {
+        "samples": 413,
+        "position_valid": 378,
+        "recommendations": 98,
+        "direction_agrees": 1,
+        "opposite_direction": 53,
+        "migration_error_p90_joints": 5.083691821596403,
+        "migration_error_max_joints": 5.542861534928513
+      },
+      {
+        "samples": 6,
+        "position_valid": 6,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.964207265864436,
+        "migration_error_max_joints": 5.0092822505125545
+      },
+      {
+        "samples": 7,
+        "position_valid": 7,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.837618219197408,
+        "migration_error_max_joints": 4.8546344413115285
+      },
+      {
+        "samples": 6,
+        "position_valid": 6,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.828966172841712,
+        "migration_error_max_joints": 4.836246125331826
+      },
+      {
+        "samples": 7,
+        "position_valid": 7,
+        "recommendations": 0,
+        "direction_agrees": 0,
+        "opposite_direction": 0,
+        "migration_error_p90_joints": 4.905581546216546,
+        "migration_error_max_joints": 4.945901816876554
+      },
+      {
+        "samples": 7,
+        "position_valid": 7,
+        "recommendations": 1,
+        "direction_agrees": 0,
+        "opposite_direction": 1,
+        "migration_error_p90_joints": 5.123898343553624,
+        "migration_error_max_joints": 5.13113984170258
+      },
+      {
+        "samples": 6,
+        "position_valid": 6,
+        "recommendations": 2,
+        "direction_agrees": 0,
+        "opposite_direction": 2,
+        "migration_error_p90_joints": 5.145760005796996,
+        "migration_error_max_joints": 5.151482211977463
+      },
+      {
+        "samples": 7,
+        "position_valid": 7,
+        "recommendations": 3,
+        "direction_agrees": 0,
+        "opposite_direction": 3,
+        "migration_error_p90_joints": 5.178754978089212,
+        "migration_error_max_joints": 5.191338433654248
+      },
+      {
+        "samples": 6,
+        "position_valid": 6,
+        "recommendations": 2,
+        "direction_agrees": 0,
+        "opposite_direction": 2,
+        "migration_error_p90_joints": 5.226239326515991,
+        "migration_error_max_joints": 5.239575211873245
+      },
+      {
+        "samples": 7,
+        "position_valid": 6,
+        "recommendations": 2,
+        "direction_agrees": 0,
+        "opposite_direction": 2,
+        "migration_error_p90_joints": 3.430431176573378,
+        "migration_error_max_joints": 5.3562114003464565
+      },
+      {
+        "samples": 6,
+        "position_valid": 5,
+        "recommendations": 2,
+        "direction_agrees": 0,
+        "opposite_direction": 2,
+        "migration_error_p90_joints": 3.749234334921889,
+        "migration_error_max_joints": 5.309135315129222
+      },
+      {
+        "samples": 7,
+        "position_valid": 5,
+        "recommendations": 2,
+        "direction_agrees": 0,
+        "opposite_direction": 2,
+        "migration_error_p90_joints": 1.146704423350495,
+        "migration_error_max_joints": 1.193002877426568
+      }
+    ],
+    "all_phase_bins_observed": true,
+    "all_phase_bins_have_valid_position": true,
+    "position_valid_samples": 550,
+    "supported_samples": 118,
+    "unsupported_samples": 471,
+    "supported_sources": {
+      "single_tail": {
+        "samples": 103,
+        "recommendations": 10,
+        "maximum_migration_error_joints": 0.40164350611182753
+      },
+      "no_trusted_passive_end": {
+        "samples": 15,
+        "recommendations": 0,
+        "maximum_migration_error_joints": 1.6862569673368044
+      }
+    },
+    "supported_recommendations": 10,
+    "supported_direction_agrees": 10,
+    "recommendations": 122,
+    "direction_agrees": 10,
+    "opposite_direction": 68,
+    "true_tail_displacement_samples": 55,
+    "true_head_displacement_samples": 215
+  },
+  "handovers": [
+    {
+      "time_s": 7.400000000000806,
+      "phase_rad": 3.227999999999804,
+      "window": [
+        3,
+        8
+      ],
+      "observation": {
+        "feedback_time_s": 7.400000000000806,
+        "current_window": [
+          3,
+          8
+        ],
+        "external_window_change": false,
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "valid": true,
+        "reasons": [],
+        "direction": -1,
+        "suggested_window": [
+          2,
+          7
+        ],
+        "state": "recommend_head",
+        "localisation": "conditional_crest_with_bending",
+        "observes_absolute_down": false,
+        "current_geometry": {
+          "turn_deg": 177.95653402013494,
+          "fit_rms_m": 0.00027413249664551184,
+          "gap_fraction": 0.6589090883082552
+        },
+        "features": {
+          "bending_center_joint": 5.040421895256244,
+          "head_boundary_turn_deg": 0.18953559851983373,
+          "tail_boundary_turn_deg": 0.0,
+          "reverse_boundary_turn_deg": 17.834356602463323
+        },
+        "phase_reference": [
+          -0.17892122042072747,
+          10.393574417496112
+        ],
+        "feature_error": [
+          -0.28065688432302893,
+          -10.583110016015945
+        ],
+        "filtered_feature_error": [
+          -0.26862494467783954,
+          -11.817020778671974
+        ],
+        "filtered_error_joints": -1.0930189617009207,
+        "estimated_bending_center_joint": 5.23137505532216,
+        "position_valid": true,
+        "end_quality": {
+          "source": "single_tail",
+          "candidates": [
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.9999925908134439,
+              "opening_alignment": 0.5795222575119918,
+              "direction": [
+                0.8521234630574561,
+                0.4613755379823667,
+                0.24701865649875454
+              ]
+            }
+          ],
+          "does_not_prove_gravity": true
+        },
+        "down_head": [
+          0.8521234630574561,
+          0.4613755379823667,
+          0.24701865649875454
+        ],
+        "crest": {
+          "joint_coordinate": 4.391986825724306,
+          "point_head_m": [
+            -0.23869011013703456,
+            0.07425904823476344,
+            -0.02734015210475265
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.9986823841202039,
+          "top_coordinate_span": [
+            3.4583161118425148,
+            5.041666252424253
+          ]
+        },
+        "gravity_proxy_assumption": "qualified passive end hangs down",
+        "candidate_window": [
+          2,
+          7
+        ],
+        "candidate_geometry": {
+          "turn_deg": 178.1357901514359,
+          "fit_rms_m": 0.00023280492069166622,
+          "gap_fraction": 0.5796816150489994
+        },
+        "persistence_s": 1.4000000000004675
+      },
+      "true_gravity_crest_offset": -0.948547276019966,
+      "candidate_support_coverage": 1.0,
+      "support_n": 27.375864435835812,
+      "floor_contact": false,
+      "supported_on_pipe": true,
+      "crest_proxy_available": true,
+      "direction_agrees": true,
+      "opposite_direction": false,
+      "migration_error_abs": 0.1444716856809547,
+      "kind": "complete",
+      "old": [
+        3,
+        8
+      ],
+      "to": [
+        2,
+        7
+      ],
+      "gate": {
+        "time_s": 7.400000000000806,
+        "candidate_geometry": {
+          "turn_deg": 178.1357901514359,
+          "fit_rms_m": 0.00023280492069166622,
+          "gap_fraction": 0.5796816150489994
+        },
+        "command_open": true,
+        "next_command_open": true,
+        "next_target_step_deg": 0.8999999999999997,
+        "entering_joint": [
+          2
+        ],
+        "exiting_joint": [
+          8
+        ],
+        "entering_angle_deg": [
+          13.802674039790983
+        ],
+        "exiting_angle_deg": [
+          1.104741538216601
+        ],
+        "entering_velocity_deg_s": [
+          -1.3135139792741644
+        ],
+        "exiting_velocity_deg_s": [
+          -36.79437410469548
+        ],
+        "phase_compatible": true,
+        "evidence_valid": true,
+        "shared_preload_jump_rad": 0.0,
+        "feedback_age_s": 0.0,
+        "unloading_observed": false,
+        "phase_paused": false,
+        "strategy": "rolling_angle_geometry"
+      },
+      "entering_passive_torque_nm": [
+        0.0
+      ],
+      "exiting_active_torque_nm": [
+        -0.6597633728721142
+      ]
+    },
+    {
+      "time_s": 38.800000000000274,
+      "phase_rad": 22.067999999988025,
+      "window": [
+        2,
+        7
+      ],
+      "observation": {
+        "feedback_time_s": 38.800000000000274,
+        "current_window": [
+          2,
+          7
+        ],
+        "external_window_change": false,
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "valid": true,
+        "reasons": [],
+        "direction": 1,
+        "suggested_window": [
+          3,
+          8
+        ],
+        "state": "recommend_tail",
+        "localisation": "intrinsic_same_winding_bending",
+        "observes_absolute_down": false,
+        "current_geometry": {
+          "turn_deg": 188.84833444717216,
+          "fit_rms_m": 0.0005496436833057458,
+          "gap_fraction": 0.5487969169881252
+        },
+        "features": {
+          "bending_center_joint": 6.087680036566789,
+          "head_boundary_turn_deg": 7.032073152132385,
+          "tail_boundary_turn_deg": 80.07442742965631,
+          "reverse_boundary_turn_deg": 0.0
+        },
+        "phase_reference": [
+          0.46423862393257925,
+          0.11758939613559899
+        ],
+        "feature_error": [
+          1.12344141263421,
+          72.92476488138833
+        ],
+        "filtered_feature_error": [
+          1.1153647118822385,
+          72.8892111269891
+        ],
+        "filtered_error_joints": 1.1153647118822385,
+        "estimated_bending_center_joint": 5.615364711882238,
+        "position_valid": true,
+        "end_quality": {
+          "source": "no_trusted_passive_end",
+          "candidates": []
+        },
+        "candidate_window": [
+          3,
+          8
+        ],
+        "candidate_geometry": {
+          "turn_deg": 189.55276435914018,
+          "fit_rms_m": 0.007538876060402942,
+          "gap_fraction": 0.6226656428727996
+        },
+        "persistence_s": 3.399999999992076
+      },
+      "true_gravity_crest_offset": -0.38991606333348827,
+      "candidate_support_coverage": 0.0,
+      "support_n": 0.0,
+      "floor_contact": true,
+      "supported_on_pipe": false,
+      "crest_proxy_available": false,
+      "direction_agrees": false,
+      "opposite_direction": true,
+      "migration_error_abs": 1.5052807752157267,
+      "kind": "complete",
+      "old": [
+        2,
+        7
+      ],
+      "to": [
+        3,
+        8
+      ],
+      "gate": {
+        "time_s": 38.800000000000274,
+        "candidate_geometry": {
+          "turn_deg": 189.55276435914018,
+          "fit_rms_m": 0.007538876060402942,
+          "gap_fraction": 0.6226656428727996
+        },
+        "command_open": true,
+        "next_command_open": true,
+        "next_target_step_deg": 0.9000000000000012,
+        "entering_joint": [
+          8
+        ],
+        "exiting_joint": [
+          2
+        ],
+        "entering_angle_deg": [
+          33.47079888276696
+        ],
+        "exiting_angle_deg": [
+          1.9727416608160222
+        ],
+        "entering_velocity_deg_s": [
+          -43.531144821259694
+        ],
+        "exiting_velocity_deg_s": [
+          -37.59405808943732
+        ],
+        "phase_compatible": true,
+        "evidence_valid": true,
+        "shared_preload_jump_rad": 0.0,
+        "feedback_age_s": 0.0,
+        "unloading_observed": false,
+        "phase_paused": false,
+        "strategy": "rolling_angle_geometry"
+      },
+      "entering_passive_torque_nm": [
+        0.0
+      ],
+      "exiting_active_torque_nm": [
+        -1.2082476287608381
+      ]
+    }
+  ],
+  "complete_single_pipe_axis_validation": false
+}

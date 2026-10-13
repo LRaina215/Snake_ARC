@@ -1,0 +1,32 @@
+{
+  "frames": 2861,
+  "through_control_time_s": 57.19999999995739,
+  "old_failure": {
+    "kind": "six_feasibility_review",
+    "time_s": 57.19999999995739,
+    "accepted": false,
+    "measured_only": true,
+    "observes_support": false,
+    "actual_geometry": {
+      "turn_deg": 161.10189283072887,
+      "fit_rms_m": 0.0002950828535236374,
+      "gap_fraction": 0.6653203340179278
+    },
+    "trial": {
+      "start_phase": 26.75999999997709,
+      "good": true,
+      "samples": 28
+    }
+  },
+  "maximum_target_error_rad": 0.0,
+  "maximum_phase_error_rad": 0.0,
+  "mask_mismatches": 0,
+  "new_resize_fault": null,
+  "new_six_trial": {
+    "start_phase": 33.11999999996227,
+    "good": true,
+    "samples": 1
+  },
+  "dynamics_after_old_failure_verified": false,
+  "passed": true
+}

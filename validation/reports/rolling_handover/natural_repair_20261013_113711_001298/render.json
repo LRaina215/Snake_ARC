@@ -1,0 +1,23 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\rolling_handover\\natural_repair_20261013_113711_001298.mp4",
+  "frames": 416,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    41.49999999999398
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    15.179999999997015,
+    15.219999999997015,
+    23.18000000000537,
+    23.22000000000537,
+    30.980000000014904,
+    31.020000000014903,
+    23.28000000000547,
+    8.220000000000883,
+    41.49999999999398
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}
