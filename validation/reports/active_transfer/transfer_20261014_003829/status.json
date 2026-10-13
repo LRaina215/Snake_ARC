@@ -1,0 +1,681 @@
+{
+  "route": "transfer",
+  "repair": false,
+  "scene": "straight",
+  "parameters": {
+    "joints": 20,
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5
+  },
+  "final_time_s": 22.220000000004173,
+  "termination": "task_complete",
+  "error": null,
+  "statistics": {
+    "steps": 22220,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 1.8919568339856763,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 0,
+    "floor_contact_steps": 0,
+    "maximum_enabled_count": 7,
+    "maximum_target_jump_deg": 0.0,
+    "maximum_shared_target_step_deg": 0.5964294139896544
+  },
+  "controller": {
+    "stage": "complete",
+    "route": "transfer",
+    "window": [
+      8,
+      13
+    ],
+    "phase_rad": 0.7,
+    "enabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "transaction": null,
+    "observation": {
+      "valid": true,
+      "crest_joint": 10.502285382613717,
+      "end_quality": {
+        "source": "two_consistent_ends",
+        "end_disagreement_deg": 2.428262029027042,
+        "candidates": [
+          {
+            "name": "head",
+            "count": 4,
+            "straightness": 0.9996736855597874,
+            "opening_alignment": 0.9545946311688573,
+            "direction": [
+              0.9998176476282108,
+              0.019095644450814426,
+              0.00016689577185161847
+            ]
+          },
+          {
+            "name": "tail",
+            "count": 4,
+            "straightness": 0.9999938505272535,
+            "opening_alignment": 0.9537568707364791,
+            "direction": [
+              0.9982362765905477,
+              0.055065402323466996,
+              -0.022184173764063522
+            ]
+          }
+        ]
+      },
+      "down_head": [
+        0.9992513060370567,
+        0.03708885027977977,
+        -0.011011111122889753
+      ],
+      "plane_rms_m": 0.00787864278870046,
+      "observes_world_position": false
+    },
+    "baseline_crest_joint": 10.964688821867046,
+    "completed": true,
+    "fault": null,
+    "gate": {
+      "exit_angle_deg": [
+        0.13109006847926072
+      ],
+      "exit_angle_ready": true,
+      "trajectory_finished": true,
+      "fresh_feedback": true
+    },
+    "options": {
+      "first_joint": 8,
+      "last_joint": 13,
+      "amplitude_deg": 60.0,
+      "loose_amplitude_deg": 45.0,
+      "hold_phase_rad": 0.7,
+      "preparation_s": 6.0,
+      "transfer_s": 5.0,
+      "review_s": 3.0,
+      "rolling_speed_rad_s": 0.6,
+      "exit_angle_deg": 12.0,
+      "target_rate_deg_s": 45.0,
+      "desired_direction": -1,
+      "desired_shift_joints": 1.0,
+      "drift_persistence_s": 0.6,
+      "maximum_transfer_wait_s": 20.0,
+      "rocking_amplitude_rad": 0.12,
+      "rocking_period_s": 2.0
+    },
+    "rocking": false,
+    "compliance": false,
+    "inputs": [
+      "angles_deg",
+      "feedback_time_s",
+      "control_time_s"
+    ]
+  },
+  "events": [
+    {
+      "kind": "baseline",
+      "time_s": 6.000000000000338,
+      "crest_joint": 10.964688821867046,
+      "phase_rad": 0.7
+    },
+    {
+      "kind": "begin_transfer",
+      "time_s": 6.000000000000338,
+      "direction": -1,
+      "old": [
+        8,
+        13
+      ],
+      "new": [
+        7,
+        12
+      ],
+      "reason": "active_command",
+      "overlap_count": 7,
+      "phase_rad": 0.7
+    },
+    {
+      "kind": "transfer_complete",
+      "time_s": 10.999999999999343,
+      "old": [
+        8,
+        13
+      ],
+      "new": [
+        7,
+        12
+      ],
+      "gate": {
+        "exit_angle_deg": [
+          0.29793454479770604
+        ],
+        "exit_angle_ready": true,
+        "trajectory_finished": true,
+        "fresh_feedback": true
+      },
+      "observation": {
+        "valid": true,
+        "crest_joint": 10.369236180926947,
+        "end_quality": {
+          "source": "two_consistent_ends",
+          "end_disagreement_deg": 4.163058430790922,
+          "candidates": [
+            {
+              "name": "head",
+              "count": 4,
+              "straightness": 0.9988208382352708,
+              "opening_alignment": 0.9828560459030227,
+              "direction": [
+                0.999343298489321,
+                -0.03602177201546839,
+                0.003924755450912232
+              ]
+            },
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.999894253828951,
+              "opening_alignment": 0.9888858948581302,
+              "direction": [
+                0.9993284259545656,
+                0.03532427111236266,
+                -0.00974130122471198
+              ]
+            }
+          ]
+        },
+        "down_head": [
+          0.9999957044848764,
+          -0.00034898072477316285,
+          -0.0029101931635910883
+        ],
+        "plane_rms_m": 0.00834686218230536,
+        "observes_world_position": false
+      }
+    },
+    {
+      "kind": "begin_transfer",
+      "time_s": 14.019999999997669,
+      "direction": 1,
+      "old": [
+        7,
+        12
+      ],
+      "new": [
+        8,
+        13
+      ],
+      "reason": "active_return",
+      "overlap_count": 7,
+      "phase_rad": 0.7
+    },
+    {
+      "kind": "transfer_complete",
+      "time_s": 19.200000000000482,
+      "old": [
+        7,
+        12
+      ],
+      "new": [
+        8,
+        13
+      ],
+      "gate": {
+        "exit_angle_deg": [
+          0.13109006847926072
+        ],
+        "exit_angle_ready": true,
+        "trajectory_finished": true,
+        "fresh_feedback": true
+      },
+      "observation": {
+        "valid": true,
+        "crest_joint": 10.644502648343424,
+        "end_quality": {
+          "source": "two_consistent_ends",
+          "end_disagreement_deg": 4.772146015378485,
+          "candidates": [
+            {
+              "name": "head",
+              "count": 4,
+              "straightness": 0.9992674610186387,
+              "opening_alignment": 0.9924991343988848,
+              "direction": [
+                0.99957668251587,
+                0.029093895278010505,
+                3.206430948921033e-05
+              ]
+            },
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.9999550456330644,
+              "opening_alignment": 0.9984845609176305,
+              "direction": [
+                0.998504504866234,
+                -0.05320692622820446,
+                -0.012560922067398856
+              ]
+            }
+          ]
+        },
+        "down_head": [
+          0.9999075341450546,
+          -0.012066977793711131,
+          -0.006269864981202003
+        ],
+        "plane_rms_m": 0.00832027687142023,
+        "observes_world_position": false
+      }
+    }
+  ],
+  "pipe_centerline": [
+    [
+      -1.2,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -1.15,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -1.1,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -1.05,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -1.0,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.95,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.9,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.85,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.8,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.75,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.7,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.65,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.6,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.55,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.5,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.45,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.4,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.35,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.3,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.25,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.2,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.15,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.1,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.05,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      2.220446049e-16,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.05,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.1,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.15,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.2,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.25,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.3,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.35,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.4,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.45,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.5,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.55,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.6,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.65,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.7,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.75,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.8,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.85,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.9,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.95,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.0,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.05,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.1,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.15,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.2,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.25,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.3,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.35,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.4,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.45,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.5,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.55,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.6,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.65,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.7,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.75,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.8,
+      0.0,
+      1.2,
+      0.0565
+    ]
+  ],
+  "gravity": [
+    0.0,
+    0.0,
+    -9.81
+  ],
+  "pipe_friction": [
+    2.0,
+    0.005,
+    0.002
+  ],
+  "control_period_s": 0.02,
+  "feedback_period_s": 0.2,
+  "physics_period_s": 0.001,
+  "hardware_run": false
+}

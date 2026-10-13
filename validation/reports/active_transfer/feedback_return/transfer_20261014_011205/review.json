@@ -1,0 +1,260 @@
+{
+  "baseline": {
+    "material": {
+      "valid": true,
+      "crown_joint": 10.959760357131112,
+      "head_hanging_m": 0.545686655970375,
+      "tail_hanging_m": 0.4904546852031477,
+      "head_shoulder_joint": 8.460258232098838,
+      "tail_shoulder_joint": 13.39605139219924,
+      "above_pipe_length_m": 0.31835865882647596
+    },
+    "actual_bend": {
+      "valid": true,
+      "interval": [
+        8,
+        14
+      ],
+      "threshold_deg": 5.0,
+      "wrap_deg": 236.872349818077,
+      "gap_fraction": 0.5375475716468866,
+      "total_turn_deg": 188.59988999412633
+    },
+    "legacy_enabled_wrap_deg": 209.88850479743343,
+    "enabled_gap_fraction": 0.6179523367089904,
+    "section_turn_deg": 178.65748302725527,
+    "plane_rms_m": 0.007876004494305042,
+    "maximum_curvature_per_m": 10.672380033393885,
+    "support_up_n": 28.014912751389026,
+    "support_by_link_n": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      15.055079305590334,
+      12.959833445798694,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "min_z_m": 0.6615745400190497,
+    "mean_x_m": -0.4807991499145104,
+    "mean_y_m": 0.0007751470870980264
+  },
+  "termination": "task_complete",
+  "statistics": {
+    "steps": 29420,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 1.8919568339856763,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 0,
+    "floor_contact_steps": 0,
+    "maximum_enabled_count": 7,
+    "maximum_shared_target_step_deg": 0.5964294139896544
+  },
+  "legacy_enabled_wrap_deg": {
+    "min": 197.44481561335428,
+    "max": 236.2386722164497
+  },
+  "enabled_gap_fraction": {
+    "min": 0.5212412214401982,
+    "max": 0.6688163532115188
+  },
+  "section_turn_deg": {
+    "min": 176.49991337063898,
+    "max": 197.8383834422142
+  },
+  "plane_rms_m": {
+    "min": 0.007463144676099999,
+    "max": 0.009589985515658393
+  },
+  "maximum_curvature_per_m": {
+    "min": 9.665842708143794,
+    "max": 13.866929221113434
+  },
+  "support_up_n": {
+    "min": 27.004004388928838,
+    "max": 28.513446557055424
+  },
+  "mean_x_m": {
+    "min": -0.4810653111425723,
+    "max": -0.4734128520426038
+  },
+  "mean_y_m": {
+    "min": -0.036500751954728725,
+    "max": 0.029398436414706276
+  },
+  "min_z_m": {
+    "min": 0.6520609722601179,
+    "max": 0.7021889467164031
+  },
+  "legacy_wrap_over218_s": 10.18,
+  "stage_results": [
+    {
+      "stage": "prepare",
+      "start_s": 6.000000000000338,
+      "end_s": 6.000000000000338,
+      "last_delta": {
+        "crown_joint": 0.0,
+        "head_hanging_m": 0.0,
+        "tail_hanging_m": 0.0
+      },
+      "crown_delta_range": [
+        0.0,
+        0.0
+      ],
+      "support_center_delta_joints": 0.0,
+      "maximum_abs_pipe_displacement_m": 0.0,
+      "maximum_wrap_deg": 209.88850479743343
+    },
+    {
+      "stage": "transfer",
+      "start_s": 6.020000000000345,
+      "end_s": 10.999999999999343,
+      "last_delta": {
+        "crown_joint": -0.567130130879308,
+        "head_hanging_m": -0.040365013108350056,
+        "tail_hanging_m": 0.03617151165298493
+      },
+      "crown_delta_range": [
+        -0.567130130879308,
+        -7.643194125961372e-05
+      ],
+      "support_center_delta_joints": 0.12658720624929565,
+      "maximum_abs_pipe_displacement_m": 0.005930154395781928,
+      "maximum_wrap_deg": 236.0147916110632
+    },
+    {
+      "stage": "align",
+      "start_s": 11.019999999999332,
+      "end_s": 13.199999999998123,
+      "last_delta": {
+        "crown_joint": -1.004391407631239,
+        "head_hanging_m": -0.06887914222091063,
+        "tail_hanging_m": 0.04637249819958844
+      },
+      "crown_delta_range": [
+        -1.004391407631239,
+        -0.567685417191063
+      ],
+      "support_center_delta_joints": -0.4626048119730868,
+      "maximum_abs_pipe_displacement_m": 0.005660541186680412,
+      "maximum_wrap_deg": 206.21394906987965
+    },
+    {
+      "stage": "review",
+      "start_s": 13.219999999998112,
+      "end_s": 16.21999999999684,
+      "last_delta": {
+        "crown_joint": -1.193354501985441,
+        "head_hanging_m": -0.07775568131174387,
+        "tail_hanging_m": 0.05863339199411899
+      },
+      "crown_delta_range": [
+        -1.193354501985441,
+        -1.0075603176298724
+      ],
+      "support_center_delta_joints": -0.4626048119730868,
+      "maximum_abs_pipe_displacement_m": 0.004067029873388361,
+      "maximum_wrap_deg": 199.16309627281163
+    },
+    {
+      "stage": "transfer",
+      "start_s": 16.239999999996865,
+      "end_s": 21.40000000000317,
+      "last_delta": {
+        "crown_joint": -0.7174992890819496,
+        "head_hanging_m": -0.04603481592039782,
+        "tail_hanging_m": 0.04592608575928048
+      },
+      "crown_delta_range": [
+        -1.1931776094563755,
+        -0.7174992890819496
+      ],
+      "support_center_delta_joints": -1.2686778655331992,
+      "maximum_abs_pipe_displacement_m": 0.006269991875505476,
+      "maximum_wrap_deg": 236.2386722164497
+    },
+    {
+      "stage": "align",
+      "start_s": 21.420000000003196,
+      "end_s": 26.400000000009282,
+      "last_delta": {
+        "crown_joint": 0.016460180552753556,
+        "head_hanging_m": -0.004204146576179513,
+        "tail_hanging_m": -0.0017438707800374598
+      },
+      "crown_delta_range": [
+        -0.7165321933519291,
+        0.016460180552753556
+      ],
+      "support_center_delta_joints": -0.6471696038762857,
+      "maximum_abs_pipe_displacement_m": 0.0066913191515790005,
+      "maximum_wrap_deg": 209.47246387054136
+    },
+    {
+      "stage": "review",
+      "start_s": 26.420000000009306,
+      "end_s": 29.400000000012948,
+      "last_delta": {
+        "crown_joint": 0.10436573280313155,
+        "head_hanging_m": 0.0077272896659006385,
+        "tail_hanging_m": -0.009733228652496484
+      },
+      "crown_delta_range": [
+        0.017289733822709152,
+        0.10436573280313155
+      ],
+      "support_center_delta_joints": -0.4626048119730868,
+      "maximum_abs_pipe_displacement_m": 0.007386297871906589,
+      "maximum_wrap_deg": 211.06593482309893
+    },
+    {
+      "stage": "complete",
+      "start_s": 29.420000000012973,
+      "end_s": 29.420000000012973,
+      "last_delta": {
+        "crown_joint": 0.10463685767740216,
+        "head_hanging_m": 0.007787976431212762,
+        "tail_hanging_m": -0.009729029328187533
+      },
+      "crown_delta_range": [
+        0.10463685767740216,
+        0.10463685767740216
+      ],
+      "support_center_delta_joints": -0.462604811973085,
+      "maximum_abs_pipe_displacement_m": 0.005520012639710414,
+      "maximum_wrap_deg": 211.09534465929158
+    }
+  ],
+  "observer_error_joints": {
+    "rmse": 0.11556337373592697,
+    "maximum": 0.2573705860658375
+  },
+  "final_material_delta": {
+    "crown_joint": 0.10463685767740216,
+    "head_hanging_m": 0.007787976431212762,
+    "tail_hanging_m": -0.009729029328187533
+  },
+  "final_net_material_transfer_m": 0.008758502879700147,
+  "support_material_center": {
+    "baseline_joint": 10.962604811973087,
+    "final_joint": 10.500000000000002
+  },
+  "initial_trace_review": {
+    "maximum_wrap_deg": 212.71217607597666,
+    "minimum_z_m": 0.6481024963354669,
+    "finite": true
+  }
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "run": "loose_20261014_003900",
+    "frames": 300,
+    "max_initial_qpos_difference_rad_or_m": 0.0,
+    "max_initial_target_difference_rad": 0.0
+  },
+  {
+    "run": "loose_repair_20261014_004957",
+    "frames": 300,
+    "max_initial_qpos_difference_rad_or_m": 0.0,
+    "max_initial_target_difference_rad": 0.0
+  },
+  {
+    "run": "transfer_20261014_003829",
+    "frames": 300,
+    "max_initial_qpos_difference_rad_or_m": 0.0,
+    "max_initial_target_difference_rad": 0.0
+  }
+]

@@ -1,0 +1,159 @@
+{
+  "baseline": {
+    "material": {
+      "valid": true,
+      "crown_joint": 10.959760357131112,
+      "head_hanging_m": 0.545686655970375,
+      "tail_hanging_m": 0.4904546852031477,
+      "head_shoulder_joint": 8.460258232098838,
+      "tail_shoulder_joint": 13.39605139219924,
+      "above_pipe_length_m": 0.31835865882647596
+    },
+    "actual_bend": {
+      "valid": true,
+      "interval": [
+        8,
+        14
+      ],
+      "threshold_deg": 5.0,
+      "wrap_deg": 236.872349818077,
+      "gap_fraction": 0.5375475716468866,
+      "total_turn_deg": 188.59988999412633
+    },
+    "legacy_enabled_wrap_deg": 209.88850479743343,
+    "enabled_gap_fraction": 0.6179523367089904,
+    "section_turn_deg": 178.65748302725527,
+    "plane_rms_m": 0.007876004494305042,
+    "maximum_curvature_per_m": 10.672380033393885,
+    "support_up_n": 28.014912751389026,
+    "support_by_link_n": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      15.055079305590334,
+      12.959833445798694,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "min_z_m": 0.6615745400190497,
+    "mean_x_m": -0.4807991499145104,
+    "mean_y_m": 0.0007751470870980264
+  },
+  "termination": "duration",
+  "statistics": {
+    "steps": 55000,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 1611,
+    "floor_contact_steps": 0,
+    "maximum_enabled_count": 6,
+    "maximum_target_jump_deg": 0.0,
+    "maximum_shared_target_step_deg": 0.6917076863240089
+  },
+  "legacy_enabled_wrap_deg": {
+    "min": 187.1142696954156,
+    "max": 209.89347105992755
+  },
+  "enabled_gap_fraction": {
+    "min": 0.6179523367089904,
+    "max": 0.8001363287743508
+  },
+  "section_turn_deg": {
+    "min": 135.43722436838,
+    "max": 178.65764879258978
+  },
+  "plane_rms_m": {
+    "min": 1.161997728304191e-05,
+    "max": 0.008019219333898589
+  },
+  "maximum_curvature_per_m": {
+    "min": 6.438119774252854,
+    "max": 14.387979419769811
+  },
+  "support_up_n": {
+    "min": 27.369767789377548,
+    "max": 28.653451624609446
+  },
+  "mean_x_m": {
+    "min": -0.4807991499145104,
+    "max": 0.3906100748422105
+  },
+  "mean_y_m": {
+    "min": -0.019442907846747397,
+    "max": 0.005586754939726325
+  },
+  "min_z_m": {
+    "min": 0.6615745400190497,
+    "max": 0.6962908573835214
+  },
+  "legacy_wrap_over218_s": 0.0,
+  "stage_results": [
+    {
+      "stage": "prepare",
+      "start_s": 6.000000000000338,
+      "end_s": 6.000000000000338,
+      "last_delta": {
+        "crown_joint": 0.0,
+        "head_hanging_m": 0.0,
+        "tail_hanging_m": 0.0
+      },
+      "crown_delta_range": [
+        0.0,
+        0.0
+      ],
+      "support_center_delta_joints": 0.0,
+      "maximum_abs_pipe_displacement_m": 0.0,
+      "maximum_wrap_deg": 209.88850479743343
+    },
+    {
+      "stage": "loose_roll",
+      "start_s": 6.020000000000345,
+      "end_s": 54.99999999996252,
+      "last_delta": {
+        "crown_joint": -0.535597721856421,
+        "head_hanging_m": -0.03389513046352832,
+        "tail_hanging_m": -0.006754249946979263
+      },
+      "crown_delta_range": [
+        -0.6266337593419458,
+        0.07599999670002511
+      ],
+      "support_center_delta_joints": -0.4626048119730868,
+      "maximum_abs_pipe_displacement_m": 0.8714092247567209,
+      "maximum_wrap_deg": 209.89347105992755
+    }
+  ],
+  "observer_error_joints": {
+    "rmse": 0.20647868864225824,
+    "maximum": 0.5580248836062047
+  },
+  "final_material_delta": {
+    "crown_joint": -0.535597721856421,
+    "head_hanging_m": -0.03389513046352832,
+    "tail_hanging_m": -0.006754249946979263
+  },
+  "final_net_material_transfer_m": -0.01357044025827453,
+  "support_material_center": {
+    "baseline_joint": 10.962604811973087,
+    "final_joint": 10.5
+  },
+  "initial_trace_review": {
+    "maximum_wrap_deg": 212.71217607597666,
+    "minimum_z_m": 0.6481024963354669,
+    "finite": true
+  }
+}
