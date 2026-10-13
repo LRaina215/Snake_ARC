@@ -34,6 +34,8 @@ FIRST_JOINT = 8                 # 关节从 1 开始编号，包含两个端点
 LAST_JOINT = 13                 # 窗口外明确关闭舵机扭矩，不发送零角位置目标
 AMPLITUDE_DEG = 60.0            # 圆弧幅值，单位：度
 OMEGA_RAD_S = 0.6               # 连续滚动角频率，单位：rad/s
+DIY_PARAMETERS = True          # 手调：关闭建形/接入的速度、幅值、开放形态和60°/0.6基准拦截
+                              # 保留编码范围/有效读角；形成斜率、目标滤波仍按下面参数执行
 INITIAL_PHASE_RAD = 0.0
 PHASE_STEP_RAD = 0.10           # Ctrl+J/H 每次累计的相位增量，单步也平滑执行
 CONTROL_PERIOD_S = 0.02         # 50 Hz，同步发送窗口内所有目标
@@ -63,8 +65,8 @@ COMPLIANCE_FEEDBACK_PERIOD_S = .20  # 全20舵机读角；不把重复计算当2
 MAX_FEEDBACK_AGE_S = .8
 
 # 自动移窗与数量自适应：同步 phase_normalized_count_v3，真实设备效果待用户验证。
-# 冻结的相位基准对应 A=60°、omega=0.6、21段64.5mm、正向滚动。
-# 其余模式仍可调幅值/频率。移窗或扩缩每次只改变相邻边界，不指定6/8白名单。
+# DIY默认按当前参数生成名义几何参考；关闭DIY才用冻结的60°/0.6正向标定。
+# 移窗或扩缩每次只改变相邻边界，不指定6/8白名单。
 MOTOR_SLIDING_AUTO = True
 MOTOR_SLIDING_COOLDOWN_S = 5.0
 MOTOR_SLIDING_SWITCH_ANGLE_DEG = 4.0
@@ -121,7 +123,8 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
                   release / status / help / quit
 参数：amplitude=60 omega=0.6 delta=0.1 window=8:13 gain=0.02 yielding=0.7 filter=0.15
 window只在release后修改；自动滑窗只用全20关节角、采样时间和已知相位。
-滑窗基准只标定了60度/0.6/正向；移窗不等于已从电机观测到支撑或卸载。
+DIY_PARAMETERS=True时三模式均可调幅值/频率，滑窗采用当前参数几何参考。
+关闭DIY才使用60度/0.6/正向冻结标定；移窗不等于已观测到支撑或卸载。
 顺应性下pause冻结相位、继续形状反馈；hold冻结全部目标。
 '''
 
@@ -146,7 +149,9 @@ def joint_angles_deg(phase_rad, amplitude_deg, first_joint, last_joint, length_n
 def angle_to_raw(index, angle_deg):
     """控制器角(度) -> 协议角(度) -> 已校准的 12 bit 单圈位置。"""
     protocol_deg = MODEL_TO_SERVO_SIGN[index] * angle_deg
-    if not math.isfinite(protocol_deg) or not MIN_ANGLE_DEG[index] <= protocol_deg <= MAX_ANGLE_DEG[index]:
+    if not math.isfinite(protocol_deg):
+        raise ValueError(f'J{index + 1} 目标角必须为有限值')
+    if not DIY_PARAMETERS and not MIN_ANGLE_DEG[index] <= protocol_deg <= MAX_ANGLE_DEG[index]:
         raise ValueError(f'J{index + 1} 目标角超出档案限位: {protocol_deg}')
     raw = round(ZERO_RAW[index] + SERVO_DIRECTION[index] * protocol_deg * 4096 / 360)
     if not 0 <= raw <= 4095:
@@ -164,7 +169,13 @@ def raw_to_angle(index, raw):
 def validate_parameters(amplitude, omega, first, last):
     if type(first) is not int or type(last) is not int or not 1 <= first <= last <= NUM_JOINTS:
         raise ValueError('使能窗口必须满足 1 <= first <= last <= 20')
-    if not math.isfinite(amplitude) or not 0 < amplitude <= 90:
+    if not math.isfinite(amplitude) or amplitude < 0:
+        raise ValueError('幅值必须为有限非负数')
+    if not math.isfinite(omega) or omega < 0:
+        raise ValueError('角频率必须为有限非负数')
+    if DIY_PARAMETERS:
+        return  # 不根据幅值推算整周期峰值；逐帧仍核对实际要编码的目标。
+    if not 0 < amplitude <= 90:
         raise ValueError('幅值必须在 (0,90] 度范围内')
     if not math.isfinite(omega) or omega < 0 or amplitude * omega > MAX_TARGET_RATE_DEG_S:
         raise ValueError('角频率非负，且 amplitude * omega 不能超过目标角速度上限')
@@ -203,6 +214,8 @@ def validate_setup():
 
 def validate_arc_reference(amplitude, omega, first, last, normalized):
     """数量改变后实际峰值不一定等于顶部幅值；使能前检查两个轴族。"""
+    if DIY_PARAMETERS:
+        return
     peaks = np.maximum(np.abs(joint_angles_deg(0., amplitude, first, last, normalized)),
                        np.abs(joint_angles_deg(math.pi/2, amplitude, first, last, normalized)))
     if float(peaks.max())*omega > MAX_TARGET_RATE_DEG_S+1e-8:
@@ -655,6 +668,8 @@ class FixedSectionCompliance:
             geometry['total_turn'] <= math.radians(self.options.maximum_section_turn_deg) + 1e-8
             and gap >= self.options.minimum_gap_fraction
         )
+        if getattr(self.p, 'manual_tuning', False):
+            valid = True  # DIY仍计算/显示截面，但不按研究形态阈值拒绝目标。
         return valid, geometry
 
     def update(self, measured, phase, time_s, dt, reference_targets=None):
@@ -691,7 +706,8 @@ class FixedSectionCompliance:
             # Calibrate the inverse approximation on the SAME phase/reference.
             # Thus an exact reference observation with K=0 gives exact Step1.
             goal[self.enabled] += self.options.yielding * (observed - nominal)
-            goal[self.enabled] = np.clip(goal[self.enabled], -math.pi/2 + .01, math.pi/2 - .01)
+            if not getattr(self.p, 'manual_tuning', False):
+                goal[self.enabled] = np.clip(goal[self.enabled], -math.pi/2 + .01, math.pi/2 - .01)
             valid, goal_geometry = self._check_goal(goal)
             if not valid:
                 self.clipped += 1
@@ -744,6 +760,7 @@ class SectionReference:
     joints: int = NUM_JOINTS
     direction: int = 1
     length_normalized: bool = False
+    manual_tuning: bool = False
 
     @property
     def enabled(self):
@@ -1690,15 +1707,20 @@ class GeneralPhaseReference:
     geometry plus an interpolated (or nearest) frozen calibration residual.
     Transfer across widths is an explicit assumption to audit in simulation.
     """
-    def __init__(self, lengths, width, calibrated):
+    def __init__(self, lengths, width, calibrated, manual_parameters=None):
         self.lengths = np.asarray(lengths, float)
         self.width = width
         self.calibrated = calibrated
+        self.manual_parameters = manual_parameters
         self.helper = AngleShapeObserver(lengths)
         self.cache = {}
         self.metadata = dict(width=width, method='nominal geometry plus frozen residual',
                              calibrated_widths=sorted(calibrated),
                              transferred=width not in calibrated, online_learning=False)
+        if manual_parameters is not None:
+            self.metadata.update(method='DIY current nominal geometry; no frozen residual',
+                                 calibrated=False, amplitude_deg=manual_parameters.amplitude_deg,
+                                 omega_rad_s=manual_parameters.omega_rad_s)
 
     def ideal(self, width, phase, first):
         # Use the same starting parity, with enough space for boundary modules.
@@ -1707,6 +1729,8 @@ class GeneralPhaseReference:
             start = 2
         window = (start, start+width-1)
         q = nominal_angles(self.lengths, window, phase)
+        if self.manual_parameters is not None:
+            q = replace(self.manual_parameters, first_joint=window[0], last_joint=window[1]).targets(phase)
         _, _, section = self.helper.geometry(q, window)
         points = forward(q, self.lengths)
         arc = section['points'][1:-1]
@@ -1719,6 +1743,8 @@ class GeneralPhaseReference:
                          f['tail_boundary_turn_deg']-f['head_boundary_turn_deg']])
 
     def at(self, phase, first):
+        if self.manual_parameters is not None:
+            return self.ideal(self.width, phase, first)
         if self.width in self.calibrated:
             return self.calibrated[self.width].at(phase, first)
         key = (round(phase % (2*math.pi), 8), first % 2)
@@ -1744,13 +1770,14 @@ class PostureWindow(MotorFeedbackSliding):
         self.references = dict(references)
         self.posture_options = posture_options
         window = (parameters.first_joint, parameters.last_joint)
-        if not mechanically_feasible(lengths, window, posture_options.nominal_joint_margin_rad):
+        manual = getattr(parameters, 'manual_tuning', False)
+        if not parameter_window_feasible(parameters, lengths, window, posture_options.nominal_joint_margin_rad):
             raise ValueError('Initial arc cannot meet the full-cycle mechanical limits')
         for phase in (0., math.pi/2):
-            if not np.allclose(parameters.targets(phase), nominal_angles(lengths, window, phase), atol=1e-10):
+            if not manual and not np.allclose(parameters.targets(phase), nominal_angles(lengths, window, phase), atol=1e-10):
                 raise ValueError('Use length-normalized half-arc parameters for every width')
         width = window[1]-window[0]+1
-        reference = GeneralPhaseReference(lengths, width, references)
+        reference = GeneralPhaseReference(lengths, width, references, parameters if manual else None)
         super().__init__(parameters, lengths, reference, execute=False,
                          allowed_widths=range(3, parameters.joints-1),
                          feedback_period_s=feedback_period_s, **kwargs)
@@ -1775,9 +1802,13 @@ class PostureWindow(MotorFeedbackSliding):
 
     def _new_observer(self):
         width = self.window[1]-self.window[0]+1
-        reference = GeneralPhaseReference(self.lengths, width, self.references)
+        manual = getattr(self.p, 'manual_tuning', False)
+        reference = GeneralPhaseReference(self.lengths, width, self.references, self.p if manual else None)
         self.observer = RollingShapeObserver(self.lengths, reference, width=width,
             options=MotorObserverOptions(maximum_feedback_gap_s=2.5*self.feedback_period_s))
+        if manual:
+            self.observer.geometry_observer.options = replace(self.observer.geometry_observer.options,
+                minimum_turn_deg=0., maximum_turn_deg=1e6, minimum_gap=0., maximum_plane_rms_m=1e6)
         self.observation = None
         self.filtered_count = None
         self.count_history = PhaseBalancedCount(maximum_feedback_gap_s=2.5*self.feedback_period_s)
@@ -1785,7 +1816,7 @@ class PostureWindow(MotorFeedbackSliding):
         self.intent = self.intent_since = None
 
     def _candidate(self, angles, window):
-        if not mechanically_feasible(self.lengths, window, self.posture_options.nominal_joint_margin_rad):
+        if not parameter_window_feasible(self.p, self.lengths, window, self.posture_options.nominal_joint_margin_rad):
             return dict(window=list(window), eligible=False, reason='mechanical boundary or peak joint limit')
         try:
             good, geometry, section = self.observer.geometry_observer.geometry(np.radians(angles), window)
@@ -1808,7 +1839,7 @@ class PostureWindow(MotorFeedbackSliding):
         q = np.radians(angles)
         actual = circle_shape(local_section(q, self.lengths, *self.window))
         nominal = q.copy()
-        nominal[self.enabled] = nominal_angles(self.lengths, self.window, self.feedback_phase)[self.enabled]
+        nominal[self.enabled] = replace(self.p, first_joint=self.window[0], last_joint=self.window[1]).targets(self.feedback_phase)[self.enabled]
         reference = circle_shape(local_section(nominal, self.lengths, *self.window))
         radius_ratio = actual['radius_m']/reference['radius_m']
         turn_ratio = reference['turn_deg']/max(actual['turn_deg'], 1e-8)
@@ -1846,7 +1877,7 @@ class PostureWindow(MotorFeedbackSliding):
             shorter_trial = (stats['maximum_group_count_joints'] <= width+option.shorter_trial_count_margin_joints and
                              stats['balanced_turn_error_deg'] >= option.shorter_trial_turn_error_deg)
             first, last = self.window
-            can_shorten = any(mechanically_feasible(self.lengths, w, option.nominal_joint_margin_rad)
+            can_shorten = any(parameter_window_feasible(self.p, self.lengths, w, option.nominal_joint_margin_rad)
                               for w in ((first+1, last), (first, last-1)))
             if (strongly_compact or shorter_trial) and can_shorten:
                 delta_width = -1
@@ -2146,6 +2177,30 @@ MOTOR_PHASE_REFERENCE8 = {'values': [[-0.6570665260128861, -0.5265259979957095, 
 
 # END MOTOR_SLIDING_CORE
 
+
+@dataclass(frozen=True)
+class ManualArcReference(ArcParameters):
+    """手调入口的真实名义目标；不复用60°冻结标定来冒充当前参数。"""
+    manual_tuning: bool = True
+
+    def __post_init__(self):
+        validate_parameters(self.amplitude_deg, self.omega_rad_s, self.first_joint, self.last_joint)
+        if self.joints != NUM_JOINTS or self.direction not in (-1, 1) or not math.isfinite(self.initial_phase_rad):
+            raise ValueError('关节数、方向或相位错误')
+
+    def targets(self, phase):
+        if not math.isfinite(phase):
+            raise ValueError('相位必须为有限值')
+        return np.radians(joint_angles_deg(phase, self.amplitude_deg, self.first_joint, self.last_joint,
+                                          length_normalized=self.last_joint-self.first_joint+1 != 6))
+
+
+def parameter_window_feasible(parameters, lengths, window, margin=.01):
+    if getattr(parameters, 'manual_tuning', False):
+        # 截面算法仍需要内部3+关节和各端一根边界连杆；不预测速度/峰值来拦截。
+        return 2 <= window[0] <= window[1] < len(lengths)-1 and window[1]-window[0]+1 >= 3
+    return mechanically_feasible(lengths, window, margin)
+
 # ==================== 4. 飞特串口协议（只有主循环操作串口） ====================
 def instruction_packet(servo_id, instruction, parameters):
     body = bytes([servo_id, len(parameters) + 2, instruction, *parameters])
@@ -2310,7 +2365,7 @@ class RollingArcController:
     def section_reference(self):
         """扩缩后切回基础/固定模式，继续使用当前长度的半圆参考。"""
         return SectionReference(self.first, self.last, self.amplitude,
-                                length_normalized=self.length_normalized)
+                                length_normalized=self.length_normalized, manual_tuning=DIY_PARAMETERS)
 
     def basic_targets(self):
         return np.degrees(self.section_reference().targets(self.phase)).tolist()
@@ -2355,12 +2410,13 @@ class RollingArcController:
             core.next_geometry_s = self.section_clock_s
             self.sliding, self.compliance = None, core
         else:
-            if self.amplitude != 60. or self.omega != .6 or self.direction != 1:
+            if not DIY_PARAMETERS and (self.amplitude != 60. or self.omega != .6 or self.direction != 1):
                 raise ValueError('冻结角度基准只标定了amplitude=60 omega=0.6正向；先在基础模式恢复')
-            if not np.allclose(LINK_LENGTHS_M, MOTOR_PHASE_REFERENCE['metadata']['link_lengths_m'], rtol=0., atol=1e-9):
+            if not DIY_PARAMETERS and not np.allclose(LINK_LENGTHS_M, MOTOR_PHASE_REFERENCE['metadata']['link_lengths_m'], rtol=0., atol=1e-9):
                 raise ValueError('实际连杆尺寸与相位基准不一致，需要重新标定')
             now, _ = self.motor_sample_clock()
-            p = HalfArcParameters(joints=NUM_JOINTS, first_joint=self.first, last_joint=self.last,
+            parameter_type = ManualArcReference if DIY_PARAMETERS else HalfArcParameters
+            p = parameter_type(joints=NUM_JOINTS, first_joint=self.first, last_joint=self.last,
                               amplitude_deg=self.amplitude, omega_rad_s=self.omega,
                               initial_phase_rad=self.phase, settle_s=0.)
             slider = PostureWindow(p, LINK_LENGTHS_M,
@@ -2426,7 +2482,7 @@ class RollingArcController:
                 freeze_targets=self.freeze_targets)
             expected_mask = (np.arange(1, NUM_JOINTS+1) >= slider.window[0]) & (np.arange(1, NUM_JOINTS+1) <= slider.window[1])
             if (not np.array_equal(enabled, expected_mask)
-                    or not mechanically_feasible(LINK_LENGTHS_M, slider.window, slider.posture_options.nominal_joint_margin_rad)
+                    or not parameter_window_feasible(slider.p, LINK_LENGTHS_M, slider.window, slider.posture_options.nominal_joint_margin_rad)
                     or slider.fault is not None or slider.resize_fault is not None):
                 raise ValueError('滑窗使能或开放目标异常：'+str(slider.fault or slider.resize_fault))
             targets = np.degrees(target).tolist()
@@ -2474,6 +2530,8 @@ class RollingArcController:
             valid = (SECTION_MIN_ACTUAL_TURN_DEG <= result['turn_deg'] <= SECTION_MAX_ACTUAL_TURN_DEG
                      and result['gap_fraction'] >= self.options.minimum_gap_fraction
                      and result['fit_rms_m'] <= SECTION_MAX_PLANE_RMS_M)
+            if DIY_PARAMETERS:
+                valid = True
             return valid, result
         except (ValueError, np.linalg.LinAlgError) as exc:
             return False, dict(error=str(exc))
@@ -2609,7 +2667,7 @@ class RollingArcController:
 
     def assign_parameters(self, command):
         """先验证整行，再一起更新；固定窗口只在release后允许人工修改。"""
-        if isinstance(self.sliding, MotorFeedbackSliding):
+        if not DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding):
             for item in command.split():
                 key, value = item.split('=', 1)
                 if key in ('amplitude', 'window') or (key == 'omega' and float(value) != .6):
@@ -2641,7 +2699,7 @@ class RollingArcController:
         if self.compliance is not None:
             reference = replace(self.compliance.p, amplitude_deg=amplitude)
             # 半圆预算随amplitude/60缩放；保留既有保守参考上限。
-            if 3*amplitude > options.maximum_section_turn_deg:
+            if not DIY_PARAMETERS and 3*amplitude > options.maximum_section_turn_deg:
                 raise ValueError('该幅值使名义半圆参考超过截面开放上限')
         if amplitude != self.amplitude and self.mode != 'released' and self.compliance is None:
             self.forming, self.settle_remaining = True, SETTLE_S
@@ -2655,10 +2713,16 @@ class RollingArcController:
             self.compliance.next_geometry_s = self.section_clock_s
             if self.sliding is not None:
                 self.sliding.section_options = options
+                if DIY_PARAMETERS:
+                    self.sliding.p = replace(self.sliding.p, amplitude_deg=amplitude, omega_rad_s=omega,
+                                             first_joint=first, last_joint=last)
+                    self.compliance.p = self.sliding.p
+                    self.sliding.pending = None
+                    self.sliding._new_observer()  # 参数改变后重新建立对应的形状参考。
 
     def command(self, command):
         command = command.strip().lower()
-        if isinstance(self.sliding, MotorFeedbackSliding) and (command in ('reverse', 'back') or
+        if not DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and (command in ('reverse', 'back') or
                 (command == 'step' and self.pending_phase < 0)):
             raise ValueError('角度相位基准未标定反向滚动；先切换基础/固定模式')
         if '=' in command:

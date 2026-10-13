@@ -49,7 +49,7 @@ SIM_HELP = '''MuJoCo新增操作：
   Ctrl+R：明确结束当前试验，重建初始预览；不是连续运动中的位姿修正
 窗口外头/尾关节数是使能窗口的分布，不等于实际接触/悬垂关节数。
 默认滑动模式仅用实测角和已知相位；接触力只记录用于评价。
-冻结相位基准对应幅值60度、omega=0.6、正向；持续侧拉可能失去方向观测。
+DIY调参策略与实机相同；持续侧拉可能失去方向观测。
 '''
 
 
@@ -166,6 +166,8 @@ class DebugArcController(real.RollingArcController):
         self.session.record_event('gait_change', to=kind)
 
     def toggle_compliance(self):
+        if SLIDING_FEEDBACK == 'motor_angles':
+            return super().toggle_compliance()
         self.select_gait('fixed' if self.compliance is None else 'basic')
 
     def release(self, verify=True):
@@ -176,9 +178,9 @@ class DebugArcController(real.RollingArcController):
         super().release(verify)
 
     def assign_parameters(self, command):
-        if self.sliding is not None and any(token.split('=')[0] in ('amplitude', 'window') for token in command.split()):
+        if not real.DIY_PARAMETERS and self.sliding is not None and any(token.split('=')[0] in ('amplitude', 'window') for token in command.split()):
             raise ValueError('滑动模式使用半圆归一化预算；调幅值/窗口先切回基础模式')
-        if isinstance(self.sliding, MotorFeedbackSliding):
+        if not real.DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding):
             for item in command.split():
                 key, value = item.split('=', 1)
                 if key == 'omega' and float(value) != .6:
@@ -189,7 +191,7 @@ class DebugArcController(real.RollingArcController):
             self.sliding.core.options = self.options
 
     def command(self, command):
-        if isinstance(self.sliding, MotorFeedbackSliding) and command.strip().lower() == 'reverse':
+        if not real.DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and command.strip().lower() == 'reverse':
             raise ValueError('冻结角度基准未标定反向滚动；先切换基础/固定模式')
         command = command.strip().lower()
         if command.startswith('gait_'):
@@ -300,7 +302,7 @@ class DebugArcController(real.RollingArcController):
         return self.session.elapsed, self.feedback_time_s
 
     def change_parameters(self, amplitude=None, omega=None):
-        if isinstance(self.sliding, MotorFeedbackSliding) and (
+        if not real.DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and (
                 (amplitude is not None and amplitude != 60.) or (omega is not None and omega != .6)):
             raise ValueError('先切换基础/固定模式再调幅值或频率；角度滑窗使用冻结的60度/0.6基准')
         return super().change_parameters(amplitude, omega)
@@ -321,7 +323,7 @@ class DebugArcController(real.RollingArcController):
         return row
 
     def show_status(self, include_feedback=False):
-        if self.sliding is None:
+        if self.sliding is None or isinstance(self.sliding, MotorFeedbackSliding):
             super().show_status(include_feedback)
             return
         label = {'released': '已释放', 'hold': '保持', 'run': '连续', 'step': '单步'}[self.mode]
@@ -382,6 +384,12 @@ class MujocoMotorBus:
 
 # ==================== 4. 物理场景、端点扰动与记录 ====================
 class ManualArcParameters(ArcParameters):
+    def __post_init__(self):
+        if real.DIY_PARAMETERS:
+            real.validate_parameters(self.amplitude_deg, self.omega_rad_s, self.first_joint, self.last_joint)
+        else:
+            super().__post_init__()
+
     def targets(self, phase):
         return np.radians(real.joint_angles_deg(phase, self.amplitude_deg, self.first_joint,
                           self.last_joint, length_normalized=self.last_joint-self.first_joint+1 != 6))

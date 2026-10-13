@@ -1,0 +1,68 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "adapter": "real",
+      "amplitude_deg": 70.0,
+      "omega_rad_s": 0.6,
+      "window": [
+        8,
+        13
+      ],
+      "establish_fixed_sliding_and_hotkeys": true
+    },
+    {
+      "adapter": "manual_mujoco",
+      "amplitude_deg": 70.0,
+      "omega_rad_s": 0.6,
+      "window": [
+        8,
+        13
+      ],
+      "establish_fixed_sliding_and_hotkeys": true
+    },
+    {
+      "adapter": "real",
+      "amplitude_deg": 70.0,
+      "omega_rad_s": 0.6,
+      "window": [
+        5,
+        9
+      ],
+      "establish_fixed_sliding_and_hotkeys": true
+    },
+    {
+      "adapter": "manual_mujoco",
+      "amplitude_deg": 70.0,
+      "omega_rad_s": 0.6,
+      "window": [
+        5,
+        9
+      ],
+      "establish_fixed_sliding_and_hotkeys": true
+    },
+    {
+      "adapter": "real",
+      "amplitude_deg": 80.0,
+      "omega_rad_s": 1.1,
+      "window": [
+        7,
+        14
+      ],
+      "establish_fixed_sliding_and_hotkeys": true
+    },
+    {
+      "adapter": "manual_mujoco",
+      "amplitude_deg": 80.0,
+      "omega_rad_s": 1.1,
+      "window": [
+        7,
+        14
+      ],
+      "establish_fixed_sliding_and_hotkeys": true
+    }
+  ],
+  "new_dynamics": 0,
+  "hardware_connections": 0,
+  "scope": "parameter startup, formation, mode acceptance and short command updates only"
+}
