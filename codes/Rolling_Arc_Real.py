@@ -2977,13 +2977,13 @@ class JointPreviewFigure:
         self.figure = plt.figure(figsize=(13, 7), facecolor='#f4f6fa')
         self.figure.canvas.manager.set_window_title('Rolling Arc — 实测构型与使能预览')
         grid = self.figure.add_gridspec(3, 2, width_ratios=[1.3, 1], height_ratios=[1, 1, .45])
-        self.body = self.figure.add_subplot(grid[:, 0], projection='3d')
+        self.body = self.figure.add_subplot(grid[:, 0])
         self.angles = self.figure.add_subplot(grid[:2, 1])
         self.mask = self.figure.add_subplot(grid[2, 1])
         self.header = self.figure.suptitle('等待实测角度；预览不会使能或驱动舵机', fontsize=12)
         self.note = self.figure.text(.04, .04, '', fontsize=10, va='bottom')
         self.figure.subplots_adjust(left=.05, right=.97, top=.88, bottom=.20, wspace=.24, hspace=.65)
-        self.body.view_init(elev=22, azim=-65)
+        self.section_horizontal = None
         from matplotlib.widgets import Button
         self.gravity = DualEndGravityPreview(LINK_LENGTHS_M)
         self.gravity_align = PREVIEW_GRAVITY_ALIGN
@@ -2998,9 +2998,7 @@ class JointPreviewFigure:
 
     def update(self, row):
         self.latest_row = row
-        elev, azim = self.body.elev, self.body.azim
         self.body.clear(); self.angles.clear(); self.mask.clear()
-        self.body.view_init(elev=elev, azim=azim)
         known = row['enable_known']
         colours = ['#147bb5' if e else '#9259b5' for e in row['enabled']] if known else ['#a3a9b2']*NUM_JOINTS
         ids = np.arange(1, NUM_JOINTS+1)
@@ -3029,25 +3027,45 @@ class JointPreviewFigure:
         if row['angles_deg'] is not None and sample_time is not None and not stale:
             if self.gravity.last_time is not None and sample_time < self.gravity.last_time:
                 self.gravity = DualEndGravityPreview(row['lengths'])  # 仿真明确重置为新episode。
+                self.section_horizontal = None
             gravity = self.gravity.update(row['angles_deg'], window, sample_time)
         aligned = self.gravity_align and gravity['basis'] is not None
         states = {'dual': '双侧融合', 'single_degraded': '单侧补充（降级）', 'conflict_hold': '双侧冲突，保留方向',
                   'unobservable_hold': '无可信悬垂段，保留方向', 'reacquiring': '重新获取', 'waiting': '等待悬垂参考'}
         view_label = '重力对齐' if aligned else '头部坐标'
         gravity_label = '反馈陈旧' if stale else states[gravity['state']]
-        self.note.set_text(f'{view_label} | {gravity_label}；仅估计上下，不测世界位置/水平朝向。实线实测，虚线目标。\n'
+        self.note.set_text(f'{view_label}截面 | {gravity_label}；蓝/紫实线：实测，橙色虚线：目标。\n'
             f"自动={row['automatic']} | 决策={decision} {direction} | 数量估计={count_text}\n"
             f"状态：{row['block_reason'] or ', '.join(row['reasons']) or '正常'}；关闭此窗口不停止控制，Ctrl+X失能。")
         if row['angles_deg'] is not None:
             points = forward(np.radians(row['angles_deg']), row['lengths'])
             target = forward(np.radians(row['target_deg']), row['lengths'])
-            if aligned:
-                basis = np.array(gravity['basis'])
-                points, target = points@basis.T, target@basis.T
-            self.body.plot(*target.T, '--', color='#a3a9b2', lw=1.5, label='目标')
+            up = -np.array(gravity['down_head']) if aligned else np.array([0., 0., 1.])
+            # 用实测圆弧的水平展宽确定含Z轴的截面；目标共用投影，不单独对齐掩盖误差。
+            arc = points[window[0]:window[1]+2]
+            centered = arc-arc.mean(axis=0)
+            flat = centered-np.outer(centered@up, up)
+            values, vectors = np.linalg.eigh(flat.T@flat)
+            horizontal = vectors[:, -1]
+            previous = self.section_horizontal
+            if values[-1] < 1e-10 or values[-1]-values[-2] < values[-1]*.05:
+                horizontal = previous.copy() if previous is not None else np.eye(3)[np.argmin(abs(up))]
+            horizontal -= (horizontal@up)*up
+            if np.linalg.norm(horizontal) < 1e-8:
+                horizontal = np.eye(3)[np.argmin(abs(up))]; horizontal -= (horizontal@up)*up
+            horizontal /= np.linalg.norm(horizontal)
+            reference = previous if previous is not None else arc[-1]-arc[0]
+            if horizontal@reference < 0:
+                horizontal = -horizontal
+            self.section_horizontal = horizontal
+            projection = np.array([horizontal, up])
+            points, target = points@projection.T, target@projection.T
             for i in range(NUM_JOINTS+1):
                 colour = colours[max(0, i-1)]
                 self.body.plot(*points[i:i+2].T, color=colour, lw=3, alpha=.45 if stale else 1.)
+            self.body.plot([], [], color='#147bb5', lw=3, label='实测（紫色为失能段）')
+            self.body.plot(*target.T, '--', color='#e38b27', lw=2, label='目标（失能段沿用实测角）')
+            self.body.legend(loc='best', fontsize=9)
             self.body.scatter(*points[1:-1].T, c=colours, s=24)
             for j, point in enumerate(points[1:-1], 1):
                 self.body.text(*point, str(j), fontsize=8)
@@ -3056,23 +3074,25 @@ class JointPreviewFigure:
             if candidate:
                 a = points[window[0]:window[1]+2].mean(axis=0)
                 b = points[candidate[0]:candidate[1]+2].mean(axis=0)
-                self.body.quiver(*a, *(b-a), color='#e38b27', linewidth=2, arrow_length_ratio=.3)
+                self.body.annotate('', xy=b, xytext=a, arrowprops=dict(arrowstyle='->', color='#e38b27', lw=2))
             both = np.r_[points, target]
             center = (both.min(axis=0)+both.max(axis=0))/2
             radius = max(.1, float(np.ptp(both, axis=0).max())*.55)
             self.body.set(xlim=(center[0]-radius, center[0]+radius),
-                          ylim=(center[1]-radius, center[1]+radius), zlim=(center[2]-radius, center[2]+radius))
+                          ylim=(center[1]-radius, center[1]+radius))
             self.angles.plot(ids, row['angles_deg'], 'o-', color='#17354b', label='实测')
             active = np.asarray(row['enabled'], bool)
             targets = np.where(active, row['target_deg'], np.nan)
             self.angles.plot(ids, targets, 's--', color='#e38b27', label='使能关节目标')
             self.angles.legend(loc='upper right')
+            error = np.abs(np.asarray(row['angles_deg'])-np.asarray(row['target_deg']))[active]
+            self.angles.set_title('使能关节最大角差：'+(f'{error.max():.2f}°' if len(error) else '无使能关节'), fontsize=11)
         else:
-            self.body.text2D(.15, .5, '等待全20关节实测角，不用目标伪装实测', transform=self.body.transAxes)
-        frame_label = 'display' if aligned else 'head'
-        self.body.set(xlabel=f'X {frame_label} / m', ylabel=f'Y {frame_label} / m',
-                      zlabel='Z up (estimated) / m' if aligned else 'Z head / m')
-        self.body.set_box_aspect((1, 1, 1))
+            self.body.text(.05, .5, '等待全20关节实测角', transform=self.body.transAxes)
+        self.body.set(xlabel='截面横向距离 / m', ylabel='Z 估计竖直高度 / m' if aligned else 'Z 头部坐标 / m',
+                      title='目标 / 实测截面叠加（不显示面外偏差）')
+        self.body.set_aspect('equal', adjustable='box')
+        self.body.grid(alpha=.2)
         self.angles.set(ylabel='控制器坐标角度 / °', xticks=ids, ylim=(-100, 100))
         self.angles.grid(alpha=.2)
         self.figure.canvas.draw_idle()

@@ -14,9 +14,13 @@ from codes import Rolling_Arc_Real as real
 ROOT = Path(__file__).resolve().parents[1]
 if __name__ == '__main__':
     folder = Path(sys.argv[1])
-    output = ROOT/'validation/results/gravity_preview'
+    name = sys.argv[2] if len(sys.argv) > 2 else 'gravity_preview'
+    if name not in ('gravity_preview', 'section_preview'):
+        raise ValueError('Expected gravity_preview or section_preview output name')
+    output = ROOT/'validation/results'/name
     output.mkdir(parents=True, exist_ok=True)
-    report = ROOT/'validation/reports/gravity_preview'
+    report = ROOT/'validation/reports'/name
+    report.mkdir(parents=True, exist_ok=True)
     figure, seen = real.JointPreviewFigure(), set()
     movie = output/'gravity_aligned_preview.mp4'
     writer = None
