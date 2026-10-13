@@ -20,6 +20,8 @@ class PhaseBalancedCount:
     def reset(self):
         self.samples = []
         self.last_time = self.last_phase = None
+        self.travel = 0.
+        self.direction = 0
 
     def update(self, count, turn_deg, phase_rad, time_s, nominal_turn_deg=180.):
         if not all(math.isfinite(v) for v in (count, turn_deg, phase_rad, time_s, nominal_turn_deg)):
@@ -27,16 +29,23 @@ class PhaseBalancedCount:
         if self.last_time is not None:
             if time_s <= self.last_time:
                 raise ValueError('Only new feedback may update phase statistics')
-            if time_s-self.last_time > self.maximum_feedback_gap_s or phase_rad < self.last_phase-1e-8:
+            delta = phase_rad-self.last_phase
+            direction = 0 if abs(delta) <= 1e-8 else (1 if delta > 0 else -1)
+            if (time_s-self.last_time > self.maximum_feedback_gap_s or
+                    (direction and self.direction and direction != self.direction)):
                 self.reset()
+            else:
+                self.travel += abs(delta)
+            if direction:
+                self.direction = direction
         sample = dict(count=float(count), turn_deg=float(turn_deg), nominal_turn_deg=float(nominal_turn_deg),
-                      phase_rad=float(phase_rad), time_s=float(time_s))
+                      phase_rad=float(phase_rad), travel_rad=self.travel, time_s=float(time_s))
         if self.samples and abs(phase_rad-self.samples[-1]['phase_rad']) <= 1e-8:
             self.samples[-1] = sample
         else:
             self.samples.append(sample)
         self.last_time, self.last_phase = time_s, phase_rad
-        self.samples = [s for s in self.samples if s['phase_rad'] >= phase_rad-self.phase_span_rad-1e-8]
+        self.samples = [s for s in self.samples if s['travel_rad'] >= self.travel-self.phase_span_rad-1e-8]
         return self.summary()
 
     def summary(self):
@@ -55,5 +64,5 @@ class PhaseBalancedCount:
                     group_turn_error_medians_deg=turn_error_medians,
                     balanced_turn_error_deg=None if not ready else float(np.mean(turn_error_medians)),
                     maximum_group_count_joints=None if not ready else max(count_medians),
-                    represented_phase_span_rad=0. if not self.samples else self.samples[-1]['phase_rad']-self.samples[0]['phase_rad'],
+                    represented_phase_span_rad=0. if not self.samples else self.samples[-1]['travel_rad']-self.samples[0]['travel_rad'],
                     new_samples=len(self.samples), observes_contact=False)

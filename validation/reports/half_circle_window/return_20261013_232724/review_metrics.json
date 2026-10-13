@@ -1,0 +1,155 @@
+{
+  "termination": "whole_body_exit_and_one_cycle",
+  "time": 87.74000000005489,
+  "stats": {
+    "steps": 87740,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 59796,
+    "floor_contact_steps": 0
+  },
+  "events": [
+    {
+      "kind": "resize_complete",
+      "operation": "contract",
+      "time_s": 7.400000000000806,
+      "old": [
+        8,
+        13
+      ],
+      "to": [
+        9,
+        13
+      ]
+    },
+    {
+      "kind": "complete",
+      "operation": "slide",
+      "time_s": 15.199999999997015,
+      "old": [
+        9,
+        13
+      ],
+      "to": [
+        8,
+        12
+      ]
+    },
+    {
+      "kind": "resize_complete",
+      "operation": "expand",
+      "time_s": 25.40000000000806,
+      "old": [
+        8,
+        12
+      ],
+      "to": [
+        7,
+        12
+      ]
+    },
+    {
+      "kind": "resize_complete",
+      "operation": "expand",
+      "time_s": 36.0000000000068,
+      "old": [
+        7,
+        12
+      ],
+      "to": [
+        7,
+        13
+      ]
+    },
+    {
+      "kind": "complete",
+      "operation": "slide",
+      "time_s": 46.599999999982096,
+      "old": [
+        7,
+        13
+      ],
+      "to": [
+        8,
+        14
+      ]
+    },
+    {
+      "kind": "resize_complete",
+      "operation": "contract",
+      "time_s": 59.19999999995273,
+      "old": [
+        8,
+        14
+      ],
+      "to": [
+        8,
+        13
+      ]
+    },
+    {
+      "kind": "resize_complete",
+      "operation": "contract",
+      "time_s": 65.59999999994918,
+      "old": [
+        8,
+        13
+      ],
+      "to": [
+        9,
+        13
+      ]
+    }
+  ],
+  "true_pipe_wrap_deg": {
+    "min": 133.00323355077916,
+    "max": 235.62241201544992,
+    "worst_time": 3.8799999999996837
+  },
+  "coverage_deg": {
+    "min": 142.27326246642406,
+    "max": 235.36567195475934,
+    "worst_time": 7.400000000000806
+  },
+  "actual_turn_deg": {
+    "min": 124.38984347162113,
+    "max": 202.30459722480313,
+    "worst_time": 7.560000000000859
+  },
+  "circle_rms_m": {
+    "min": 0.0009845584444301292,
+    "max": 0.011651017480706636,
+    "worst_time": 67.77999999995959
+  },
+  "support_up_n": {
+    "min": 18.99408822464777,
+    "max": 129.35671190636094,
+    "worst_time": 72.1599999999805
+  },
+  "min_z_m": {
+    "min": 0.6113549089693346,
+    "max": 0.732367616582993,
+    "worst_time": 30.700000000014537
+  },
+  "radius_m": {
+    "min": 0.08837309956305767,
+    "max": 0.14372262784789688,
+    "worst_time": 46.61999999998205
+  },
+  "wrap_above218_seconds": 4.84,
+  "last_cycle": {
+    "true_pipe_wrap_deg": [
+      188.21375154142993,
+      197.97169055253963
+    ],
+    "coverage_deg": [
+      169.8842017508843,
+      204.31546112183665
+    ],
+    "radius_m": [
+      0.08837309956305767,
+      0.10662282877027358
+    ]
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "phase_rad": -24.252000000000475,
+  "window": [
+    8,
+    13
+  ],
+  "measured_controller_deg": {
+    "J1": 25.400390625,
+    "J2": -2.548828125,
+    "J3": -21.26953125,
+    "J4": 15.1171875,
+    "J5": -7.3828125,
+    "J6": 72.861328125,
+    "J7": -87.099609375,
+    "J8": 20.830078125,
+    "J9": 17.578125,
+    "J10": 37.6171875,
+    "J11": 17.578125,
+    "J12": 20.7421875,
+    "J13": 2.900390625,
+    "J14": -11.162109375,
+    "J15": -11.513671875,
+    "J16": -7.119140625,
+    "J17": -52.3828125,
+    "J18": 10.72265625,
+    "J19": 3.603515625,
+    "J20": 31.376953125
+  },
+  "observation": {
+    "feedback_time_s": 136.2348206,
+    "current_window": [
+      8,
+      13
+    ],
+    "external_window_change": false,
+    "execution": "observation_only",
+    "executes_window_update": false,
+    "valid": true,
+    "reasons": [],
+    "direction": -1,
+    "suggested_window": [
+      7,
+      12
+    ],
+    "state": "recommend_head",
+    "localisation": "intrinsic_same_winding_bending",
+    "observes_absolute_down": false,
+    "current_geometry": {
+      "turn_deg": 87.55303772057013,
+      "fit_rms_m": 0.0035581066594583288,
+      "gap_fraction": 0.8874567191898729
+    },
+    "features": {
+      "bending_center_joint": 10.044456145520835,
+      "head_boundary_turn_deg": 0.0,
+      "tail_boundary_turn_deg": 0.0,
+      "reverse_boundary_turn_deg": 283.3773047849287
+    },
+    "phase_reference": [
+      -0.12239755686926834,
+      0.0
+    ],
+    "feature_error": [
+      -0.3331462976098969,
+      0.0
+    ],
+    "filtered_feature_error": [
+      -0.6328443258807865,
+      -21.473040417548404
+    ],
+    "filtered_error_joints": -0.6328443258807865,
+    "estimated_bending_center_joint": 9.867155674119214,
+    "position_valid": true,
+    "end_quality": {
+      "source": "no_trusted_passive_end",
+      "candidates": []
+    },
+    "candidate_window": [
+      7,
+      12
+    ],
+    "candidate_geometry": {
+      "turn_deg": 175.36541857573098,
+      "fit_rms_m": 0.0035622164614839053,
+      "gap_fraction": 0.8594164807465771
+    },
+    "persistence_s": 24.339714900000004
+  },
+  "source_log": "codes/logs/rolling_arc_20261013_232455_267867.jsonl",
+  "time_s": 136.28200000000652
+}

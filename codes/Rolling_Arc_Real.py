@@ -593,6 +593,7 @@ class SectionOptions:
     target_filter_s: float = .15
     maximum_section_turn_deg: float = 190.
     minimum_gap_fraction: float = .4
+    correct_discrete_turn: bool = True
 
     def __post_init__(self):
         if not all(math.isfinite(v) for v in asdict(self).values()):
@@ -656,6 +657,47 @@ class FixedSectionCompliance:
         self.status = 'initializing'
         self.updates = 0
         self.clipped = 0
+        self.inverse_diagnostic = None
+
+    def _match_measured_deformation(self, measured, geometry, candidate):
+        """Correct only the curve-to-hinge discretization, using measured shape.
+
+        The desired turn is that of the measured curve AFTER the original
+        length-preserving deformation, never pi or a nominal gait amplitude.
+        A scalar inverse solve preserves the integrator's relative joint shape
+        and rolling phase. It prevents a positive curvature bias being erased
+        by projection/integration/discretization losses.
+        """
+        desired = sum(abs(s.turn)*(1+self.options.gain*(.5 if s.joint in (1, self.count) else 1.))
+                      for s in geometry['curve'] if 1 <= s.joint <= self.count)
+        def evaluate(scale):
+            q = measured.copy()
+            q[self.enabled] = candidate[self.enabled]*scale
+            shape = local_section(q, self.lengths, self.first, self.last, geometry['axis'])
+            return shape['total_turn'], q
+        raw_turn, best = evaluate(1.)
+        best_scale, best_error = 1., abs(raw_turn-desired)
+        lower, upper = .25, 2.
+        # Do not search across a hinge fold; this is an inverse conversion,
+        # not a request to drive the motors past the existing joint range.
+        peak = float(np.max(abs(candidate[self.enabled])))
+        if peak > 1e-12:
+            upper = min(upper, (math.pi/2-.01)/peak)
+        upper = max(lower, upper)
+        for _ in range(10):
+            scale = .5*(lower+upper)
+            turn, q = evaluate(scale)
+            error = abs(turn-desired)
+            if error < best_error:
+                best, best_error, best_scale = q, error, scale
+            if turn < desired:
+                lower = scale
+            else:
+                upper = scale
+        self.inverse_diagnostic = dict(source='measured_deformed_curve', scale=best_scale,
+            requested_turn_deg=math.degrees(desired), raw_turn_deg=math.degrees(raw_turn),
+            residual_deg=math.degrees(best_error), nominal_used=False)
+        return best
 
     def _check_goal(self, angles):
         """Evaluate the open shape from angles, without any pipe information."""
@@ -697,6 +739,8 @@ class FixedSectionCompliance:
             # length, integrate its curvature, and use those angles directly.
             goal = measured.copy()
             goal[self.enabled] = observed
+            if self.options.correct_discrete_turn:
+                goal = self._match_measured_deformation(measured, geometry, goal)
             if not getattr(self.p, 'manual_tuning', False):
                 goal[self.enabled] = np.clip(goal[self.enabled], -math.pi/2 + .01, math.pi/2 - .01)
             valid, goal_geometry = self._check_goal(goal)
@@ -723,6 +767,7 @@ class FixedSectionCompliance:
         radius=math.sqrt(max(0,circle[2]+circle[:2]@circle[:2]))
         return dict(status=self.status,window=[self.first,self.last],geometry_updates=self.updates,
                     control_law='direct_measured_section', nominal_restoring=False,
+                    inverse_conversion=self.inverse_diagnostic,
                     constrained_updates=self.clipped,fit_rms_m=g['fit_rms'],
                     measured_section_turn_deg=math.degrees(g['total_turn']),
                     target_section_turn_deg=math.degrees(self.target_geometry['total_turn']),
@@ -1604,6 +1649,8 @@ class PhaseBalancedCount:
     def reset(self):
         self.samples = []
         self.last_time = self.last_phase = None
+        self.travel = 0.
+        self.direction = 0
 
     def update(self, count, turn_deg, phase_rad, time_s, nominal_turn_deg=180.):
         if not all(math.isfinite(v) for v in (count, turn_deg, phase_rad, time_s, nominal_turn_deg)):
@@ -1611,16 +1658,23 @@ class PhaseBalancedCount:
         if self.last_time is not None:
             if time_s <= self.last_time:
                 raise ValueError('Only new feedback may update phase statistics')
-            if time_s-self.last_time > self.maximum_feedback_gap_s or phase_rad < self.last_phase-1e-8:
+            delta = phase_rad-self.last_phase
+            direction = 0 if abs(delta) <= 1e-8 else (1 if delta > 0 else -1)
+            if (time_s-self.last_time > self.maximum_feedback_gap_s or
+                    (direction and self.direction and direction != self.direction)):
                 self.reset()
+            else:
+                self.travel += abs(delta)
+            if direction:
+                self.direction = direction
         sample = dict(count=float(count), turn_deg=float(turn_deg), nominal_turn_deg=float(nominal_turn_deg),
-                      phase_rad=float(phase_rad), time_s=float(time_s))
+                      phase_rad=float(phase_rad), travel_rad=self.travel, time_s=float(time_s))
         if self.samples and abs(phase_rad-self.samples[-1]['phase_rad']) <= 1e-8:
             self.samples[-1] = sample
         else:
             self.samples.append(sample)
         self.last_time, self.last_phase = time_s, phase_rad
-        self.samples = [s for s in self.samples if s['phase_rad'] >= phase_rad-self.phase_span_rad-1e-8]
+        self.samples = [s for s in self.samples if s['travel_rad'] >= self.travel-self.phase_span_rad-1e-8]
         return self.summary()
 
     def summary(self):
@@ -1639,7 +1693,7 @@ class PhaseBalancedCount:
                     group_turn_error_medians_deg=turn_error_medians,
                     balanced_turn_error_deg=None if not ready else float(np.mean(turn_error_medians)),
                     maximum_group_count_joints=None if not ready else max(count_medians),
-                    represented_phase_span_rad=0. if not self.samples else self.samples[-1]['phase_rad']-self.samples[0]['phase_rad'],
+                    represented_phase_span_rad=0. if not self.samples else self.samples[-1]['travel_rad']-self.samples[0]['travel_rad'],
                     new_samples=len(self.samples), observes_contact=False)
 
 
@@ -1686,6 +1740,24 @@ def mechanically_feasible(lengths, window, margin=.01):
         return False
 
 
+def measured_half_circle(section):
+    """Body-circle coverage from measured points, independent of gait amplitude.
+
+    The circle is not a pipe measurement. Polar-angle sweep describes covered
+    arc, whereas tangent turning includes boundary effects of the reconstruction.
+    """
+    xy = section['projected'][1:-1]
+    fit = np.linalg.lstsq(np.column_stack([2*xy, np.ones(len(xy))]), np.sum(xy*xy, axis=1), rcond=None)[0]
+    center = fit[:2]
+    radius = math.sqrt(max(0., fit[2]+center@center))
+    radial = xy-center
+    angles = np.unwrap(np.arctan2(radial[:, 1], radial[:, 0]))
+    coverage = float(abs(angles[-1]-angles[0]))
+    rms = float(np.sqrt(np.mean((np.linalg.norm(radial, axis=1)-radius)**2)))
+    return dict(radius_m=radius, circle_rms_m=rms, coverage_deg=math.degrees(coverage),
+                arc_length_m=radius*coverage, turn_deg=math.degrees(section['total_turn']))
+
+
 class GeneralPhaseReference:
     """Reuse any available calibration; transfer its residual to other widths.
 
@@ -1693,20 +1765,15 @@ class GeneralPhaseReference:
     geometry plus an interpolated (or nearest) frozen calibration residual.
     Transfer across widths is an explicit assumption to audit in simulation.
     """
-    def __init__(self, lengths, width, calibrated, manual_parameters=None):
+    def __init__(self, lengths, width, calibrated):
         self.lengths = np.asarray(lengths, float)
         self.width = width
         self.calibrated = calibrated
-        self.manual_parameters = manual_parameters
         self.helper = AngleShapeObserver(lengths)
         self.cache = {}
         self.metadata = dict(width=width, method='nominal geometry plus frozen residual',
                              calibrated_widths=sorted(calibrated),
                              transferred=width not in calibrated, online_learning=False)
-        if manual_parameters is not None:
-            self.metadata.update(method='DIY current nominal geometry; no frozen residual',
-                                 calibrated=False, amplitude_deg=manual_parameters.amplitude_deg,
-                                 omega_rad_s=manual_parameters.omega_rad_s)
 
     def ideal(self, width, phase, first):
         # Use the same starting parity, with enough space for boundary modules.
@@ -1715,8 +1782,6 @@ class GeneralPhaseReference:
             start = 2
         window = (start, start+width-1)
         q = nominal_angles(self.lengths, window, phase)
-        if self.manual_parameters is not None:
-            q = replace(self.manual_parameters, first_joint=window[0], last_joint=window[1]).targets(phase)
         _, _, section = self.helper.geometry(q, window)
         points = forward(q, self.lengths)
         arc = section['points'][1:-1]
@@ -1729,8 +1794,6 @@ class GeneralPhaseReference:
                          f['tail_boundary_turn_deg']-f['head_boundary_turn_deg']])
 
     def at(self, phase, first):
-        if self.manual_parameters is not None:
-            return self.ideal(self.width, phase, first)
         if self.width in self.calibrated:
             return self.calibrated[self.width].at(phase, first)
         key = (round(phase % (2*math.pi), 8), first % 2)
@@ -1756,14 +1819,10 @@ class PostureWindow(MotorFeedbackSliding):
         self.references = dict(references)
         self.posture_options = posture_options
         window = (parameters.first_joint, parameters.last_joint)
-        manual = getattr(parameters, 'manual_tuning', False)
-        if not parameter_window_feasible(parameters, lengths, window, posture_options.nominal_joint_margin_rad):
-            raise ValueError('Initial arc cannot meet the full-cycle mechanical limits')
-        for phase in (0., math.pi/2):
-            if not manual and not np.allclose(parameters.targets(phase), nominal_angles(lengths, window, phase), atol=1e-10):
-                raise ValueError('Use length-normalized half-arc parameters for every width')
+        if not (2 <= window[0] <= window[1] < parameters.joints and window[1]-window[0]+1 >= 3):
+            raise ValueError('Initial window requires 3+ interior joints')
         width = window[1]-window[0]+1
-        reference = GeneralPhaseReference(lengths, width, references, parameters if manual else None)
+        reference = GeneralPhaseReference(lengths, width, references)
         super().__init__(parameters, lengths, reference, execute=False,
                          allowed_widths=range(3, parameters.joints-1),
                          feedback_period_s=feedback_period_s, **kwargs)
@@ -1788,27 +1847,50 @@ class PostureWindow(MotorFeedbackSliding):
 
     def _new_observer(self):
         width = self.window[1]-self.window[0]+1
-        manual = getattr(self.p, 'manual_tuning', False)
-        reference = GeneralPhaseReference(self.lengths, width, self.references, self.p if manual else None)
+        reference = GeneralPhaseReference(self.lengths, width, self.references)
         self.observer = RollingShapeObserver(self.lengths, reference, width=width,
             options=MotorObserverOptions(maximum_feedback_gap_s=2.5*self.feedback_period_s))
-        if manual:
-            self.observer.geometry_observer.options = replace(self.observer.geometry_observer.options,
-                minimum_turn_deg=0., maximum_turn_deg=1e6, minimum_gap=0., maximum_plane_rms_m=1e6)
+        # Over/under-covered arcs must remain observable so they can be resized.
+        self.observer.geometry_observer.options = replace(self.observer.geometry_observer.options,
+            minimum_turn_deg=30., maximum_turn_deg=330., minimum_gap=.08, maximum_plane_rms_m=.025)
         self.observation = None
         self.filtered_count = None
         self.count_history = PhaseBalancedCount(maximum_feedback_gap_s=2.5*self.feedback_period_s)
         self.count_observation = None
         self.intent = self.intent_since = None
 
+    def _position_evidence(self, window=None):
+        """Use the observer's persistent intrinsic recommendation when down is absent.
+
+        This localises bending along the chain; it does not infer gravity or
+        support. Without a down proxy this fallback authorises only the exact
+        recommended slide, never a resize or an unrelated candidate.
+        """
+        o = self.observation
+        if not o or not o.get('valid') or not o.get('position_valid', False):
+            return None
+        if 'down_head' in o:
+            return 'passive_down_and_bending'
+        suggested = o.get('suggested_window')
+        if o.get('state') in ('recommend_head', 'recommend_tail') and suggested:
+            if window is None or tuple(window) == tuple(suggested):
+                return 'persistent_intrinsic_bending_and_boundary'
+        return None
+
     def _candidate(self, angles, window):
-        if not parameter_window_feasible(self.p, self.lengths, window, self.posture_options.nominal_joint_margin_rad):
-            return dict(window=list(window), eligible=False, reason='mechanical boundary or peak joint limit')
+        if not (2 <= window[0] <= window[1] < self.p.joints and window[1]-window[0]+1 >= 3):
+            return dict(window=list(window), eligible=False, reason='robot boundary')
         try:
             good, geometry, section = self.observer.geometry_observer.geometry(np.radians(angles), window)
             down, quality = self.observer.passive_down(forward(np.radians(angles), self.lengths), window, section)
-            return dict(window=list(window), eligible=bool(good and down is not None), geometry=geometry,
-                        end_source=quality['source'], reason=None if good and down is not None else 'shape or passive reference')
+            measured = measured_half_circle(section)
+            intrinsic = self._position_evidence(window) == 'persistent_intrinsic_bending_and_boundary'
+            reason = ('candidate_shape_unreliable' if not good else
+                      'candidate_circle_fit_unreliable' if measured['circle_rms_m'] > self.posture_options.circle_rms_max_m else
+                      'candidate_has_no_position_reference' if down is None and not intrinsic else None)
+            return dict(window=list(window), eligible=reason is None,
+                        geometry=geometry, actual_body_circle=measured,
+                        end_source=quality['source'], position_evidence=self._position_evidence(window), reason=reason)
         except (ValueError, np.linalg.LinAlgError) as exc:
             return dict(window=list(window), eligible=False, reason=str(exc))
 
@@ -1823,29 +1905,31 @@ class PostureWindow(MotorFeedbackSliding):
             return
         width = self.window[1]-self.window[0]+1
         q = np.radians(angles)
-        actual = circle_shape(local_section(q, self.lengths, *self.window))
-        nominal = q.copy()
-        nominal[self.enabled] = replace(self.p, first_joint=self.window[0], last_joint=self.window[1]).targets(self.feedback_phase)[self.enabled]
-        reference = circle_shape(local_section(nominal, self.lengths, *self.window))
-        radius_ratio = actual['radius_m']/reference['radius_m']
-        turn_ratio = reference['turn_deg']/max(actual['turn_deg'], 1e-8)
-        estimated_count = width*.5*(radius_ratio+turn_ratio)
+        actual = measured_half_circle(local_section(q, self.lengths, *self.window))
+        # L_half = pi*R_body. The active arc length is R_body*coverage;
+        # using the ratio avoids confusing a body-radius fit with pipe radius.
+        estimated_count = width*180./max(actual['coverage_deg'], 1e-8)
         if actual['circle_rms_m'] > self.posture_options.circle_rms_max_m:
             self.count_history.reset()
             self.count_observation = dict(valid=False, reason='body circle fit not reliable', actual_body_circle=actual)
             return
-        phase_statistics = self.count_history.update(estimated_count, actual['turn_deg'], self.feedback_phase,
-                                                    self.last_time, reference['turn_deg'])
+        phase_statistics = self.count_history.update(estimated_count, actual['coverage_deg'], self.feedback_phase,
+                                                    self.last_time, 180.)
         self.filtered_count = phase_statistics['balanced_count_joints']
         self.count_observation = dict(valid=True, time_s=self.last_time, window=list(self.window),
-            raw_count_joints=estimated_count, actual_body_circle=actual, nominal_body_circle=reference,
+            raw_count_joints=estimated_count, actual_body_circle=actual, nominal_body_circle=None,
+            target_coverage_deg=180., required_arc_length_m=math.pi*actual['radius_m'],
             phase_statistics=phase_statistics, observes_support=False, observes_pipe_radius=False)
 
     def _select(self, angles, time_s):
         o, count = self.observation, self.count_observation
-        if not o or not o['valid'] or 'down_head' not in o:
+        evidence = self._position_evidence()
+        if evidence is None:
             self.intent = self.intent_since = None
-            self.selection = dict(state='retain_untrusted_shape_or_down', observes_support=False)
+            reason = ('waiting_angle_feedback' if not o else 'current_shape_unreliable' if not o['valid'] else
+                      'no_passive_down_or_persistent_intrinsic_recommendation')
+            self.selection = dict(state='retain_untrusted_position', length_reason=reason,
+                                  observer_reasons=[] if not o else o.get('reasons', []), observes_support=False)
             return
         width = self.window[1]-self.window[0]+1
         option = self.posture_options
@@ -1857,22 +1941,20 @@ class PostureWindow(MotorFeedbackSliding):
         length_reason = 'multi_phase_coverage_incomplete' if not ready else 'no_persistent_count_error'
         if ready and self.filtered_count >= width+option.count_hysteresis_joints and stats['balanced_turn_error_deg'] <= option.expansion_turn_error_deg:
             delta_width = 1
-            length_reason = 'multi_phase_arc_deficit'
-        elif ready:
-            strongly_compact = self.filtered_count <= width-option.count_hysteresis_joints and stats['balanced_turn_error_deg'] >= option.contraction_turn_error_deg
-            shorter_trial = (stats['maximum_group_count_joints'] <= width+option.shorter_trial_count_margin_joints and
-                             stats['balanced_turn_error_deg'] >= option.shorter_trial_turn_error_deg)
-            first, last = self.window
-            can_shorten = any(parameter_window_feasible(self.p, self.lengths, w, option.nominal_joint_margin_rad)
-                              for w in ((first+1, last), (first, last-1)))
-            if (strongly_compact or shorter_trial) and can_shorten:
-                delta_width = -1
-                length_reason = 'multi_phase_compact_arc' if strongly_compact else 'guarded_adjacent_shorter_trial'
+            length_reason = 'measured_coverage_below_half_circle'
+        elif ready and self.filtered_count <= width-option.count_hysteresis_joints and stats['balanced_turn_error_deg'] >= option.contraction_turn_error_deg:
+            delta_width = -1
+            length_reason = 'measured_coverage_above_half_circle'
+        if evidence == 'persistent_intrinsic_bending_and_boundary':
+            delta_width = 0
+            length_reason = 'intrinsic_slide_only_resize_waits_for_down'
         offset = float(o['filtered_error_joints'])
         sign = 1 if offset > 0 else -1
         bending = o['filtered_feature_error']
         corroborated = sign*bending[0] >= self.observer.options.bending_threshold_joints or sign*bending[1] >= self.observer.options.boundary_threshold_deg
         migration = sign if abs(offset) >= self.observer.options.crest_threshold_joints and corroborated else 0
+        if evidence == 'persistent_intrinsic_bending_and_boundary':
+            migration = int(o['direction'])
         first, last = self.window
         if delta_width > 0:
             windows = [(first-1, last), (first, last+1)]
@@ -1890,13 +1972,16 @@ class PostureWindow(MotorFeedbackSliding):
         for c in candidates:
             w = c['window']
             c['center_error_joints'] = abs(sum(w)/2-desired_center)
-            c['score'] = c['center_error_joints']+.01*abs(c.get('geometry', {}).get('turn_deg', 180.)-180.)
+            coverage = c.get('actual_body_circle', {}).get('coverage_deg', float('inf'))
+            c['score'] = abs(coverage-180.)/30.+.25*c['center_error_joints']
+            if operation == 'contract' and actual is not None:
+                c['eligible'] &= abs(coverage-180.)+1. < abs(actual['coverage_deg']-180.)
         usable = [c for c in candidates if c['eligible']]
         best = min(usable, key=lambda c: c['score']) if usable else None
         self.selection = dict(state=operation if best else 'retain' if not windows else 'blocked_candidates',
             current_window=list(self.window), estimated_count_joints=None if not count else count.get('raw_count_joints'),
             filtered_count_joints=self.filtered_count, actual_body_circle=actual, nominal_body_circle=reference,
-            phase_statistics=stats, length_reason=length_reason,
+            phase_statistics=stats, length_reason=length_reason, position_evidence=evidence,
             migration_direction=migration, conditional_crest_error_joints=offset,
             candidates=candidates, chosen=None if best is None else best['window'],
             observes_pipe_radius=False, observes_support=False)
@@ -1933,7 +2018,7 @@ class PostureWindow(MotorFeedbackSliding):
             step_deg = float(np.degrees(abs(preview[p.enabled]-preload[p.enabled])).max())
             exit_bound = self.posture_options.contract_exit_angle_deg if request['operation'] == 'contract' else self.options.switch_angle_deg
             compatible = bool(np.max(abs(angles[exiting])) <= exit_bound) if len(exiting) else abs(math.cos(self.phase) if entering[0] % 2 == 0 else math.sin(self.phase)) <= .1
-            current_trusted = self.observation is not None and self.observation['valid'] and 'down_head' in self.observation
+            current_trusted = self._position_evidence(new) is not None
             evidence = request.get('rollback', False) or current_trusted
             shared = self.enabled & p.enabled
             self.last_gate = dict(time_s=time_s, candidate_geometry=candidate.get('geometry'),
@@ -1943,8 +2028,18 @@ class PostureWindow(MotorFeedbackSliding):
                 exit_angle_bound_deg=exit_bound,
                 command_open=bool(core._check_goal(preload)[0]), next_command_open=bool(preview_core._check_goal(preview)[0]),
                 next_target_step_deg=step_deg, phase_compatible=compatible, evidence_valid=bool(evidence),
+                candidate_eligible=candidate['eligible'], candidate_reason=candidate.get('reason'),
+                position_evidence=self._position_evidence(new), angle_velocity_available=self.angle_velocity_available,
                 shared_preload_jump_rad=float(abs(preload[shared]-self.targets[shared]).max()),
                 unloading_observed=False, phase_paused=False)
+            self.last_gate['waiting_reasons'] = [name for name, ok in (
+                (candidate.get('reason') or 'candidate_rejected', candidate['eligible']),
+                ('position_evidence_changed', evidence), ('exit_angle_or_entry_phase', compatible),
+                ('waiting_second_angle_sample', self.angle_velocity_available),
+                ('preload_shape', self.last_gate['command_open']),
+                ('next_command_shape', self.last_gate['next_command_open']),
+                ('compliance_blocked', preview_core.status == 'running'),
+                ('target_rate', step_deg <= self.section_options.target_rate_deg_s*.02+1e-8)) if not ok]
             ready = (candidate['eligible'] and evidence and compatible and self.angle_velocity_available and
                      self.last_gate['command_open'] and self.last_gate['next_command_open'] and preview_core.status == 'running' and
                      step_deg <= self.section_options.target_rate_deg_s*.02+1e-8)
@@ -2017,7 +2112,7 @@ class PostureWindow(MotorFeedbackSliding):
                       automatic=self.automatic,
                       count_observation=copy.deepcopy(self.count_observation),
                       stable_width_whitelist=None, preferred_count=None,
-                      controller_revision='phase_normalized_count_v3')
+                      controller_revision='measured_half_circle_v4')
         return result
 
 MOTOR_PHASE_REFERENCE = {'values': [[0.15833807751140405, -0.06707766383423497, 15.790626070439448],
@@ -2852,7 +2947,7 @@ class RollingArcController:
         print(f'{gait} | {label} | J{self.first}–J{self.last} | A={self.amplitude:g}° '
               f'omega={self.omega:g}rad/s | phase={self.phase:.4f}rad | delta={self.phase_step:g}rad', flush=True)
         if self.compliance is not None:
-            window_state = '窗口固定' if self.sliding is None else f'自动选窗={self.sliding.automatic} 等相位={self.sliding.phase_hold}'
+            window_state = '窗口固定' if self.sliding is None else f'自动选窗={self.sliding.automatic} 待交接={self.sliding.pending is not None}'
             print(f'实测截面直接顺应 K={self.options.gain:g} | '
                   f'{window_state} | 阻塞原因={self.section_block_reason or "无"}', flush=True)
         if self.sliding is not None and self.sliding.observation is not None:
@@ -2861,9 +2956,18 @@ class RollingArcController:
                   f'不可观测原因={o.get("reasons", [])}', flush=True)
         if isinstance(self.sliding, PostureWindow):
             s = self.sliding.selection or {}
-            print(f'使能数量={sum(self.enabled)}，数量估计={s.get("filtered_count_joints")} '
+            count = self.sliding.count_observation or {}
+            phase_stats = count.get('phase_statistics', {})
+            print(f'使能数量={sum(self.enabled)}，数量估计={self.sliding.filtered_count} '
                   f'决策={s.get("state", "收集相位")}，候选={s.get("chosen")}，'
-                  f'原因={s.get("length_reason", "等待反馈")}', flush=True)
+                  f'原因={s.get("length_reason", count.get("reason", "收集实测角与相位"))}', flush=True)
+            print(f'数量观测={count.get("reason", "可靠" if count.get("valid") else "等待实测角")} '
+                  f'相位分组样本={phase_stats.get("group_sample_counts", [])} '
+                  f'位置依据={s.get("position_evidence") or (self.sliding.observation or {}).get("end_quality", {}).get("source", "暂无")}', flush=True)
+            if self.sliding.pending is not None:
+                gate = self.sliding.last_gate or {}
+                print(f'交接目标={self.sliding.pending["to"]} '
+                      f'等待条件={gate.get("waiting_reasons", ["等待下一帧实测角"])}', flush=True)
         if include_feedback:
             print('实测角：'+' '.join(f'J{i+1}={v:.1f}°' for i, v in self.last_feedback.items()), flush=True)
             print('原始负载/电流（只记录）：'+' '.join(

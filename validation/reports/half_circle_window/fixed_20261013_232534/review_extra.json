@@ -1,0 +1,11 @@
+{
+  "min_gap_fraction": 0.4381478772236948,
+  "max_smooth_curvature_per_m": 27.505975146884417,
+  "max_abs_joint_deg": 83.15365367630304,
+  "max_shared_target_step_deg": 0.9000000000000012,
+  "max_abs_mean_y_m": 0.04636971824488181,
+  "max_backward_from_running_peak_m": 0.0030543584736349993,
+  "minimum_support_time_s": 3.27999999999975,
+  "phase_paused_frames": 0,
+  "intrinsic_recommendations_without_down": 0
+}

@@ -75,7 +75,7 @@ class MeasuredSectionRestoreTests(unittest.TestCase):
                 for module in (real, research):
                     for amplitude, legacy_yield in ((30., 0.), (85., .9)):
                         core = module.FixedSectionCompliance(replace(p, amplitude_deg=amplitude),
-                            real.LINK_LENGTHS_M, module.SectionOptions(yielding=legacy_yield))
+                            real.LINK_LENGTHS_M, module.SectionOptions(yielding=legacy_yield, correct_discrete_turn=False))
                         # Fail if the nominal generator is consulted during compliance.
                         with patch.object(real.SectionReference, 'targets', side_effect=AssertionError('nominal used')):
                             core.update(measured, phase, 0., .02, reference_targets=np.full(20, 9.))

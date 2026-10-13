@@ -21,6 +21,7 @@ class SectionOptions:
     target_filter_s: float = .15
     maximum_section_turn_deg: float = 190.
     minimum_gap_fraction: float = .4
+    correct_discrete_turn: bool = True
 
     def __post_init__(self):
         if not all(math.isfinite(v) for v in asdict(self).values()):
@@ -84,6 +85,47 @@ class FixedSectionCompliance:
         self.status = 'initializing'
         self.updates = 0
         self.clipped = 0
+        self.inverse_diagnostic = None
+
+    def _match_measured_deformation(self, measured, geometry, candidate):
+        """Correct only the curve-to-hinge discretization, using measured shape.
+
+        The desired turn is that of the measured curve AFTER the original
+        length-preserving deformation, never pi or a nominal gait amplitude.
+        A scalar inverse solve preserves the integrator's relative joint shape
+        and rolling phase. It prevents a positive curvature bias being erased
+        by projection/integration/discretization losses.
+        """
+        desired = sum(abs(s.turn)*(1+self.options.gain*(.5 if s.joint in (1, self.count) else 1.))
+                      for s in geometry['curve'] if 1 <= s.joint <= self.count)
+        def evaluate(scale):
+            q = measured.copy()
+            q[self.enabled] = candidate[self.enabled]*scale
+            shape = local_section(q, self.lengths, self.first, self.last, geometry['axis'])
+            return shape['total_turn'], q
+        raw_turn, best = evaluate(1.)
+        best_scale, best_error = 1., abs(raw_turn-desired)
+        lower, upper = .25, 2.
+        # Do not search across a hinge fold; this is an inverse conversion,
+        # not a request to drive the motors past the existing joint range.
+        peak = float(np.max(abs(candidate[self.enabled])))
+        if peak > 1e-12:
+            upper = min(upper, (math.pi/2-.01)/peak)
+        upper = max(lower, upper)
+        for _ in range(10):
+            scale = .5*(lower+upper)
+            turn, q = evaluate(scale)
+            error = abs(turn-desired)
+            if error < best_error:
+                best, best_error, best_scale = q, error, scale
+            if turn < desired:
+                lower = scale
+            else:
+                upper = scale
+        self.inverse_diagnostic = dict(source='measured_deformed_curve', scale=best_scale,
+            requested_turn_deg=math.degrees(desired), raw_turn_deg=math.degrees(raw_turn),
+            residual_deg=math.degrees(best_error), nominal_used=False)
+        return best
 
     def _check_goal(self, angles):
         """Evaluate the open shape from angles, without any pipe information."""
@@ -125,6 +167,8 @@ class FixedSectionCompliance:
             # length, integrate its curvature, and use those angles directly.
             goal = measured.copy()
             goal[self.enabled] = observed
+            if self.options.correct_discrete_turn:
+                goal = self._match_measured_deformation(measured, geometry, goal)
             if not getattr(self.p, 'manual_tuning', False):
                 goal[self.enabled] = np.clip(goal[self.enabled], -math.pi/2 + .01, math.pi/2 - .01)
             valid, goal_geometry = self._check_goal(goal)
@@ -151,6 +195,7 @@ class FixedSectionCompliance:
         radius=math.sqrt(max(0,circle[2]+circle[:2]@circle[:2]))
         return dict(status=self.status,window=[self.first,self.last],geometry_updates=self.updates,
                     control_law='direct_measured_section', nominal_restoring=False,
+                    inverse_conversion=self.inverse_diagnostic,
                     constrained_updates=self.clipped,fit_rms_m=g['fit_rms'],
                     measured_section_turn_deg=math.degrees(g['total_turn']),
                     target_section_turn_deg=math.degrees(self.target_geometry['total_turn']),
