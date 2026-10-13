@@ -1,0 +1,143 @@
+{
+  "dynamics_attempts": 3,
+  "budget_maximum": 3,
+  "physical_steps": 258560,
+  "saved_actual_states": 12931,
+  "replayed_control_frames": 12928,
+  "hardware_runs": 0,
+  "real_and_manual_entries_updated": false,
+  "all_requested_acceptance_complete": false,
+  "tests_and_repair_plan_executed": true,
+  "cases": [
+    {
+      "source": "acute_20261013_151323_765893",
+      "case": "acute",
+      "repair": false,
+      "final_time_s": 41.95999999999291,
+      "physical_steps": 41960,
+      "saved_states": 2099,
+      "passed": true,
+      "shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": false,
+      "phase_continuity_pass": true,
+      "body_turn_range_deg": [
+        160.01821100884123,
+        187.14221882601558
+      ],
+      "pipe_wrap_range_deg": [
+        150.78013987153432,
+        216.12295337707175
+      ],
+      "pipe_violation_frames": 0,
+      "pipe_unobservable_frames": 764,
+      "count_chain": [
+        6,
+        6,
+        7
+      ],
+      "operation_counts": {
+        "slide": 1,
+        "expand": 1
+      },
+      "post_exit_cycles": 1.0007662821596277,
+      "post_last_change_cycles": 1.0637916396240206
+    },
+    {
+      "source": "return_20261013_143147_086584",
+      "case": "return",
+      "repair": false,
+      "final_time_s": 88.70000000005948,
+      "physical_steps": 88700,
+      "saved_states": 4436,
+      "passed": false,
+      "shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": false,
+      "phase_continuity_pass": true,
+      "body_turn_range_deg": [
+        160.1854901759401,
+        188.91665570926355
+      ],
+      "pipe_wrap_range_deg": [
+        152.97303002732806,
+        233.42413171091684
+      ],
+      "pipe_violation_frames": 196,
+      "pipe_unobservable_frames": 0,
+      "count_chain": [
+        6,
+        7,
+        6,
+        6
+      ],
+      "operation_counts": {
+        "expand": 1,
+        "contract": 1,
+        "slide": 1
+      },
+      "post_exit_cycles": 1.3750987083140278,
+      "post_last_change_cycles": 1.000766282161876
+    },
+    {
+      "source": "return_repair_20261013_145949_538155",
+      "case": "return",
+      "repair": true,
+      "final_time_s": 127.90000000024665,
+      "physical_steps": 127900,
+      "saved_states": 6396,
+      "passed": false,
+      "shape_pass": true,
+      "mechanics_pass": true,
+      "strict_pipe_pass": false,
+      "phase_continuity_pass": true,
+      "body_turn_range_deg": [
+        160.1854901759401,
+        187.1482744133115
+      ],
+      "pipe_wrap_range_deg": [
+        152.97303002732806,
+        218.66862636617168
+      ],
+      "pipe_violation_frames": 53,
+      "pipe_unobservable_frames": 0,
+      "count_chain": [
+        6,
+        7,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "operation_counts": {
+        "expand": 1,
+        "contract": 1,
+        "slide": 6
+      },
+      "post_exit_cycles": 5.087865220761902,
+      "post_last_change_cycles": 1.000766282161876
+    }
+  ],
+  "count_comparison": {
+    "source": "acute_20261013_134937_702758_count_replay.jsonl.gz",
+    "comparable_samples": 35,
+    "ranges": {
+      "Instantaneous proxy": [
+        6.613326629638821,
+        7.92825369639783
+      ],
+      "Temporal EMA formula": [
+        6.679530804426725,
+        7.799852830852929
+      ],
+      "Equal phase groups": [
+        7.040774838722477,
+        7.177838812776977
+      ]
+    },
+    "interpretation": "decision smoothing, not a measured optimal joint count"
+  }
+}

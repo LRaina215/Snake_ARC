@@ -1,0 +1,10 @@
+{
+  "source": "return_repair_20261013_145949_538155",
+  "time_s": 71.2999999999764,
+  "window": [
+    8,
+    13
+  ],
+  "direct_world_x_axis_wrap_deg": 218.66862636617165,
+  "method": "actual backbone endpoints; unwrap atan2(z-1.2,y); no evaluator or mj_step"
+}

@@ -1,0 +1,90 @@
+[
+  {
+    "source": "acute_20261013_134937_702758",
+    "feedbacks": 199,
+    "by_width": [
+      {
+        "width": 6,
+        "comparable_ready_samples": 104,
+        "raw_range": [
+          5.672539798475626,
+          6.881716370621397
+        ],
+        "ema_range": [
+          5.7152013082526505,
+          6.836296547908469
+        ],
+        "balanced_range": [
+          5.811667492822764,
+          6.708781272718742
+        ],
+        "expands": 32,
+        "shorter_trial_evidence": 43
+      },
+      {
+        "width": 7,
+        "comparable_ready_samples": 35,
+        "raw_range": [
+          6.613326629638821,
+          7.92825369639783
+        ],
+        "ema_range": [
+          6.679530804426725,
+          7.799852830852929
+        ],
+        "balanced_range": [
+          7.040774838722477,
+          7.177838812776977
+        ],
+        "expands": 0,
+        "shorter_trial_evidence": 0
+      }
+    ],
+    "physics_steps": 0,
+    "interpretation": "same actual angle inputs; does not simulate a changed mask response"
+  },
+  {
+    "source": "adaptive_20261013_081901_624965",
+    "feedbacks": 538,
+    "by_width": [
+      {
+        "width": 6,
+        "comparable_ready_samples": 179,
+        "raw_range": [
+          5.673419569281934,
+          6.832823832391443
+        ],
+        "ema_range": [
+          5.713845537260554,
+          6.821253191720101
+        ],
+        "balanced_range": [
+          5.810881260895974,
+          6.564459452811845
+        ],
+        "expands": 20,
+        "shorter_trial_evidence": 135
+      },
+      {
+        "width": 8,
+        "comparable_ready_samples": 293,
+        "raw_range": [
+          7.569726271851441,
+          7.995846452139756
+        ],
+        "ema_range": [
+          7.606395381529667,
+          7.912809382092523
+        ],
+        "balanced_range": [
+          7.632075501847883,
+          7.76632528427112
+        ],
+        "expands": 0,
+        "shorter_trial_evidence": 293
+      }
+    ],
+    "physics_steps": 0,
+    "interpretation": "same actual angle inputs; does not simulate a changed mask response"
+  }
+]

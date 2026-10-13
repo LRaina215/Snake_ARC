@@ -1,0 +1,2930 @@
+{
+  "status": "complete",
+  "error": null,
+  "case": "return",
+  "repair": false,
+  "final_time_s": 88.70000000005948,
+  "samples": 4436,
+  "scene": "length_taper_return",
+  "start_x_m": -0.35,
+  "parameters": {
+    "joints": 20,
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5,
+    "mechanical_lengths_m": [
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645,
+      0.0645
+    ]
+  },
+  "control_period_s": 0.02,
+  "motor_feedback_period_s": 0.2,
+  "statistics_1ms": {
+    "physical_steps": 88700,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 28066,
+    "mask_violation_steps": 0,
+    "floor_contact_steps": 0,
+    "maximum_external_force_sum_n": 0.0,
+    "finite": true
+  },
+  "scene_geometry": {
+    "centerline_world_m_and_radius": [
+      [
+        -1.2,
+        0.0,
+        1.2,
+        0.055
+      ],
+      [
+        -0.2,
+        0.0,
+        1.2,
+        0.055
+      ],
+      [
+        -0.175,
+        0.0,
+        1.2,
+        0.05857142857
+      ],
+      [
+        -0.15,
+        0.0,
+        1.2,
+        0.06214285714
+      ],
+      [
+        -0.125,
+        0.0,
+        1.2,
+        0.06571428571
+      ],
+      [
+        -0.1,
+        0.0,
+        1.2,
+        0.06928571429
+      ],
+      [
+        -0.075,
+        0.0,
+        1.2,
+        0.07285714286
+      ],
+      [
+        -0.05,
+        0.0,
+        1.2,
+        0.07642857143
+      ],
+      [
+        -0.025,
+        0.0,
+        1.2,
+        0.08
+      ],
+      [
+        -2.775557562e-17,
+        0.0,
+        1.2,
+        0.08357142857
+      ],
+      [
+        0.025,
+        0.0,
+        1.2,
+        0.08714285714
+      ],
+      [
+        0.05,
+        0.0,
+        1.2,
+        0.09071428571
+      ],
+      [
+        0.075,
+        0.0,
+        1.2,
+        0.09428571429
+      ],
+      [
+        0.1,
+        0.0,
+        1.2,
+        0.09785714286
+      ],
+      [
+        0.125,
+        0.0,
+        1.2,
+        0.1014285714
+      ],
+      [
+        0.15,
+        0.0,
+        1.2,
+        0.105
+      ],
+      [
+        0.55,
+        0.0,
+        1.2,
+        0.105
+      ],
+      [
+        0.575,
+        0.0,
+        1.2,
+        0.1014285714
+      ],
+      [
+        0.6,
+        0.0,
+        1.2,
+        0.09785714286
+      ],
+      [
+        0.625,
+        0.0,
+        1.2,
+        0.09428571429
+      ],
+      [
+        0.65,
+        0.0,
+        1.2,
+        0.09071428571
+      ],
+      [
+        0.675,
+        0.0,
+        1.2,
+        0.08714285714
+      ],
+      [
+        0.7,
+        0.0,
+        1.2,
+        0.08357142857
+      ],
+      [
+        0.725,
+        0.0,
+        1.2,
+        0.08
+      ],
+      [
+        0.75,
+        0.0,
+        1.2,
+        0.07642857143
+      ],
+      [
+        0.775,
+        0.0,
+        1.2,
+        0.07285714286
+      ],
+      [
+        0.8,
+        0.0,
+        1.2,
+        0.06928571429
+      ],
+      [
+        0.825,
+        0.0,
+        1.2,
+        0.06571428571
+      ],
+      [
+        0.85,
+        0.0,
+        1.2,
+        0.06214285714
+      ],
+      [
+        0.875,
+        0.0,
+        1.2,
+        0.05857142857
+      ],
+      [
+        0.9,
+        0.0,
+        1.2,
+        0.055
+      ],
+      [
+        3.5,
+        0.0,
+        1.2,
+        0.055
+      ]
+    ],
+    "feature_span_m": [
+      1.0,
+      2.1
+    ],
+    "gravity": [
+      0.0,
+      0.0,
+      -9.81
+    ]
+  },
+  "passive_model": {
+    "damping": [
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5,
+      1.5
+    ],
+    "armature": [
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01,
+      0.01
+    ],
+    "calibrated_to_hardware": false
+  },
+  "stimulation": {
+    "kind": "none",
+    "enters_controller": false
+  },
+  "events": [
+    {
+      "kind": "prepare",
+      "time_s": 31.200000000015148,
+      "old": [
+        8,
+        13
+      ],
+      "to": [
+        8,
+        14
+      ],
+      "operation": "expand",
+      "selection": {
+        "state": "expand",
+        "current_window": [
+          8,
+          13
+        ],
+        "estimated_count_joints": 6.71058903982385,
+        "filtered_count_joints": 6.537608558445971,
+        "actual_body_circle": {
+          "radius_m": 0.13977490667682826,
+          "circle_rms_m": 0.00743965311232693,
+          "turn_deg": 161.6549140289874
+        },
+        "nominal_body_circle": {
+          "radius_m": 0.12421595452978573,
+          "circle_rms_m": 0.007319026592521231,
+          "turn_deg": 179.69652983221934
+        },
+        "phase_statistics": {
+          "ready": true,
+          "phase_period_rad": 3.141592653589793,
+          "group_sample_counts": [
+            7,
+            7,
+            7,
+            6
+          ],
+          "group_count_medians": [
+            6.621052370224847,
+            6.630527312386779,
+            6.353613620853544,
+            6.545240930318712
+          ],
+          "group_turn_medians_deg": [
+            164.58537481904472,
+            161.82916107589807,
+            170.5449011008721,
+            167.1676200928152
+          ],
+          "balanced_count_joints": 6.537608558445971,
+          "balanced_turn_deg": 166.03176427215752,
+          "maximum_group_count_joints": 6.630527312386779,
+          "represented_phase_span_rad": 3.1200000000001165,
+          "new_samples": 27,
+          "observes_contact": false
+        },
+        "length_reason": "multi_phase_arc_deficit",
+        "migration_direction": 0,
+        "conditional_crest_error_joints": 0.05836546065603075,
+        "candidates": [
+          {
+            "window": [
+              7,
+              13
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 162.80181908446417,
+              "fit_rms_m": 0.0019445682631199655,
+              "gap_fraction": 0.6032043790134507
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.5,
+            "score": 0.6719818091553583
+          },
+          {
+            "window": [
+              8,
+              14
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 176.1638026546427,
+              "fit_rms_m": 0.0018685999889922252,
+              "gap_fraction": 0.6850080519695284
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.5,
+            "score": 0.5383619734535731
+          }
+        ],
+        "chosen": [
+          8,
+          14
+        ],
+        "observes_pipe_radius": false,
+        "observes_support": false
+      }
+    },
+    {
+      "kind": "resize_complete",
+      "operation": "expand",
+      "time_s": 33.40000000001286,
+      "old": [
+        8,
+        13
+      ],
+      "to": [
+        8,
+        14
+      ],
+      "phase_rad": 18.83999999999555,
+      "observation": {
+        "feedback_time_s": 33.40000000001286,
+        "current_window": [
+          8,
+          13
+        ],
+        "external_window_change": false,
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "valid": true,
+        "reasons": [],
+        "direction": 0,
+        "suggested_window": null,
+        "state": "retain",
+        "localisation": "conditional_crest_with_bending",
+        "observes_absolute_down": false,
+        "current_geometry": {
+          "turn_deg": 161.75333180944597,
+          "fit_rms_m": 0.001794944975350451,
+          "gap_fraction": 0.6656863863123584
+        },
+        "features": {
+          "bending_center_joint": 10.730649569321999,
+          "head_boundary_turn_deg": 11.057072869319992,
+          "tail_boundary_turn_deg": 1.4787481734338728,
+          "reverse_boundary_turn_deg": 6.885469607028249
+        },
+        "phase_reference": [
+          0.4322728953245813,
+          -0.2369923318318093
+        ],
+        "feature_error": [
+          -0.20162332600258231,
+          -9.34133236405431
+        ],
+        "filtered_feature_error": [
+          -0.15127413738802825,
+          -6.961533323190942
+        ],
+        "filtered_error_joints": -0.3364770569281075,
+        "estimated_bending_center_joint": 10.348725862611971,
+        "position_valid": true,
+        "end_quality": {
+          "source": "two_consistent_ends",
+          "end_disagreement_deg": 10.019710744252224,
+          "candidates": [
+            {
+              "name": "head",
+              "count": 4,
+              "straightness": 0.9998071808065274,
+              "opening_alignment": 0.9736868020188657,
+              "direction": [
+                0.9998957712885937,
+                0.014080110904446518,
+                -0.003193279835317485
+              ]
+            },
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.9999822017656949,
+              "opening_alignment": 0.9227194063914779,
+              "direction": [
+                0.9862383622963447,
+                -0.06397654252408481,
+                0.15244964657777307
+              ]
+            }
+          ]
+        },
+        "down_head": [
+          0.9968754381941554,
+          -0.02504389119246988,
+          0.07491437938840995
+        ],
+        "crest": {
+          "joint_coordinate": 10.571301126970017,
+          "point_head_m": [
+            -0.5860382036851327,
+            -0.16938246424877273,
+            0.04099366438589258
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.9838018028348673,
+          "top_coordinate_span": [
+            9.708162147443623,
+            11.208327450820988
+          ]
+        },
+        "gravity_proxy_assumption": "qualified passive end hangs down"
+      },
+      "gate": {
+        "time_s": 33.40000000001286,
+        "candidate_geometry": {
+          "turn_deg": 163.26828073984476,
+          "fit_rms_m": 0.002827604076931076,
+          "gap_fraction": 0.609308849612612
+        },
+        "entering_joint": [
+          14
+        ],
+        "exiting_joint": [],
+        "entering_angle_deg": [
+          -12.634900843765795
+        ],
+        "exiting_angle_deg": [],
+        "exiting_velocity_deg_s": [],
+        "command_open": true,
+        "next_command_open": true,
+        "next_target_step_deg": 0.8999999999999997,
+        "phase_compatible": true,
+        "evidence_valid": true,
+        "shared_preload_jump_rad": 0.0,
+        "unloading_observed": false,
+        "phase_paused": false
+      },
+      "selection": {
+        "state": "expand",
+        "current_window": [
+          8,
+          13
+        ],
+        "estimated_count_joints": 6.71058903982385,
+        "filtered_count_joints": 6.537608558445971,
+        "actual_body_circle": {
+          "radius_m": 0.13977490667682826,
+          "circle_rms_m": 0.00743965311232693,
+          "turn_deg": 161.6549140289874
+        },
+        "nominal_body_circle": {
+          "radius_m": 0.12421595452978573,
+          "circle_rms_m": 0.007319026592521231,
+          "turn_deg": 179.69652983221934
+        },
+        "phase_statistics": {
+          "ready": true,
+          "phase_period_rad": 3.141592653589793,
+          "group_sample_counts": [
+            7,
+            7,
+            7,
+            6
+          ],
+          "group_count_medians": [
+            6.621052370224847,
+            6.630527312386779,
+            6.353613620853544,
+            6.545240930318712
+          ],
+          "group_turn_medians_deg": [
+            164.58537481904472,
+            161.82916107589807,
+            170.5449011008721,
+            167.1676200928152
+          ],
+          "balanced_count_joints": 6.537608558445971,
+          "balanced_turn_deg": 166.03176427215752,
+          "maximum_group_count_joints": 6.630527312386779,
+          "represented_phase_span_rad": 3.1200000000001165,
+          "new_samples": 27,
+          "observes_contact": false
+        },
+        "length_reason": "multi_phase_arc_deficit",
+        "migration_direction": 0,
+        "conditional_crest_error_joints": 0.05836546065603075,
+        "candidates": [
+          {
+            "window": [
+              7,
+              13
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 162.80181908446417,
+              "fit_rms_m": 0.0019445682631199655,
+              "gap_fraction": 0.6032043790134507
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.5,
+            "score": 0.6719818091553583
+          },
+          {
+            "window": [
+              8,
+              14
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 176.1638026546427,
+              "fit_rms_m": 0.0018685999889922252,
+              "gap_fraction": 0.6850080519695284
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.5,
+            "score": 0.5383619734535731
+          }
+        ],
+        "chosen": [
+          8,
+          14
+        ],
+        "observes_pipe_radius": false,
+        "observes_support": false
+      },
+      "rollback": false
+    },
+    {
+      "kind": "shape_trial_complete",
+      "time_s": 38.60000000000074,
+      "trial": {
+        "old": [
+          8,
+          13
+        ],
+        "new": [
+          8,
+          14
+        ],
+        "start_time_s": 33.40000000001286,
+        "bad_samples": 0,
+        "samples": 27,
+        "good": true
+      },
+      "observes_support": false,
+      "full_cycle_claim": false
+    },
+    {
+      "kind": "prepare",
+      "time_s": 60.1999999999504,
+      "old": [
+        8,
+        14
+      ],
+      "to": [
+        8,
+        13
+      ],
+      "operation": "contract",
+      "selection": {
+        "state": "contract",
+        "current_window": [
+          8,
+          14
+        ],
+        "estimated_count_joints": 6.78637970031953,
+        "filtered_count_joints": 6.819952577322569,
+        "actual_body_circle": {
+          "radius_m": 0.11921524292429078,
+          "circle_rms_m": 0.008064075437398262,
+          "turn_deg": 182.9511759778874
+        },
+        "nominal_body_circle": {
+          "radius_m": 0.12381044126986013,
+          "circle_rms_m": 0.007195098821330651,
+          "turn_deg": 178.5750601744436
+        },
+        "phase_statistics": {
+          "ready": true,
+          "phase_period_rad": 3.141592653589793,
+          "group_sample_counts": [
+            7,
+            6,
+            7,
+            7
+          ],
+          "group_count_medians": [
+            6.878679874395363,
+            6.480366702719677,
+            6.728129999290903,
+            7.1926337328843335
+          ],
+          "group_turn_medians_deg": [
+            181.0623455449359,
+            186.39749741210696,
+            185.66500321192632,
+            175.64135386271514
+          ],
+          "balanced_count_joints": 6.819952577322569,
+          "balanced_turn_deg": 182.19155000792108,
+          "maximum_group_count_joints": 7.1926337328843335,
+          "represented_phase_span_rad": 3.1199999999927286,
+          "new_samples": 27,
+          "observes_contact": false
+        },
+        "length_reason": "guarded_adjacent_shorter_trial",
+        "migration_direction": 0,
+        "conditional_crest_error_joints": 0.2910971103209926,
+        "candidates": [
+          {
+            "window": [
+              9,
+              14
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 181.10769001777447,
+              "fit_rms_m": 0.0030439732914704963,
+              "gap_fraction": 0.658927005944642
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.5,
+            "score": 0.5110769001777448
+          },
+          {
+            "window": [
+              8,
+              13
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 181.04014129520473,
+              "fit_rms_m": 0.002883642092289467,
+              "gap_fraction": 0.574781740530772
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.5,
+            "score": 0.5104014129520473
+          }
+        ],
+        "chosen": [
+          8,
+          13
+        ],
+        "observes_pipe_radius": false,
+        "observes_support": false
+      }
+    },
+    {
+      "kind": "resize_complete",
+      "operation": "contract",
+      "time_s": 64.99999999994631,
+      "old": [
+        8,
+        14
+      ],
+      "to": [
+        8,
+        13
+      ],
+      "phase_rad": 37.79999999995278,
+      "observation": {
+        "feedback_time_s": 64.99999999994631,
+        "current_window": [
+          8,
+          14
+        ],
+        "external_window_change": false,
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "valid": true,
+        "reasons": [],
+        "direction": 0,
+        "suggested_window": null,
+        "state": "retain",
+        "localisation": "conditional_crest_with_bending",
+        "observes_absolute_down": false,
+        "current_geometry": {
+          "turn_deg": 178.61049832856935,
+          "fit_rms_m": 0.0001457149304789385,
+          "gap_fraction": 0.5199080366598379
+        },
+        "features": {
+          "bending_center_joint": 11.18348113003005,
+          "head_boundary_turn_deg": 0.0,
+          "tail_boundary_turn_deg": 8.26893483619204,
+          "reverse_boundary_turn_deg": 2.5097829388853437
+        },
+        "phase_reference": [
+          -0.22127804799585107,
+          -5.700801010194105
+        ],
+        "feature_error": [
+          0.40475917802590045,
+          13.969735846386145
+        ],
+        "filtered_feature_error": [
+          0.41645589421020124,
+          14.222685273584345
+        ],
+        "filtered_error_joints": 0.4443479626540957,
+        "estimated_bending_center_joint": 11.416455894210202,
+        "position_valid": true,
+        "end_quality": {
+          "source": "two_consistent_ends",
+          "end_disagreement_deg": 7.277386396409215,
+          "candidates": [
+            {
+              "name": "head",
+              "count": 4,
+              "straightness": 0.9999895244648507,
+              "opening_alignment": 0.9879098026815074,
+              "direction": [
+                0.9999908969927181,
+                -0.003524416049267941,
+                0.0024050827866412047
+              ]
+            },
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.9999475974711943,
+              "opening_alignment": 0.9981928204723013,
+              "direction": [
+                0.9921164886752368,
+                0.0988221475373208,
+                0.07706527139270257
+              ]
+            }
+          ]
+        },
+        "down_head": [
+          0.9980656965416701,
+          0.047745115268759936,
+          0.03981544115997795
+        ],
+        "crest": {
+          "joint_coordinate": 11.142732090683051,
+          "point_head_m": [
+            -0.6421725783742459,
+            -0.09841191058073989,
+            -0.03846388317568829
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.9955276619828682,
+          "top_coordinate_span": [
+            10.625000740493155,
+            11.624999847053369
+          ]
+        },
+        "gravity_proxy_assumption": "qualified passive end hangs down"
+      },
+      "gate": {
+        "time_s": 64.99999999994631,
+        "candidate_geometry": {
+          "turn_deg": 178.60622866508484,
+          "fit_rms_m": 0.00012798610333758409,
+          "gap_fraction": 0.5820692676982596
+        },
+        "entering_joint": [],
+        "exiting_joint": [
+          14
+        ],
+        "entering_angle_deg": [],
+        "exiting_angle_deg": [
+          -0.5557712596033273
+        ],
+        "exiting_velocity_deg_s": [
+          27.138045717808858
+        ],
+        "command_open": true,
+        "next_command_open": true,
+        "next_target_step_deg": 0.7921856342716296,
+        "phase_compatible": true,
+        "evidence_valid": true,
+        "shared_preload_jump_rad": 0.0,
+        "unloading_observed": false,
+        "phase_paused": false
+      },
+      "selection": {
+        "state": "contract",
+        "current_window": [
+          8,
+          14
+        ],
+        "estimated_count_joints": 6.78637970031953,
+        "filtered_count_joints": 6.819952577322569,
+        "actual_body_circle": {
+          "radius_m": 0.11921524292429078,
+          "circle_rms_m": 0.008064075437398262,
+          "turn_deg": 182.9511759778874
+        },
+        "nominal_body_circle": {
+          "radius_m": 0.12381044126986013,
+          "circle_rms_m": 0.007195098821330651,
+          "turn_deg": 178.5750601744436
+        },
+        "phase_statistics": {
+          "ready": true,
+          "phase_period_rad": 3.141592653589793,
+          "group_sample_counts": [
+            7,
+            6,
+            7,
+            7
+          ],
+          "group_count_medians": [
+            6.878679874395363,
+            6.480366702719677,
+            6.728129999290903,
+            7.1926337328843335
+          ],
+          "group_turn_medians_deg": [
+            181.0623455449359,
+            186.39749741210696,
+            185.66500321192632,
+            175.64135386271514
+          ],
+          "balanced_count_joints": 6.819952577322569,
+          "balanced_turn_deg": 182.19155000792108,
+          "maximum_group_count_joints": 7.1926337328843335,
+          "represented_phase_span_rad": 3.1199999999927286,
+          "new_samples": 27,
+          "observes_contact": false
+        },
+        "length_reason": "guarded_adjacent_shorter_trial",
+        "migration_direction": 0,
+        "conditional_crest_error_joints": 0.2910971103209926,
+        "candidates": [
+          {
+            "window": [
+              9,
+              14
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 181.10769001777447,
+              "fit_rms_m": 0.0030439732914704963,
+              "gap_fraction": 0.658927005944642
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.5,
+            "score": 0.5110769001777448
+          },
+          {
+            "window": [
+              8,
+              13
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 181.04014129520473,
+              "fit_rms_m": 0.002883642092289467,
+              "gap_fraction": 0.574781740530772
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.5,
+            "score": 0.5104014129520473
+          }
+        ],
+        "chosen": [
+          8,
+          13
+        ],
+        "observes_pipe_radius": false,
+        "observes_support": false
+      },
+      "rollback": false
+    },
+    {
+      "kind": "shape_trial_complete",
+      "time_s": 69.99999999997019,
+      "trial": {
+        "old": [
+          8,
+          14
+        ],
+        "new": [
+          8,
+          13
+        ],
+        "start_time_s": 64.99999999994631,
+        "bad_samples": 0,
+        "samples": 26,
+        "good": true
+      },
+      "observes_support": false,
+      "full_cycle_claim": false
+    },
+    {
+      "kind": "prepare",
+      "time_s": 77.20000000000456,
+      "old": [
+        8,
+        13
+      ],
+      "to": [
+        7,
+        12
+      ],
+      "operation": "slide",
+      "selection": {
+        "state": "slide",
+        "current_window": [
+          8,
+          13
+        ],
+        "estimated_count_joints": 5.84594099617296,
+        "filtered_count_joints": 5.855181549912064,
+        "actual_body_circle": {
+          "radius_m": 0.1186278800184603,
+          "circle_rms_m": 0.0036734306037847515,
+          "turn_deg": 180.67376069622782
+        },
+        "nominal_body_circle": {
+          "radius_m": 0.12389189452773541,
+          "circle_rms_m": 0.0050268491561332234,
+          "turn_deg": 179.07222713028855
+        },
+        "phase_statistics": {
+          "ready": true,
+          "phase_period_rad": 3.141592653589793,
+          "group_sample_counts": [
+            7,
+            7,
+            7,
+            6
+          ],
+          "group_count_medians": [
+            5.810004216405071,
+            5.84594099617296,
+            5.8006544817209775,
+            5.96412650534925
+          ],
+          "group_turn_medians_deg": [
+            183.8209476571024,
+            180.67376069622782,
+            184.7258436766334,
+            180.4765016391762
+          ],
+          "balanced_count_joints": 5.855181549912064,
+          "balanced_turn_deg": 182.42426341728498,
+          "maximum_group_count_joints": 5.96412650534925,
+          "represented_phase_span_rad": 3.1200000000001182,
+          "new_samples": 27,
+          "observes_contact": false
+        },
+        "length_reason": "no_persistent_count_error",
+        "migration_direction": -1,
+        "conditional_crest_error_joints": -0.8729814643336882,
+        "candidates": [
+          {
+            "window": [
+              7,
+              12
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 173.17669437615885,
+              "fit_rms_m": 0.007060735471641143,
+              "gap_fraction": 0.5977808842689837
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.12701853566631272,
+            "score": 0.19525159190472424
+          }
+        ],
+        "chosen": [
+          7,
+          12
+        ],
+        "observes_pipe_radius": false,
+        "observes_support": false
+      }
+    },
+    {
+      "kind": "complete",
+      "operation": "slide",
+      "time_s": 78.20000000000934,
+      "old": [
+        8,
+        13
+      ],
+      "to": [
+        7,
+        12
+      ],
+      "phase_rad": 45.71999999995308,
+      "observation": {
+        "feedback_time_s": 78.20000000000934,
+        "current_window": [
+          8,
+          13
+        ],
+        "external_window_change": false,
+        "execution": "observation_only",
+        "executes_window_update": false,
+        "valid": true,
+        "reasons": [],
+        "direction": -1,
+        "suggested_window": [
+          7,
+          12
+        ],
+        "state": "recommend_head",
+        "localisation": "conditional_crest_with_bending",
+        "observes_absolute_down": false,
+        "current_geometry": {
+          "turn_deg": 181.44910263099723,
+          "fit_rms_m": 0.0008580064209442481,
+          "gap_fraction": 0.6440399426966037
+        },
+        "features": {
+          "bending_center_joint": 10.037676949465876,
+          "head_boundary_turn_deg": 1.4309062635885526,
+          "tail_boundary_turn_deg": 0.47904042318746315,
+          "reverse_boundary_turn_deg": 2.7184110986945553
+        },
+        "phase_reference": [
+          -0.0964411712933466,
+          17.21286469827075
+        ],
+        "feature_error": [
+          -0.3658818792407774,
+          -18.16473053867184
+        ],
+        "filtered_feature_error": [
+          -0.3739060048927469,
+          -18.575443097527543
+        ],
+        "filtered_error_joints": -0.6551274088783522,
+        "estimated_bending_center_joint": 10.126093995107253,
+        "position_valid": true,
+        "end_quality": {
+          "source": "two_consistent_ends",
+          "end_disagreement_deg": 19.463004009998656,
+          "candidates": [
+            {
+              "name": "head",
+              "count": 4,
+              "straightness": 0.9999489813835025,
+              "opening_alignment": 0.8476288881484195,
+              "direction": [
+                0.9999650414216917,
+                -0.00831165019559408,
+                0.0009123626146457306
+              ]
+            },
+            {
+              "name": "tail",
+              "count": 4,
+              "straightness": 0.9999833479313637,
+              "opening_alignment": 0.8471950255750774,
+              "direction": [
+                0.9455735858281945,
+                0.3248930390894967,
+                0.01830592623170621
+              ]
+            }
+          ]
+        },
+        "down_head": [
+          0.9869711551006151,
+          0.16060164249817277,
+          0.00974943209868482
+        ],
+        "crest": {
+          "joint_coordinate": 10.0039817050696,
+          "point_head_m": [
+            -0.5709577996102638,
+            -0.0010197805505265736,
+            -0.11676893016157147
+          ],
+          "top_band_m": 0.0080625,
+          "projected_down_norm": 0.9998516539227803,
+          "top_coordinate_span": [
+            9.541664399515719,
+            10.500010355348058
+          ]
+        },
+        "gravity_proxy_assumption": "qualified passive end hangs down",
+        "candidate_window": [
+          7,
+          12
+        ],
+        "candidate_geometry": {
+          "turn_deg": 181.77971923926256,
+          "fit_rms_m": 0.0008068689383599005,
+          "gap_fraction": 0.566115305823039
+        },
+        "persistence_s": 2.0000000000095497
+      },
+      "gate": {
+        "time_s": 78.20000000000934,
+        "candidate_geometry": {
+          "turn_deg": 181.77971923926256,
+          "fit_rms_m": 0.0008068689383599005,
+          "gap_fraction": 0.566115305823039
+        },
+        "entering_joint": [
+          7
+        ],
+        "exiting_joint": [
+          13
+        ],
+        "entering_angle_deg": [
+          9.763393000819374
+        ],
+        "exiting_angle_deg": [
+          -3.007232575506838
+        ],
+        "exiting_velocity_deg_s": [
+          -36.505067361982114
+        ],
+        "command_open": true,
+        "next_command_open": true,
+        "next_target_step_deg": 0.8999999999999997,
+        "phase_compatible": true,
+        "evidence_valid": true,
+        "shared_preload_jump_rad": 0.0,
+        "unloading_observed": false,
+        "phase_paused": false
+      },
+      "selection": {
+        "state": "slide",
+        "current_window": [
+          8,
+          13
+        ],
+        "estimated_count_joints": 5.84594099617296,
+        "filtered_count_joints": 5.855181549912064,
+        "actual_body_circle": {
+          "radius_m": 0.1186278800184603,
+          "circle_rms_m": 0.0036734306037847515,
+          "turn_deg": 180.67376069622782
+        },
+        "nominal_body_circle": {
+          "radius_m": 0.12389189452773541,
+          "circle_rms_m": 0.0050268491561332234,
+          "turn_deg": 179.07222713028855
+        },
+        "phase_statistics": {
+          "ready": true,
+          "phase_period_rad": 3.141592653589793,
+          "group_sample_counts": [
+            7,
+            7,
+            7,
+            6
+          ],
+          "group_count_medians": [
+            5.810004216405071,
+            5.84594099617296,
+            5.8006544817209775,
+            5.96412650534925
+          ],
+          "group_turn_medians_deg": [
+            183.8209476571024,
+            180.67376069622782,
+            184.7258436766334,
+            180.4765016391762
+          ],
+          "balanced_count_joints": 5.855181549912064,
+          "balanced_turn_deg": 182.42426341728498,
+          "maximum_group_count_joints": 5.96412650534925,
+          "represented_phase_span_rad": 3.1200000000001182,
+          "new_samples": 27,
+          "observes_contact": false
+        },
+        "length_reason": "no_persistent_count_error",
+        "migration_direction": -1,
+        "conditional_crest_error_joints": -0.8729814643336882,
+        "candidates": [
+          {
+            "window": [
+              7,
+              12
+            ],
+            "eligible": true,
+            "geometry": {
+              "turn_deg": 173.17669437615885,
+              "fit_rms_m": 0.007060735471641143,
+              "gap_fraction": 0.5977808842689837
+            },
+            "end_source": "two_consistent_ends",
+            "reason": null,
+            "center_error_joints": 0.12701853566631272,
+            "score": 0.19525159190472424
+          }
+        ],
+        "chosen": [
+          7,
+          12
+        ],
+        "observes_pipe_radius": false,
+        "observes_support": false
+      },
+      "rollback": false
+    },
+    {
+      "kind": "shape_trial_complete",
+      "time_s": 83.20000000003321,
+      "trial": {
+        "old": [
+          8,
+          13
+        ],
+        "new": [
+          7,
+          12
+        ],
+        "start_time_s": 78.20000000000934,
+        "bad_samples": 0,
+        "samples": 26,
+        "good": true
+      },
+      "observes_support": false,
+      "full_cycle_claim": false
+    }
+  ],
+  "final_controller": {
+    "window": [
+      7,
+      12
+    ],
+    "phase_rad": 52.00799999995332,
+    "phase_hold": false,
+    "pending": null,
+    "observation": {
+      "feedback_time_s": 88.600000000059,
+      "current_window": [
+        7,
+        12
+      ],
+      "external_window_change": false,
+      "execution": "observation_only",
+      "executes_window_update": false,
+      "valid": true,
+      "reasons": [],
+      "direction": 0,
+      "suggested_window": null,
+      "state": "retain",
+      "localisation": "conditional_crest_with_bending",
+      "observes_absolute_down": false,
+      "current_geometry": {
+        "turn_deg": 182.37891962542588,
+        "fit_rms_m": 0.00015893001999748546,
+        "gap_fraction": 0.5632460762971688
+      },
+      "features": {
+        "bending_center_joint": 9.795767517778357,
+        "head_boundary_turn_deg": 7.1808071069328365,
+        "tail_boundary_turn_deg": 0.0,
+        "reverse_boundary_turn_deg": 7.797063544856474
+      },
+      "phase_reference": [
+        0.38482310742216297,
+        -0.8762745640374431
+      ],
+      "feature_error": [
+        -0.08905558964380622,
+        -6.3045325428953936
+      ],
+      "filtered_feature_error": [
+        -0.12843757230343664,
+        -6.205561118088427
+      ],
+      "filtered_error_joints": -0.17520351833405268,
+      "estimated_bending_center_joint": 9.371562427696563,
+      "position_valid": true,
+      "end_quality": {
+        "source": "two_consistent_ends",
+        "end_disagreement_deg": 11.946768509869488,
+        "candidates": [
+          {
+            "name": "head",
+            "count": 4,
+            "straightness": 0.999779089663656,
+            "opening_alignment": 0.9640285328059687,
+            "direction": [
+              0.9998581351944292,
+              -0.01568564242381967,
+              0.006137597842032103
+            ]
+          },
+          {
+            "name": "tail",
+            "count": 4,
+            "straightness": 0.9999450803425802,
+            "opening_alignment": 0.9774859017368885,
+            "direction": [
+              0.9749202478022894,
+              -0.2222416970151828,
+              0.011795699764507334
+            ]
+          }
+        ]
+      },
+      "down_head": [
+        0.9927796425290415,
+        -0.11961312774636104,
+        0.009015600403813374
+      ],
+      "crest": {
+        "joint_coordinate": 9.761354980954343,
+        "point_head_m": [
+          -0.5382264713031256,
+          0.04769160041500005,
+          -0.14098853531532077
+        ],
+        "top_band_m": 0.0080625,
+        "projected_down_norm": 0.9984409945940695,
+        "top_coordinate_span": [
+          9.208330403783014,
+          10.208333840802418
+        ]
+      },
+      "gravity_proxy_assumption": "qualified passive end hangs down"
+    },
+    "last_gate": {
+      "time_s": 78.20000000000934,
+      "candidate_geometry": {
+        "turn_deg": 181.77971923926256,
+        "fit_rms_m": 0.0008068689383599005,
+        "gap_fraction": 0.566115305823039
+      },
+      "entering_joint": [
+        7
+      ],
+      "exiting_joint": [
+        13
+      ],
+      "entering_angle_deg": [
+        9.763393000819374
+      ],
+      "exiting_angle_deg": [
+        -3.007232575506838
+      ],
+      "exiting_velocity_deg_s": [
+        -36.505067361982114
+      ],
+      "command_open": true,
+      "next_command_open": true,
+      "next_target_step_deg": 0.8999999999999997,
+      "phase_compatible": true,
+      "evidence_valid": true,
+      "shared_preload_jump_rad": 0.0,
+      "unloading_observed": false,
+      "phase_paused": false
+    },
+    "fault": null,
+    "compliance": {
+      "status": "running",
+      "window": [
+        7,
+        12
+      ],
+      "geometry_updates": 175,
+      "constrained_updates": 0,
+      "fit_rms_m": 0.00015893001999748546,
+      "measured_section_turn_deg": 182.3789196254259,
+      "target_section_turn_deg": 184.41698367512996,
+      "fitted_body_radius_m": 0.11216092648940515,
+      "axis": [
+        -0.17467087502834708,
+        -0.9844622796937218,
+        -0.018002924125592568
+      ],
+      "axis_confidence": 0.9947023326667505,
+      "projected_m": [
+        [
+          -0.14995030067955734,
+          0.06963399904595216
+        ],
+        [
+          -0.12480626028559141,
+          0.010237405225173942
+        ],
+        [
+          -0.09965760583380714,
+          -0.04915715990937423
+        ],
+        [
+          -0.03536689106520085,
+          -0.054334194310705144
+        ],
+        [
+          0.02892479836638832,
+          -0.059505768846094986
+        ],
+        [
+          0.06327070551394479,
+          -0.0049118209694739975
+        ],
+        [
+          0.097611580796235,
+          0.04968480083138547
+        ],
+        [
+          0.07002367250803145,
+          0.10798673797908853
+        ],
+        [
+          0.04254704864362836,
+          0.1661525612377219
+        ]
+      ],
+      "section_curve_m": [
+        [
+          -0.14995030067955734,
+          0.06963399904595216
+        ],
+        [
+          -0.14815429779427405,
+          0.06539138520161086
+        ],
+        [
+          -0.14635829490899077,
+          0.06114877135726956
+        ],
+        [
+          -0.1445622920237075,
+          0.056906157512928254
+        ],
+        [
+          -0.1427662891384242,
+          0.05266354366858696
+        ],
+        [
+          -0.14097028625314093,
+          0.04842092982424566
+        ],
+        [
+          -0.13917428336785764,
+          0.044178315979904355
+        ],
+        [
+          -0.1373782804825744,
+          0.03993570213556305
+        ],
+        [
+          -0.13737826697942576,
+          0.03993567023770486
+        ],
+        [
+          -0.13544409837326096,
+          0.035366712204724454
+        ],
+        [
+          -0.13350990230479398,
+          0.03079776579740728
+        ],
+        [
+          -0.1315756787740947,
+          0.0262288310159184
+        ],
+        [
+          -0.129641427781233,
+          0.021659907860422874
+        ],
+        [
+          -0.12770714932627877,
+          0.01709099633108577
+        ],
+        [
+          -0.12577284340930187,
+          0.012522096428072161
+        ],
+        [
+          -0.12383851003037219,
+          0.00795320815154709
+        ],
+        [
+          -0.12190414918955962,
+          0.0033843315016756498
+        ],
+        [
+          -0.11996976088693403,
+          -0.0011845335213771097
+        ],
+        [
+          -0.11803534512256533,
+          -0.005753386917446139
+        ],
+        [
+          -0.11610090189652336,
+          -0.01032222868636637
+        ],
+        [
+          -0.11416643120887807,
+          -0.01489105882797271
+        ],
+        [
+          -0.11223193305969931,
+          -0.019459877342100147
+        ],
+        [
+          -0.1122318250066224,
+          -0.019460132535296538
+        ],
+        [
+          -0.11014846871276426,
+          -0.02381807202809219
+        ],
+        [
+          -0.10767842826421012,
+          -0.027969085187856062
+        ],
+        [
+          -0.10484206604471002,
+          -0.03187895212035119
+        ],
+        [
+          -0.10166276430130425,
+          -0.0355154408793608
+        ],
+        [
+          -0.09816673238703971,
+          -0.038848573178635805
+        ],
+        [
+          -0.0943827906977453,
+          -0.04185087152524396
+        ],
+        [
+          -0.09034213308403596,
+          -0.04449758573701657
+        ],
+        [
+          -0.08607806969716086,
+          -0.046766896976740566
+        ],
+        [
+          -0.08162575238860843,
+          -0.04864009762108992
+        ],
+        [
+          -0.07702188492720433,
+          -0.05010174548150319
+        ],
+        [
+          -0.07230442042259827,
+          -0.05113979110564908
+        ],
+        [
+          -0.06751224844950403,
+          -0.0517456771100397
+        ],
+        [
+          -0.06256680754402417,
+          -0.052143894245326956
+        ],
+        [
+          -0.05762136401685969,
+          -0.052542078820689425
+        ],
+        [
+          -0.052675917868224925,
+          -0.05294023083610985
+        ],
+        [
+          -0.04773046909833426,
+          -0.05333835029157098
+        ],
+        [
+          -0.04278501770740206,
+          -0.05373643718705556
+        ],
+        [
+          -0.0378395636956427,
+          -0.05413449152254632
+        ],
+        [
+          -0.032894107063270554,
+          -0.05453251329802602
+        ],
+        [
+          -0.027948647810499973,
+          -0.0549305025134774
+        ],
+        [
+          -0.023003185937545342,
+          -0.0553284591688832
+        ],
+        [
+          -0.018057721444621012,
+          -0.055726383264226194
+        ],
+        [
+          -0.013112254331941374,
+          -0.05612427479948911
+        ],
+        [
+          -0.008166784599720797,
+          -0.05652213377465471
+        ],
+        [
+          -0.0032213122481736522,
+          -0.05691996018970574
+        ],
+        [
+          -0.0032210463494063038,
+          -0.056919981578400086
+        ],
+        [
+          -0.0032209457792840525,
+          -0.05691998966818413
+        ],
+        [
+          0.0016068783049841533,
+          -0.057088405094510894
+        ],
+        [
+          0.006430087379974451,
+          -0.056818398866071235
+        ],
+        [
+          0.011208949745597961,
+          -0.056112195188020624
+        ],
+        [
+          0.015904099012522425,
+          -0.05497561148861101
+        ],
+        [
+          0.020476858387010403,
+          -0.05341801049750408
+        ],
+        [
+          0.024889559275140097,
+          -0.05145222311928526
+        ],
+        [
+          0.02910585158187245,
+          -0.049094442737516314
+        ],
+        [
+          0.033091003148842876,
+          -0.04636409182000806
+        ],
+        [
+          0.03681218586422669,
+          -0.04328366192416662
+        ],
+        [
+          0.040238746087817794,
+          -0.03987852842038615
+        ],
+        [
+          0.04334245716366504,
+          -0.036176741459724035
+        ],
+        [
+          0.04609775194016652,
+          -0.03220879490778452
+        ],
+        [
+          0.04609786268442635,
+          -0.032208618876144915
+        ],
+        [
+          0.048739824271133374,
+          -0.028009102555384104
+        ],
+        [
+          0.05138175739474015,
+          -0.023809568328310673
+        ],
+        [
+          0.05402366205512532,
+          -0.01961001619511754
+        ],
+        [
+          0.05666553825216753,
+          -0.015410446155997619
+        ],
+        [
+          0.059307385985745406,
+          -0.011210858211143829
+        ],
+        [
+          0.061949205255737605,
+          -0.0070112523607490755
+        ],
+        [
+          0.06459099606202276,
+          -0.002811628605006288
+        ],
+        [
+          0.06723275840447951,
+          0.0013880130558916112
+        ],
+        [
+          0.06987449228298649,
+          0.0055876726217517145
+        ],
+        [
+          0.07251619769742237,
+          0.009787350092381103
+        ],
+        [
+          0.07515787464766581,
+          0.013987045467586848
+        ],
+        [
+          0.07779952313359542,
+          0.01818675874717602
+        ],
+        [
+          0.08044114315508988,
+          0.022386489930955704
+        ],
+        [
+          0.08288169873534391,
+          0.026652416564553735
+        ],
+        [
+          0.08495742699488798,
+          0.031107278377907804
+        ],
+        [
+          0.0866538223804232,
+          0.03571994401498632
+        ],
+        [
+          0.08795903018333458,
+          0.04045817935894818
+        ],
+        [
+          0.08886392938247485,
+          0.0452888727898073
+        ],
+        [
+          0.08936219638346077,
+          0.05017826657424302
+        ],
+        [
+          0.08945034920906016,
+          0.05509219277056394
+        ],
+        [
+          0.08912777183185988,
+          0.059996312000279786
+        ],
+        [
+          0.08839671847917337,
+          0.06485635341770371
+        ],
+        [
+          0.08726229788010473,
+          0.06963835420063536
+        ],
+        [
+          0.08573243756485327,
+          0.07430889688852174
+        ],
+        [
+          0.08381782846574151,
+          0.0788353429095352
+        ],
+        [
+          0.08381762665213323,
+          0.07883576940523698
+        ],
+        [
+          0.0837811378099635,
+          0.07891288181841986
+        ],
+        [
+          0.0816647180799118,
+          0.08338583622255955
+        ],
+        [
+          0.0795485249870805,
+          0.08785889785516847
+        ],
+        [
+          0.07743255853690235,
+          0.09233206670476328
+        ],
+        [
+          0.07531681873480953,
+          0.09680534275986036
+        ],
+        [
+          0.07320130558623358,
+          0.10127872600897586
+        ],
+        [
+          0.0710860190966055,
+          0.1057522164406256
+        ],
+        [
+          0.06897095927135569,
+          0.11022581404332513
+        ],
+        [
+          0.06685612611591396,
+          0.11469951880558975
+        ],
+        [
+          0.06474151963570958,
+          0.11917333071593449
+        ],
+        [
+          0.0626271398361712,
+          0.12364724976287408
+        ],
+        [
+          0.0605129867227269,
+          0.128121275934923
+        ],
+        [
+          0.05839906030080416,
+          0.13259540922059537
+        ],
+        [
+          0.056285360575829925,
+          0.13706964960840523
+        ],
+        [
+          0.05432274458551542,
+          0.14122435126973618
+        ],
+        [
+          0.052360128595200915,
+          0.14537905293106715
+        ],
+        [
+          0.05039751260488641,
+          0.1495337545923981
+        ],
+        [
+          0.048434896614571905,
+          0.15368845625372907
+        ],
+        [
+          0.0464722806242574,
+          0.15784315791506
+        ],
+        [
+          0.0445096646339429,
+          0.16199785957639096
+        ],
+        [
+          0.04254704864362839,
+          0.16615256123772193
+        ]
+      ]
+    },
+    "options": {
+      "cooldown_s": 5.0,
+      "phase_zero_tolerance": 0.015,
+      "switch_angle_deg": 4.0,
+      "switch_velocity_deg_s": 8.0,
+      "stable_feedback_s": 0.06,
+      "minimum_hold_s": 0.1,
+      "handover_timeout_s": 20.0,
+      "maximum_feedback_age_s": 0.8
+    },
+    "feedback_time_s": 88.600000000059,
+    "control_time_s": 88.68000000005938,
+    "new_feedback_this_tick": false,
+    "feedback_phase_rad": 51.94799999995332,
+    "feedback_period_s": 0.2,
+    "feedback_source": "measured joint angles; qdot from fresh angle differences",
+    "observes_contact_or_unloading": false,
+    "execute": false,
+    "active_count": 6,
+    "selection": {
+      "state": "retain",
+      "current_window": [
+        7,
+        12
+      ],
+      "estimated_count_joints": 5.8873663553881785,
+      "filtered_count_joints": 5.823260443247113,
+      "actual_body_circle": {
+        "radius_m": 0.11216092648940515,
+        "circle_rms_m": 0.00829271171993191,
+        "turn_deg": 182.37891962542588
+      },
+      "nominal_body_circle": {
+        "radius_m": 0.11491192992063626,
+        "circle_rms_m": 0.008037700339280206,
+        "turn_deg": 179.8977555959217
+      },
+      "phase_statistics": {
+        "ready": true,
+        "phase_period_rad": 3.141592653589793,
+        "group_sample_counts": [
+          7,
+          7,
+          7,
+          6
+        ],
+        "group_count_medians": [
+          5.790902368156344,
+          5.933084433867837,
+          5.748110096453455,
+          5.8209448745108165
+        ],
+        "group_turn_medians_deg": [
+          184.1592135267924,
+          181.2112310984317,
+          185.84024100383408,
+          180.97721871909602
+        ],
+        "balanced_count_joints": 5.823260443247113,
+        "balanced_turn_deg": 183.04697608703856,
+        "maximum_group_count_joints": 5.933084433867837,
+        "represented_phase_span_rad": 3.1200000000001182,
+        "new_samples": 27,
+        "observes_contact": false
+      },
+      "length_reason": "no_persistent_count_error",
+      "migration_direction": 0,
+      "conditional_crest_error_joints": -0.17520351833405268,
+      "candidates": [],
+      "chosen": null,
+      "observes_pipe_radius": false,
+      "observes_support": false
+    },
+    "length_observation": {
+      "state": "retain",
+      "current_window": [
+        7,
+        12
+      ],
+      "estimated_count_joints": 5.8873663553881785,
+      "filtered_count_joints": 5.823260443247113,
+      "actual_body_circle": {
+        "radius_m": 0.11216092648940515,
+        "circle_rms_m": 0.00829271171993191,
+        "turn_deg": 182.37891962542588
+      },
+      "nominal_body_circle": {
+        "radius_m": 0.11491192992063626,
+        "circle_rms_m": 0.008037700339280206,
+        "turn_deg": 179.8977555959217
+      },
+      "phase_statistics": {
+        "ready": true,
+        "phase_period_rad": 3.141592653589793,
+        "group_sample_counts": [
+          7,
+          7,
+          7,
+          6
+        ],
+        "group_count_medians": [
+          5.790902368156344,
+          5.933084433867837,
+          5.748110096453455,
+          5.8209448745108165
+        ],
+        "group_turn_medians_deg": [
+          184.1592135267924,
+          181.2112310984317,
+          185.84024100383408,
+          180.97721871909602
+        ],
+        "balanced_count_joints": 5.823260443247113,
+        "balanced_turn_deg": 183.04697608703856,
+        "maximum_group_count_joints": 5.933084433867837,
+        "represented_phase_span_rad": 3.1200000000001182,
+        "new_samples": 27,
+        "observes_contact": false
+      },
+      "length_reason": "no_persistent_count_error",
+      "migration_direction": 0,
+      "conditional_crest_error_joints": -0.17520351833405268,
+      "candidates": [],
+      "chosen": null,
+      "observes_pipe_radius": false,
+      "observes_support": false
+    },
+    "trial": null,
+    "resize_fault": null,
+    "posture_options": {
+      "count_hysteresis_joints": 0.5,
+      "expansion_turn_deg": 175.0,
+      "contraction_turn_deg": 185.0,
+      "circle_rms_max_m": 0.012,
+      "persistence_s": 1.0,
+      "cooldown_s": 5.0,
+      "trial_grace_s": 1.0,
+      "trial_review_s": 5.0,
+      "nominal_joint_margin_rad": 0.01,
+      "shorter_trial_count_margin_joints": 0.25,
+      "shorter_trial_turn_deg": 180.0
+    },
+    "observer_configuration": {
+      "options": {
+        "crest_threshold_joints": 0.5,
+        "bending_threshold_joints": 0.2,
+        "boundary_threshold_deg": 8.0,
+        "filter_s": 0.2,
+        "persistence_s": 0.5,
+        "maximum_feedback_gap_s": 0.5
+      },
+      "frozen_reference": {
+        "metadata": {
+          "width": 6,
+          "method": "nominal geometry plus frozen residual",
+          "calibrated_widths": [
+            6,
+            8
+          ],
+          "transferred": false,
+          "online_learning": false
+        },
+        "calibrations": {
+          "6": {
+            "values": [
+              [
+                0.15833807751140405,
+                -0.06707766383423497,
+                15.790626070439448
+              ],
+              [
+                0.24920276274168796,
+                0.02536057701555894,
+                12.395211690197813
+              ],
+              [
+                0.3734541008434089,
+                0.16845054934214154,
+                7.62153022032187
+              ],
+              [
+                0.46378255925176504,
+                0.3253755415483619,
+                3.199743136734469
+              ],
+              [
+                0.5073863314267077,
+                0.4513296148095325,
+                0.9978033754624366
+              ],
+              [
+                0.5223977266067124,
+                0.5125031733178709,
+                0.8439353914176058
+              ],
+              [
+                0.39561665739814167,
+                0.3747303690784296,
+                -1.0122521644161462
+              ],
+              [
+                0.37505650923980927,
+                0.2605016598342882,
+                2.3391707944094295
+              ],
+              [
+                0.2993804563979765,
+                0.09126427422450512,
+                6.112216197237271
+              ],
+              [
+                0.14734398772633384,
+                -0.0703727243346286,
+                9.45566373288018
+              ],
+              [
+                0.0013173140603726097,
+                -0.16453627632445222,
+                11.938442674644946
+              ],
+              [
+                -0.06634367647607498,
+                -0.2061481609866309,
+                11.69737589944446
+              ],
+              [
+                -0.03201483675658423,
+                -0.17334666333776294,
+                10.126628677912105
+              ],
+              [
+                0.094737682550603,
+                -0.06629309598288913,
+                7.279149714181012
+              ],
+              [
+                0.24696620944067682,
+                0.0957196623174319,
+                3.6334985715118986
+              ],
+              [
+                0.3704103527859024,
+                0.27905585980702163,
+                0.5598734460687046
+              ],
+              [
+                0.4310940894138815,
+                0.3936009166417138,
+                -1.4012551228543793
+              ],
+              [
+                0.4575229058899257,
+                0.4695048988132493,
+                -0.3977261241876268
+              ],
+              [
+                0.4680110247611182,
+                0.4439960793038127,
+                2.098362837401867
+              ],
+              [
+                0.460983373691235,
+                0.33745983417685643,
+                6.004498340048969
+              ],
+              [
+                0.4195904217878894,
+                0.1743310317474167,
+                10.402662608307672
+              ],
+              [
+                0.31802774120819066,
+                0.013682720649617508,
+                14.091099107139492
+              ],
+              [
+                0.21647529307361868,
+                -0.07238521748343807,
+                16.925851990920634
+              ],
+              [
+                0.14392091508250182,
+                -0.0988697887929968,
+                17.241840646977693
+              ]
+            ],
+            "metadata": {
+              "source": "validation/reports/angle_observer/whole_body_observer_trace.jsonl.gz",
+              "stage": "shared no_force prefix; first full commanded cycle only",
+              "samples": 524,
+              "start_time_s": 2.1999999999998687,
+              "end_time_s": 12.659999999998423,
+              "phase_span_rad": 6.275999999999921,
+              "start_phase_rad": 0.0,
+              "bins": 24,
+              "bin_counts": [
+                21,
+                22,
+                22,
+                22,
+                22,
+                21,
+                23,
+                22,
+                21,
+                22,
+                22,
+                22,
+                22,
+                21,
+                22,
+                22,
+                22,
+                22,
+                22,
+                21,
+                22,
+                22,
+                22,
+                22
+              ],
+              "first_joint": 8,
+              "calibration_window": [
+                8,
+                13
+              ],
+              "link_lengths_m": [
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645
+              ],
+              "adaptation": "frozen offline; no online learning",
+              "fields": [
+                "angle-only crest relative to window center",
+                "angle bending center relative to window center",
+                "tail minus head passive-boundary absolute turns"
+              ],
+              "unused_inputs": [
+                "contact",
+                "root pose",
+                "gravity truth",
+                "motor torque",
+                "side-pull labels"
+              ]
+            }
+          },
+          "8": {
+            "values": [
+              [
+                -0.6570665260128861,
+                -0.5265259979957095,
+                -1.3146355254500173
+              ],
+              [
+                -0.6028652118794033,
+                -0.4631916158970686,
+                -1.3526659035445499
+              ],
+              [
+                -0.49921537171850794,
+                -0.3406073039009714,
+                -2.1491573806117783
+              ],
+              [
+                -0.4186763809658025,
+                -0.20296725017434092,
+                -4.6355452357763625
+              ],
+              [
+                -0.39157326688499516,
+                -0.04010396200467703,
+                -8.450767539914994
+              ],
+              [
+                -0.41416288823033387,
+                0.05076215598159539,
+                -11.693360524739553
+              ],
+              [
+                -0.43698910304997707,
+                0.06327629957845549,
+                -13.278122318298301
+              ],
+              [
+                -0.46404746245798734,
+                0.023273998431257326,
+                -13.727317063303389
+              ],
+              [
+                -0.5047603114825412,
+                -0.0660861634572365,
+                -12.969561031143986
+              ],
+              [
+                -0.5741496298787379,
+                -0.18958092255968317,
+                -10.715228067873472
+              ],
+              [
+                -0.6924622596224399,
+                -0.3609726670296567,
+                -7.0138700336612825
+              ],
+              [
+                -0.7374358237686716,
+                -0.47028177498347734,
+                -3.5719283120227763
+              ],
+              [
+                -0.7092689899273159,
+                -0.4813457162493986,
+                -1.5686128401228594
+              ],
+              [
+                -0.6268196662237662,
+                -0.408838463467041,
+                -0.2140931251314856
+              ],
+              [
+                -0.5274004460417085,
+                -0.2970778418678135,
+                -0.21680187819838714
+              ],
+              [
+                -0.43514876602542785,
+                -0.14816722207897115,
+                -3.5986461159757313
+              ],
+              [
+                -0.42671510821487146,
+                -0.008928153233595637,
+                -7.95426406007654
+              ],
+              [
+                -0.44749373619845745,
+                0.04954940841145472,
+                -11.052050022685007
+              ],
+              [
+                -0.4733382201678813,
+                0.057012452947115655,
+                -13.08963584279277
+              ],
+              [
+                -0.5053410770785813,
+                0.02117847437030651,
+                -13.71947502752245
+              ],
+              [
+                -0.5556567108796804,
+                -0.06726650754962016,
+                -13.322533530589425
+              ],
+              [
+                -0.6653805089619276,
+                -0.22632471749949268,
+                -10.713674478597168
+              ],
+              [
+                -0.8090300706248659,
+                -0.3992724243285739,
+                -7.242202381307166
+              ],
+              [
+                -0.8735685407734213,
+                -0.4929743462334386,
+                -4.710881953080088
+              ]
+            ],
+            "metadata": {
+              "width": 8,
+              "source": "calibration_20261013_081414_692753",
+              "control_feedback_period_s": 0.2,
+              "phase_interval_rad": [
+                0.0,
+                6.283185307179586
+              ],
+              "fields": [
+                "crest",
+                "same-winding bending",
+                "same-winding tail minus head boundary"
+              ],
+              "link_lengths_m": [
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645,
+                0.0645
+              ],
+              "adaptation": "frozen first cycle; next cycle held out"
+            }
+          }
+        }
+      },
+      "gravity_assumption": "qualified long passive end; otherwise strong intrinsic bending only",
+      "position_definition": "conditional gravity crest with same-winding corroboration",
+      "inputs": [
+        "angles_deg",
+        "phase_rad",
+        "enabled",
+        "feedback_time_s"
+      ]
+    },
+    "automatic": true,
+    "count_observation": {
+      "valid": true,
+      "time_s": 88.600000000059,
+      "window": [
+        7,
+        12
+      ],
+      "raw_count_joints": 5.8873663553881785,
+      "actual_body_circle": {
+        "radius_m": 0.11216092648940515,
+        "circle_rms_m": 0.00829271171993191,
+        "turn_deg": 182.37891962542588
+      },
+      "nominal_body_circle": {
+        "radius_m": 0.11491192992063626,
+        "circle_rms_m": 0.008037700339280206,
+        "turn_deg": 179.8977555959217
+      },
+      "phase_statistics": {
+        "ready": true,
+        "phase_period_rad": 3.141592653589793,
+        "group_sample_counts": [
+          7,
+          7,
+          7,
+          6
+        ],
+        "group_count_medians": [
+          5.790902368156344,
+          5.933084433867837,
+          5.748110096453455,
+          5.8209448745108165
+        ],
+        "group_turn_medians_deg": [
+          184.1592135267924,
+          181.2112310984317,
+          185.84024100383408,
+          180.97721871909602
+        ],
+        "balanced_count_joints": 5.823260443247113,
+        "balanced_turn_deg": 183.04697608703856,
+        "maximum_group_count_joints": 5.933084433867837,
+        "represented_phase_span_rad": 3.1200000000001182,
+        "new_samples": 27,
+        "observes_contact": false
+      },
+      "observes_support": false,
+      "observes_pipe_radius": false
+    },
+    "stable_width_whitelist": null,
+    "preferred_count": null,
+    "controller_revision": "phase_balanced_count_v2"
+  },
+  "hardware_run": false,
+  "termination_reason": "whole_body_exit_and_one_cycle",
+  "post_exit_cycles": 1.3750987083140278,
+  "preferred_count": null,
+  "stable_width_whitelist": null,
+  "frozen_references": {
+    "6": {
+      "values": [
+        [
+          0.15833807751140405,
+          -0.06707766383423497,
+          15.790626070439448
+        ],
+        [
+          0.24920276274168796,
+          0.02536057701555894,
+          12.395211690197813
+        ],
+        [
+          0.3734541008434089,
+          0.16845054934214154,
+          7.62153022032187
+        ],
+        [
+          0.46378255925176504,
+          0.3253755415483619,
+          3.199743136734469
+        ],
+        [
+          0.5073863314267077,
+          0.4513296148095325,
+          0.9978033754624366
+        ],
+        [
+          0.5223977266067124,
+          0.5125031733178709,
+          0.8439353914176058
+        ],
+        [
+          0.39561665739814167,
+          0.3747303690784296,
+          -1.0122521644161462
+        ],
+        [
+          0.37505650923980927,
+          0.2605016598342882,
+          2.3391707944094295
+        ],
+        [
+          0.2993804563979765,
+          0.09126427422450512,
+          6.112216197237271
+        ],
+        [
+          0.14734398772633384,
+          -0.0703727243346286,
+          9.45566373288018
+        ],
+        [
+          0.0013173140603726097,
+          -0.16453627632445222,
+          11.938442674644946
+        ],
+        [
+          -0.06634367647607498,
+          -0.2061481609866309,
+          11.69737589944446
+        ],
+        [
+          -0.03201483675658423,
+          -0.17334666333776294,
+          10.126628677912105
+        ],
+        [
+          0.094737682550603,
+          -0.06629309598288913,
+          7.279149714181012
+        ],
+        [
+          0.24696620944067682,
+          0.0957196623174319,
+          3.6334985715118986
+        ],
+        [
+          0.3704103527859024,
+          0.27905585980702163,
+          0.5598734460687046
+        ],
+        [
+          0.4310940894138815,
+          0.3936009166417138,
+          -1.4012551228543793
+        ],
+        [
+          0.4575229058899257,
+          0.4695048988132493,
+          -0.3977261241876268
+        ],
+        [
+          0.4680110247611182,
+          0.4439960793038127,
+          2.098362837401867
+        ],
+        [
+          0.460983373691235,
+          0.33745983417685643,
+          6.004498340048969
+        ],
+        [
+          0.4195904217878894,
+          0.1743310317474167,
+          10.402662608307672
+        ],
+        [
+          0.31802774120819066,
+          0.013682720649617508,
+          14.091099107139492
+        ],
+        [
+          0.21647529307361868,
+          -0.07238521748343807,
+          16.925851990920634
+        ],
+        [
+          0.14392091508250182,
+          -0.0988697887929968,
+          17.241840646977693
+        ]
+      ],
+      "metadata": {
+        "source": "validation/reports/angle_observer/whole_body_observer_trace.jsonl.gz",
+        "stage": "shared no_force prefix; first full commanded cycle only",
+        "samples": 524,
+        "start_time_s": 2.1999999999998687,
+        "end_time_s": 12.659999999998423,
+        "phase_span_rad": 6.275999999999921,
+        "start_phase_rad": 0.0,
+        "bins": 24,
+        "bin_counts": [
+          21,
+          22,
+          22,
+          22,
+          22,
+          21,
+          23,
+          22,
+          21,
+          22,
+          22,
+          22,
+          22,
+          21,
+          22,
+          22,
+          22,
+          22,
+          22,
+          21,
+          22,
+          22,
+          22,
+          22
+        ],
+        "first_joint": 8,
+        "calibration_window": [
+          8,
+          13
+        ],
+        "link_lengths_m": [
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645
+        ],
+        "adaptation": "frozen offline; no online learning",
+        "fields": [
+          "angle-only crest relative to window center",
+          "angle bending center relative to window center",
+          "tail minus head passive-boundary absolute turns"
+        ],
+        "unused_inputs": [
+          "contact",
+          "root pose",
+          "gravity truth",
+          "motor torque",
+          "side-pull labels"
+        ]
+      }
+    },
+    "8": {
+      "values": [
+        [
+          -0.6570665260128861,
+          -0.5265259979957095,
+          -1.3146355254500173
+        ],
+        [
+          -0.6028652118794033,
+          -0.4631916158970686,
+          -1.3526659035445499
+        ],
+        [
+          -0.49921537171850794,
+          -0.3406073039009714,
+          -2.1491573806117783
+        ],
+        [
+          -0.4186763809658025,
+          -0.20296725017434092,
+          -4.6355452357763625
+        ],
+        [
+          -0.39157326688499516,
+          -0.04010396200467703,
+          -8.450767539914994
+        ],
+        [
+          -0.41416288823033387,
+          0.05076215598159539,
+          -11.693360524739553
+        ],
+        [
+          -0.43698910304997707,
+          0.06327629957845549,
+          -13.278122318298301
+        ],
+        [
+          -0.46404746245798734,
+          0.023273998431257326,
+          -13.727317063303389
+        ],
+        [
+          -0.5047603114825412,
+          -0.0660861634572365,
+          -12.969561031143986
+        ],
+        [
+          -0.5741496298787379,
+          -0.18958092255968317,
+          -10.715228067873472
+        ],
+        [
+          -0.6924622596224399,
+          -0.3609726670296567,
+          -7.0138700336612825
+        ],
+        [
+          -0.7374358237686716,
+          -0.47028177498347734,
+          -3.5719283120227763
+        ],
+        [
+          -0.7092689899273159,
+          -0.4813457162493986,
+          -1.5686128401228594
+        ],
+        [
+          -0.6268196662237662,
+          -0.408838463467041,
+          -0.2140931251314856
+        ],
+        [
+          -0.5274004460417085,
+          -0.2970778418678135,
+          -0.21680187819838714
+        ],
+        [
+          -0.43514876602542785,
+          -0.14816722207897115,
+          -3.5986461159757313
+        ],
+        [
+          -0.42671510821487146,
+          -0.008928153233595637,
+          -7.95426406007654
+        ],
+        [
+          -0.44749373619845745,
+          0.04954940841145472,
+          -11.052050022685007
+        ],
+        [
+          -0.4733382201678813,
+          0.057012452947115655,
+          -13.08963584279277
+        ],
+        [
+          -0.5053410770785813,
+          0.02117847437030651,
+          -13.71947502752245
+        ],
+        [
+          -0.5556567108796804,
+          -0.06726650754962016,
+          -13.322533530589425
+        ],
+        [
+          -0.6653805089619276,
+          -0.22632471749949268,
+          -10.713674478597168
+        ],
+        [
+          -0.8090300706248659,
+          -0.3992724243285739,
+          -7.242202381307166
+        ],
+        [
+          -0.8735685407734213,
+          -0.4929743462334386,
+          -4.710881953080088
+        ]
+      ],
+      "metadata": {
+        "width": 8,
+        "source": "calibration_20261013_081414_692753",
+        "control_feedback_period_s": 0.2,
+        "phase_interval_rad": [
+          0.0,
+          6.283185307179586
+        ],
+        "fields": [
+          "crest",
+          "same-winding bending",
+          "same-winding tail minus head boundary"
+        ],
+        "link_lengths_m": [
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645,
+          0.0645
+        ],
+        "adaptation": "frozen first cycle; next cycle held out"
+      }
+    }
+  }
+}

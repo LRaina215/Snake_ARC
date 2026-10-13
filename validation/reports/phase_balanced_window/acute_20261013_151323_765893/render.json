@@ -1,0 +1,21 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\phase_balanced_window\\acute_20261013_151323_765893.mp4",
+  "frames": 420,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    41.95999999999291
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    15.179999999997015,
+    15.219999999997015,
+    30.78000000001466,
+    30.82000000001466,
+    2.859999999999796,
+    8.200000000000895,
+    41.95999999999291
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}

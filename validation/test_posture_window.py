@@ -48,6 +48,7 @@ class PostureWindowTests(unittest.TestCase):
         self.assertFalse(c.phase_hold)
         self.assertEqual(c.last_gate['shared_preload_jump_rad'], 0.)
         self.assertFalse(c.last_gate['unloading_observed'])
+        self.assertEqual(c.count_history.summary()['new_samples'], 0)
 
 
 if __name__ == '__main__':

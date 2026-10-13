@@ -3,6 +3,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gzip
+import argparse
+import importlib.util
 import json
 import numpy as np
 from snake_control.adaptive_arc_length import HalfArcParameters
@@ -14,7 +16,23 @@ from validation.posture_window_experiment import REPORT
 def replay(folder):
     status = json.loads((folder/'status.json').read_text(encoding='utf8'))
     refs = {int(w): PhaseShapeReference.from_dict(r) for w, r in status['frozen_references'].items()}
-    c = PostureWindow(HalfArcParameters(**status['parameters']), [.0645]*21, refs, feedback_period_s=.2)
+    cls = PostureWindow
+    revision = status['final_controller'].get('controller_revision')
+    archived_root = Path(__file__).resolve().parents[1]/'validation/reports/phase_balanced_window'
+    if revision in ('posture_boundaries_v1', 'phase_balanced_count_v2'):
+        directory = archived_root/('before_phase_balance' if revision == 'posture_boundaries_v1' else 'before_return_repair')
+        archived = directory/'posture_window.py'
+        spec = importlib.util.spec_from_file_location('snake_control.recorded_'+revision, archived)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        if revision == 'phase_balanced_count_v2':
+            helper_spec = importlib.util.spec_from_file_location('snake_control.recorded_phase_v2', directory/'phase_balanced_count.py')
+            helper = importlib.util.module_from_spec(helper_spec)
+            helper_spec.loader.exec_module(helper)
+            module.PhaseBalancedCount = helper.PhaseBalancedCount
+        cls = module.PostureWindow
+    c = cls(HalfArcParameters(**status['parameters']), [.0645]*21, refs, feedback_period_s=.2)
     frames, target_error, phase_error, mask_errors = 0, 0., 0., 0
     with gzip.open(folder/'actual_trace.jsonl.gz', 'rt', encoding='utf8') as stream:
         for line in stream:
@@ -35,8 +53,11 @@ def replay(folder):
 
 
 if __name__ == '__main__':
-    result = [replay(p.parent) for p in sorted(REPORT.glob('*/status.json'))]
-    (REPORT/'input_replay.json').write_text(json.dumps(result, indent=2), encoding='utf8')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--report', type=Path, default=REPORT)
+    folder = parser.parse_args().report
+    result = [replay(p.parent) for p in sorted(folder.glob('*/status.json'))]
+    (folder/'input_replay.json').write_text(json.dumps(result, indent=2), encoding='utf8')
     print(json.dumps(result))
     if not all(r['passed'] for r in result):
         raise SystemExit(1)

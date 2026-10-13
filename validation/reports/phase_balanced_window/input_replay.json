@@ -1,0 +1,50 @@
+[
+  {
+    "source": "acute_20261013_151323_765893",
+    "control_frames": 2098,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "event_sequence_matches": true,
+    "input_fields": [
+      "angles_deg",
+      "feedback_time_s",
+      "phase_rad",
+      "control_time_s"
+    ],
+    "physics_steps": 0,
+    "passed": true
+  },
+  {
+    "source": "return_20261013_143147_086584",
+    "control_frames": 4435,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "event_sequence_matches": true,
+    "input_fields": [
+      "angles_deg",
+      "feedback_time_s",
+      "phase_rad",
+      "control_time_s"
+    ],
+    "physics_steps": 0,
+    "passed": true
+  },
+  {
+    "source": "return_repair_20261013_145949_538155",
+    "control_frames": 6395,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "event_sequence_matches": true,
+    "input_fields": [
+      "angles_deg",
+      "feedback_time_s",
+      "phase_rad",
+      "control_time_s"
+    ],
+    "physics_steps": 0,
+    "passed": true
+  }
+]

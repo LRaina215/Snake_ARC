@@ -16,20 +16,23 @@ from .motor_feedback_sliding import MotorFeedbackSliding
 from .motor_shape_observer import MotorObserverOptions, bending_features
 from .rolling_shape_observer import RollingShapeObserver
 from .section_geometry import forward, local_section
+from .phase_balanced_count import PhaseBalancedCount
 
 
 @dataclass(frozen=True)
 class PostureWindowOptions:
-    count_hysteresis_joints: float = .65
-    expansion_turn_deg: float = 175.
-    contraction_turn_deg: float = 185.
+    count_hysteresis_joints: float = .5
+    expansion_turn_error_deg: float = -5.
+    contraction_turn_error_deg: float = 5.
     circle_rms_max_m: float = .012
-    filter_s: float = .5
     persistence_s: float = 1.
     cooldown_s: float = 5.
     trial_grace_s: float = 1.
     trial_review_s: float = 5.
     nominal_joint_margin_rad: float = .01
+    shorter_trial_count_margin_joints: float = .25
+    shorter_trial_turn_error_deg: float = -2.
+    contract_exit_angle_deg: float = 12.
 
 
 def nominal_angles(lengths, window, phase):
@@ -156,6 +159,8 @@ class PostureWindow(MotorFeedbackSliding):
             options=MotorObserverOptions(maximum_feedback_gap_s=2.5*self.feedback_period_s))
         self.observation = None
         self.filtered_count = None
+        self.count_history = PhaseBalancedCount(maximum_feedback_gap_s=2.5*self.feedback_period_s)
+        self.count_observation = None
         self.intent = self.intent_since = None
 
     def _candidate(self, angles, window):
@@ -169,11 +174,14 @@ class PostureWindow(MotorFeedbackSliding):
         except (ValueError, np.linalg.LinAlgError) as exc:
             return dict(window=list(window), eligible=False, reason=str(exc))
 
-    def _select(self, angles, time_s):
+    def _observe_count(self, angles, time_s):
+        """Collect even while a handover, trial or cooldown is in progress."""
         o = self.observation
-        if not o or not o['valid'] or 'down_head' not in o:
-            self.intent = self.intent_since = None
-            self.selection = dict(state='retain_untrusted_shape_or_down', observes_support=False)
+        if not o or tuple(o['current_window']) != self.window:
+            return
+        if not o['valid']:
+            self.count_history.reset()
+            self.count_observation = dict(valid=False, reason='current shape not reliable')
             return
         width = self.window[1]-self.window[0]+1
         q = np.radians(angles)
@@ -184,15 +192,44 @@ class PostureWindow(MotorFeedbackSliding):
         radius_ratio = actual['radius_m']/reference['radius_m']
         turn_ratio = reference['turn_deg']/max(actual['turn_deg'], 1e-8)
         estimated_count = width*.5*(radius_ratio+turn_ratio)
+        if actual['circle_rms_m'] > self.posture_options.circle_rms_max_m:
+            self.count_history.reset()
+            self.count_observation = dict(valid=False, reason='body circle fit not reliable', actual_body_circle=actual)
+            return
+        phase_statistics = self.count_history.update(estimated_count, actual['turn_deg'], self.feedback_phase,
+                                                    self.last_time, reference['turn_deg'])
+        self.filtered_count = phase_statistics['balanced_count_joints']
+        self.count_observation = dict(valid=True, time_s=self.last_time, window=list(self.window),
+            raw_count_joints=estimated_count, actual_body_circle=actual, nominal_body_circle=reference,
+            phase_statistics=phase_statistics, observes_support=False, observes_pipe_radius=False)
+
+    def _select(self, angles, time_s):
+        o, count = self.observation, self.count_observation
+        if not o or not o['valid'] or 'down_head' not in o:
+            self.intent = self.intent_since = None
+            self.selection = dict(state='retain_untrusted_shape_or_down', observes_support=False)
+            return
+        width = self.window[1]-self.window[0]+1
         option = self.posture_options
-        gain = 1-math.exp(-self.feedback_period_s/option.filter_s)
-        self.filtered_count = estimated_count if self.filtered_count is None else self.filtered_count+gain*(estimated_count-self.filtered_count)
-        reliable_circle = actual['circle_rms_m'] <= option.circle_rms_max_m
+        stats = count.get('phase_statistics', {}) if count and count['valid'] else {}
+        ready = stats.get('ready', False)
+        actual = None if not count else count.get('actual_body_circle')
+        reference = None if not count else count.get('nominal_body_circle')
         delta_width = 0
-        if reliable_circle and self.filtered_count >= width+option.count_hysteresis_joints and actual['turn_deg'] <= option.expansion_turn_deg:
+        length_reason = 'multi_phase_coverage_incomplete' if not ready else 'no_persistent_count_error'
+        if ready and self.filtered_count >= width+option.count_hysteresis_joints and stats['balanced_turn_error_deg'] <= option.expansion_turn_error_deg:
             delta_width = 1
-        elif reliable_circle and self.filtered_count <= width-option.count_hysteresis_joints and actual['turn_deg'] >= option.contraction_turn_deg:
-            delta_width = -1
+            length_reason = 'multi_phase_arc_deficit'
+        elif ready:
+            strongly_compact = self.filtered_count <= width-option.count_hysteresis_joints and stats['balanced_turn_error_deg'] >= option.contraction_turn_error_deg
+            shorter_trial = (stats['maximum_group_count_joints'] <= width+option.shorter_trial_count_margin_joints and
+                             stats['balanced_turn_error_deg'] >= option.shorter_trial_turn_error_deg)
+            first, last = self.window
+            can_shorten = any(mechanically_feasible(self.lengths, w, option.nominal_joint_margin_rad)
+                              for w in ((first+1, last), (first, last-1)))
+            if (strongly_compact or shorter_trial) and can_shorten:
+                delta_width = -1
+                length_reason = 'multi_phase_compact_arc' if strongly_compact else 'guarded_adjacent_shorter_trial'
         offset = float(o['filtered_error_joints'])
         sign = 1 if offset > 0 else -1
         bending = o['filtered_feature_error']
@@ -219,12 +256,15 @@ class PostureWindow(MotorFeedbackSliding):
         usable = [c for c in candidates if c['eligible']]
         best = min(usable, key=lambda c: c['score']) if usable else None
         self.selection = dict(state=operation if best else 'retain' if not windows else 'blocked_candidates',
-            current_window=list(self.window), estimated_count_joints=estimated_count,
+            current_window=list(self.window), estimated_count_joints=None if not count else count.get('raw_count_joints'),
             filtered_count_joints=self.filtered_count, actual_body_circle=actual, nominal_body_circle=reference,
+            phase_statistics=stats, length_reason=length_reason,
             migration_direction=migration, conditional_crest_error_joints=offset,
             candidates=candidates, chosen=None if best is None else best['window'],
             observes_pipe_radius=False, observes_support=False)
-        intent = None if best is None else (operation, *best['window'])
+        # A length decision persists across a phase-dependent choice of side.
+        # The fresh candidate and continuity gate decide which side can switch.
+        intent = None if best is None else (operation, width+delta_width) if delta_width else (operation, *best['window'])
         if intent != self.intent:
             self.intent, self.intent_since = intent, time_s
         if intent is not None and time_s-self.intent_since+1e-8 >= option.persistence_s:
@@ -253,7 +293,8 @@ class PostureWindow(MotorFeedbackSliding):
             preview_core = copy.deepcopy(core)
             preview = preview_core.update(q, self.phase, time_s, .02)
             step_deg = float(np.degrees(abs(preview[p.enabled]-preload[p.enabled])).max())
-            compatible = bool(np.max(abs(angles[exiting])) <= self.options.switch_angle_deg) if len(exiting) else abs(math.cos(self.phase) if entering[0] % 2 == 0 else math.sin(self.phase)) <= .1
+            exit_bound = self.posture_options.contract_exit_angle_deg if request['operation'] == 'contract' else self.options.switch_angle_deg
+            compatible = bool(np.max(abs(angles[exiting])) <= exit_bound) if len(exiting) else abs(math.cos(self.phase) if entering[0] % 2 == 0 else math.sin(self.phase)) <= .1
             current_trusted = self.observation is not None and self.observation['valid'] and 'down_head' in self.observation
             evidence = request.get('rollback', False) or current_trusted
             shared = self.enabled & p.enabled
@@ -261,6 +302,7 @@ class PostureWindow(MotorFeedbackSliding):
                 entering_joint=(entering+1).tolist(), exiting_joint=(exiting+1).tolist(),
                 entering_angle_deg=angles[entering].tolist(), exiting_angle_deg=angles[exiting].tolist(),
                 exiting_velocity_deg_s=self.angle_velocity_deg_s[exiting].tolist(),
+                exit_angle_bound_deg=exit_bound,
                 command_open=bool(core._check_goal(preload)[0]), next_command_open=bool(preview_core._check_goal(preview)[0]),
                 next_target_step_deg=step_deg, phase_compatible=compatible, evidence_valid=bool(evidence),
                 shared_preload_jump_rad=float(abs(preload[shared]-self.targets[shared]).max()),
@@ -317,6 +359,8 @@ class PostureWindow(MotorFeedbackSliding):
         if self.resize_fault or (self.fault and not rolling_back):
             kwargs['freeze_targets'] = True
         result = super().advance(angles_deg, feedback_time_s, control_time_s, commanded_phase_rad, **kwargs)
+        if self.fresh_feedback:
+            self._observe_count(np.asarray(angles_deg), control_time_s)
         self._review_trial(np.asarray(angles_deg), control_time_s)
         if (self.automatic and self.fresh_feedback and self.pending is None and self.trial is None and
                 control_time_s >= self.cooldown_until and not self.fault and not self.resize_fault and
@@ -333,6 +377,7 @@ class PostureWindow(MotorFeedbackSliding):
                       resize_fault=self.resize_fault, posture_options=asdict(self.posture_options),
                       observer_configuration=self.observer.configuration(),
                       automatic=self.automatic,
+                      count_observation=copy.deepcopy(self.count_observation),
                       stable_width_whitelist=None, preferred_count=None,
-                      controller_revision='posture_boundaries_v1')
+                      controller_revision='phase_normalized_count_v3')
         return result

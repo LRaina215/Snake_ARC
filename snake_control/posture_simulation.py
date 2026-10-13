@@ -10,7 +10,8 @@ class PostureSimulation(MotorFeedbackSimulation):
     def __init__(self, parameters, references, scene, start_x):
         ArcSimulation.__init__(self, scene, parameters, start_x)
         self.lengths = np.asarray(parameters.mechanical_lengths_m)
-        radius = .055 if scene == 'elbow90_taper110_210' else .0565
+        route = self.model.numeric('pipe_centerline').data.reshape(-1, 4)
+        radius = .055 if scene == 'elbow90_taper110_210' else float(np.interp(start_x, route[:, 0], route[:, 3]))
         self.data.qpos[2] += radius-.0565
         mujoco.mj_forward(self.model, self.data)
         self.controller = PostureWindow(parameters, self.lengths, references, feedback_period_s=.2)

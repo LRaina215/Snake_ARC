@@ -28,7 +28,8 @@ def load(path):
 
 def audit(path):
     # Reuse the full actual body/pipe/torque audit, replace its old 6/8 verdict.
-    base_audit.REPORT = REPORT
+    report_folder = path.parent
+    base_audit.REPORT = report_folder
     with contextlib.redirect_stdout(io.StringIO()):
         base_audit.audit(path)
     status = json.loads((path/'status.json').read_text(encoding='utf8'))
@@ -109,6 +110,11 @@ def audit(path):
     continuation = summary['post_last_change_cycles'] >= 1.
     if status['case'] == 'straight':
         passed = basic and review['strict_pipe_pass'] and continuation and sum(e['operation'] == 'slide' for e in changes) >= 2
+    elif status['case'] == 'return':
+        expansions = [e for e in changes if e['operation'] == 'expand']
+        contractions = [e for e in changes if e['operation'] == 'contract']
+        expand_then_contract = expansions and any(e['time_s'] > expansions[0]['time_s'] for e in contractions)
+        passed = basic and review['strict_pipe_pass'] and continuation and (summary['continuous_exit_cycles'] or 0.) >= 1. and expand_then_contract
     else:
         passed = basic and continuation and (summary['continuous_exit_cycles'] or 0.) >= 1. and any(e['operation'] in ('expand', 'contract') for e in changes)
     for key in ('resize_pass', 'completed_widths', 'resize_mechanism_pass', 'exit_duration_pass'):
@@ -120,7 +126,7 @@ def audit(path):
                   complete_single_pipe_axis_validation=review['strict_pipe_pass'],
                   supports_measured_in_controller=False)
     (path/'review.json').write_text(json.dumps(review, indent=2), encoding='utf8')
-    (REPORT/(status['case']+'_review.json')).write_text(json.dumps(review, indent=2), encoding='utf8')
+    (report_folder/(status['case']+'_review.json')).write_text(json.dumps(review, indent=2), encoding='utf8')
     with gzip.open(path/'position_review.jsonl.gz', 'wt', encoding='utf8') as stream:
         for o in observed: stream.write(json.dumps(o)+'\n')
     print(json.dumps({k: v for k, v in review.items() if k != 'summary'}))
