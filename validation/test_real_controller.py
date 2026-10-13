@@ -242,6 +242,7 @@ class RealControllerTests(unittest.TestCase):
             return SimpleNamespace(stop=lambda: None, join=lambda timeout: None)
         with tempfile.TemporaryDirectory() as folder:
             with patch.object(real, 'PORT', None), patch.object(real, 'DRY_RUN', False), \
+                 patch.object(real, 'SHOW_PREVIEW', False), \
                  patch.object(real, 'SAVE_LOG', True), patch.object(real, 'LOG_DIRECTORY', Path(folder)), \
                  patch.object(serial.tools.list_ports, 'comports', return_value=[
                      SimpleNamespace(device='COM9', description='USB-SERIAL CH340')]), \

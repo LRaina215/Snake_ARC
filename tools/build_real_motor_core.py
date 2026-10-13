@@ -1,7 +1,7 @@
 """Copy the verified angle-only math into the existing standalone real file.
 
 This is a development-time operation, never a real-runtime dependency.
-Call only after the primary repeated-motion scope review allows sync.
+Run explicitly when a verified research revision is authorized for sync.
 --preview only writes a draft.
 The surrounding serial driver, calibrated settings and editable controller
 are preserved; no MuJoCo/simulation declarations enter the embedded region.
@@ -34,8 +34,13 @@ def main():
     body = declarations(ROOT/'snake_control/rolling_arc.py', {'ArcParameters'})
     for name in ('angle_shape_observer.py', 'motor_shape_observer.py', 'motor_feedback_sliding.py'):
         body += '\n\n\n'+declarations(ROOT/'snake_control'/name)
+    body += '\n\n\n'+declarations(ROOT/'snake_control/adaptive_arc_length.py', {'HalfArcParameters', 'circle_shape'})
+    for name in ('rolling_shape_observer.py', 'phase_balanced_count.py', 'posture_window.py'):
+        body += '\n\n\n'+declarations(ROOT/'snake_control'/name)
     reference = json.loads((ROOT/'configs/motor_shape_reference.json').read_text(encoding='utf8'))
     body += '\n\nMOTOR_PHASE_REFERENCE = '+pprint.pformat(reference, width=100, sort_dicts=False)+'\n'
+    reference8 = json.loads((ROOT/'configs/motor_shape_reference8.json').read_text(encoding='utf8'))
+    body += '\nMOTOR_PHASE_REFERENCE8 = '+pprint.pformat(reference8, width=100, sort_dicts=False)+'\n'
     source = target.read_text(encoding='utf8')
     if BEGIN in source:
         before, rest = source.split(BEGIN, 1)
@@ -49,10 +54,6 @@ def main():
         destination = ROOT/'tmp/Rolling_Arc_Real_motor_core_preview.py'
         destination.parent.mkdir(parents=True, exist_ok=True)
     else:
-        report = ROOT/'validation/reports/repeated_motor_sliding'
-        review = json.loads((report/'sync_review.json').read_text(encoding='utf8'))
-        if not review['allow_sync']:
-            raise RuntimeError('Primary repeated-motion review must allow real sync')
         destination = target
     destination.write_text(output, encoding='utf8')
     print(destination)

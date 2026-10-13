@@ -26,13 +26,13 @@ MotorFeedbackSliding = real.MotorFeedbackSliding
 
 
 # ==================== 1. 手动测试参数 ====================
-SCENE = 'straight'              # straight / bend90 / elbow90 / taper_true90 / elbow90_taper110_210
+SCENE = 'straight'              # straight / bend90 / elbow90 / taper_true90 / elbow90_taper110_210 / length_taper_return
 START_X_M = -.5                 # 弯管常用-.35，急弯常用-.25
 SIM_FIRST_JOINT = real.FIRST_JOINT  # 本轮偏置搭管实验设5 / 10，不修改实机文件
 SIM_LAST_JOINT = real.LAST_JOINT
 SIM_AMPLITUDE_DEG = 60.0         # 与本轮冻结基准一致；独立于用户的实机幅值调试
 SIM_OMEGA_RAD_S = .6
-SLIDING_FEEDBACK = 'motor_angles'  # motor_angles：新角度滑窗；contact：原接触反馈版本
+SLIDING_FEEDBACK = 'motor_angles'  # motor_angles：自动位置+数量；contact：历史固定宽度接触版本
 SAVE_LOG = True
 LOG_DIRECTORY = Path(__file__).resolve().parent / 'logs'
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 800
@@ -44,7 +44,7 @@ PUSH_DOWNWARD_RATIO = 1.0        # 水平向外+向下拉；0时只水平拉，�
 SIM_HELP = '''MuJoCo新增操作：
   Ctrl+1 / 2 / 3：基础圆弧 / 固定截面顺应 / 滑动窗口截面顺应
   Ctrl+A / D：按住拉动左(-Y) / 右(+Y)悬垂端；松开字母或Ctrl即停止
-  Ctrl+[ / ]：扰动总力减小 / 增大；Ctrl+W：自动选窗开/关（仅滑动模式）
+  Ctrl+[ / ]：扰动总力减小 / 增大；Ctrl+W：自动移窗与扩缩开/关（仅滑动模式）
   Ctrl+R：明确结束当前试验，重建初始预览；不是连续运动中的位姿修正
 窗口外头/尾关节数是使能窗口的分布，不等于实际接触/悬垂关节数。
 默认滑动模式仅用实测角和已知相位；接触力只记录用于评价。
@@ -75,6 +75,7 @@ class DebugArcController(real.RollingArcController):
         super().__init__(bus)
         self.session = session
         self.first, self.last = session.sim.p.first_joint, session.sim.p.last_joint
+        self.length_normalized = self.last-self.first+1 != 6
         self.amplitude, self.omega = session.sim.p.amplitude_deg, session.sim.p.omega_rad_s
         self.sliding = None
         self.pending_gait = None
@@ -379,18 +380,32 @@ class MujocoMotorBus:
 
 
 # ==================== 4. 物理场景、端点扰动与记录 ====================
+class ManualArcParameters(ArcParameters):
+    def targets(self, phase):
+        return np.radians(real.joint_angles_deg(phase, self.amplitude_deg, self.first_joint,
+                          self.last_joint, length_normalized=self.last_joint-self.first_joint+1 != 6))
+
+
+def make_manual_simulation(scene, start_x):
+    p = replace(ManualArcParameters.load(ROOT/'configs/step1.json'),
+                joints=real.NUM_JOINTS, first_joint=SIM_FIRST_JOINT, last_joint=SIM_LAST_JOINT,
+                amplitude_deg=SIM_AMPLITUDE_DEG, omega_rad_s=SIM_OMEGA_RAD_S,
+                initial_phase_rad=real.INITIAL_PHASE_RAD, settle_s=real.SETTLE_S)
+    sim = ArcSimulation(scene, p, start_x)
+    if scene in ('length_taper_return', 'elbow90_taper110_210'):
+        route = sim.model.numeric('pipe_centerline').data.reshape(-1, 4)
+        radius = .055 if scene == 'elbow90_taper110_210' else float(np.interp(start_x, route[:, 0], route[:, 3]))
+        sim.data.qpos[2] += radius-.0565  # 只修正初始搭管；控制器不读取管径。
+        mujoco.mj_forward(sim.model, sim.data)
+    return sim
+
+
 class DebugSession:
     """共用基础/固定控制；仿真扩展滑动模式、物理扰动和实际状态记录。"""
     def __init__(self, scene=SCENE, start_x=START_X_M):
         self.start_x = start_x
         real.validate_setup()
-        if SIM_LAST_JOINT-SIM_FIRST_JOINT+1 != 6:
-            raise ValueError('手调仿真初始窗口也需要连续6关节')
-        p = replace(ArcParameters.load(ROOT/'configs/step1.json'),
-                    joints=real.NUM_JOINTS, first_joint=SIM_FIRST_JOINT, last_joint=SIM_LAST_JOINT,
-                    amplitude_deg=SIM_AMPLITUDE_DEG, omega_rad_s=SIM_OMEGA_RAD_S,
-                    initial_phase_rad=real.INITIAL_PHASE_RAD, settle_s=real.SETTLE_S)
-        self.sim = ArcSimulation(scene, p, start_x)
+        self.sim = make_manual_simulation(scene, start_x)
         lengths = np.linalg.norm(np.diff(backbone(self.sim.model, self.sim.data), axis=0), axis=1)
         if not np.allclose(lengths, real.LINK_LENGTHS_M, atol=1e-8):
             raise ValueError('当前模型骨架与实机代码LINK_LENGTHS_M不同，请先核对机械尺寸')
@@ -456,11 +471,7 @@ class DebugSession:
                       targets=self.controller.targets.copy(), enabled=self.controller.enabled.copy())
         self.record_event('reset_episode', previous_state=before)
         self.controller.release()
-        p = replace(ArcParameters.load(ROOT/'configs/step1.json'),
-                    joints=real.NUM_JOINTS, first_joint=SIM_FIRST_JOINT, last_joint=SIM_LAST_JOINT,
-                    amplitude_deg=SIM_AMPLITUDE_DEG, omega_rad_s=SIM_OMEGA_RAD_S,
-                    initial_phase_rad=real.INITIAL_PHASE_RAD, settle_s=real.SETTLE_S)
-        self.sim = ArcSimulation(self.sim.scene, p, self.start_x)
+        self.sim = make_manual_simulation(self.sim.scene, self.start_x)
         self.bus = MujocoMotorBus(self.sim)
         self._configure_perturbation()
         fresh = DebugArcController(self.bus, self)
@@ -599,7 +610,12 @@ class DebugViewer:
         elif isinstance(c.sliding, MotorFeedbackSliding):
             o = slider['observation']
             cycle = 'waiting motor angles' if o is None else f"{o['state']} offset={o.get('filtered_error_joints', float('nan')):+.2f}"
-            handover = 'geometric trial hold' if slider['phase_hold'] else 'waiting zero phase' if slider['pending'] else 'none'
+            selection = slider.get('selection') or {}
+            estimate = selection.get('filtered_count_joints')
+            count = '-' if estimate is None else f'{estimate:.2f}'
+            cycle += f" | {selection.get('state', 'collecting')} count~{count}"
+            pending = slider['pending']
+            handover = f"{pending.get('operation', 'slide')} -> {pending['to']} (rolling)" if pending else 'none'
         else:
             center = slider['cycle_support_center_joint']
             cycle = f'J{center:.2f}' if center is not None else f"collecting {slider['load_observation_phase_rad']:.1f}/6.3 rad"
@@ -612,7 +628,7 @@ class DebugViewer:
         observation_label = 'Motor shape observer' if isinstance(c.sliding, MotorFeedbackSliding) else 'Cycle load center'
         left = 'Gait\nMode\nWindow\nOutside joints\nPhase\nPhysics\nTime\nPull\nSide displacement\n'+observation_label+'\nHandover'
         right = (f'{gait}{" -> "+c.pending_gait if c.pending_gait else ""}\n{c.mode}'
-                 f'\nJ{c.first}-J{c.last}\nHead:{c.first-1}  Tail:{real.NUM_JOINTS-c.last}'
+                 f'\nJ{c.first}-J{c.last} ({sum(c.enabled)} enabled)\nHead:{c.first-1}  Tail:{real.NUM_JOINTS-c.last}'
                  f'\n{c.phase:.3f} rad'
                  f'\n{"running" if self.session.physics_started else "initial preview; Ctrl+U"}'
                  f'\n{sim.data.time:.2f} s'
