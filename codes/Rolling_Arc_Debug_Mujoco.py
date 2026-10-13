@@ -330,7 +330,7 @@ class DebugArcController(real.RollingArcController):
         print(f'滑动窗口截面顺应 | {label} | J{self.first}–J{self.last} | phase={self.phase:.4f}rad | '
               f'omega={self.omega:g}rad/s | 自动={self.sliding.automatic} | '
               f'交接保持={self.sliding.phase_hold}', flush=True)
-        print(f'截面K={self.options.gain:g} yielding={self.options.yielding:g} | '
+        print(f'实测截面直接顺应 K={self.options.gain:g} | '
               f'半圆预算={180*self.sliding.budget_scale:g}° | '
               f'{self.sliding.selection_reason} | 阻塞原因={self.section_block_reason or "无"}', flush=True)
         if include_feedback:

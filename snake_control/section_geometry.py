@@ -152,7 +152,8 @@ def continuous_section(points, gamma_min=math.pi*.01, original=False):
             if a>b: add(a-b,0,0,i,kind)
             add(radius*abs(turn),radius,turn,i,kind)
             if b>a: add(b-a,0,0,i,kind)
-    add(lengths[-1]/2,0,0,len(points)-2,'end')
+    # The tail half-link is a separate module after the final interior joint.
+    add(lengths[-1]/2,0,0,len(points)-1,'end')
     return result
 
 

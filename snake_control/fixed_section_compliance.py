@@ -2,9 +2,9 @@
 
 2023 ingredients: measured shape, line/arc section, length-preserving local
 radius/turn deformation, module normalization and Yamada integration.
-Open-arc extensions: zero spatial twist reference, reconstruction calibration,
-bounded correction and total-turn/opening constraints. This is not the original
-full-helix controller, nor the previous paired-joint amplitude proxy.
+Local adaptation: zero spatial twist, active-window boundary lengths and global
+joint parity. Targets come directly from the measured section, without a
+nominal-arc restoring term. Shape checks never substitute a nominal target.
 """
 from dataclasses import dataclass,asdict
 import math
@@ -15,7 +15,7 @@ from .section_geometry import local_section, sample_section
 @dataclass(frozen=True)
 class SectionOptions:
     gain: float = .02
-    yielding: float = .7
+    yielding: float = .7  # Legacy configuration field; ignored by measured-section control.
     geometry_period_s: float = .05
     target_rate_deg_s: float = 45.
     target_filter_s: float = .15
@@ -25,7 +25,7 @@ class SectionOptions:
     def __post_init__(self):
         if not all(math.isfinite(v) for v in asdict(self).values()):
             raise ValueError('Nonfinite parameter')
-        if not 0 <= self.gain < .2 or not 0 <= self.yielding < 1:
+        if not 0 <= self.gain < .2:
             raise ValueError('Invalid compliance gain')
         if min(self.geometry_period_s, self.target_rate_deg_s, self.target_filter_s) <= 0:
             raise ValueError('Geometry period, rate limit and filter time must be positive')
@@ -79,7 +79,6 @@ class FixedSectionCompliance:
         self.previous_axis = None
         self.geometry = None
         self.target_geometry = None
-        self.reference_geometry = None
         self.last_goal = None
         self.next_geometry_s = 0.
         self.status = 'initializing'
@@ -96,6 +95,8 @@ class FixedSectionCompliance:
             geometry['total_turn'] <= math.radians(self.options.maximum_section_turn_deg) + 1e-8
             and gap >= self.options.minimum_gap_fraction
         )
+        if getattr(self.p, 'manual_tuning', False):
+            valid = True  # DIY只记录形态，不按研究阈值拒绝目标。
         return valid, geometry
 
     def update(self, measured, phase, time_s, dt, reference_targets=None):
@@ -103,6 +104,8 @@ class FixedSectionCompliance:
 
         Only self.enabled is driven by the adapter. Passive entries carry the
         measured angles so that later geometry checks use the actual boundary.
+        reference_targets is accepted for old callers but deliberately ignored:
+        an initial/nominal arc must not restore or replace measured geometry.
         """
         measured = np.asarray(measured)
         if self.targets is None:
@@ -111,47 +114,27 @@ class FixedSectionCompliance:
             self.next_geometry_s = time_s + self.options.geometry_period_s
             self.updates += 1
             geometry = local_section(measured, self.lengths, self.first, self.last, self.previous_axis)
-            reference = measured.copy()
-            nominal_targets = self.p.targets(phase) if reference_targets is None else np.asarray(reference_targets)
-            if nominal_targets.shape != measured.shape or not np.isfinite(nominal_targets).all():
-                raise ValueError('Invalid external open-arc reference')
-            reference[self.enabled] = nominal_targets[self.enabled]
-            ref_geometry = local_section(reference, self.lengths, self.first, self.last)
-            self.geometry, self.reference_geometry = geometry, ref_geometry
+            self.geometry = geometry
             self.previous_axis = geometry['axis']
             links = self.lengths[self.first-1:self.last+2]
             observed, _ = yamada_section(
                 geometry['curve'], links, self.first, self.count, phase,
                 self.options.gain, self.p.direction,
             )
-            nominal, _ = yamada_section(
-                ref_geometry['curve'], links, self.first, self.count, phase,
-                direction=self.p.direction,
-            )
-            goal = reference.copy()
-            # Calibrate the inverse approximation on the SAME phase/reference.
-            # Thus an exact reference observation with K=0 gives exact Step1.
-            goal[self.enabled] += self.options.yielding * (observed - nominal)
-            goal[self.enabled] = np.clip(goal[self.enabled], -math.pi/2 + .01, math.pi/2 - .01)
+            # Reference repository: deform the ACTUAL section at constant arc
+            # length, integrate its curvature, and use those angles directly.
+            goal = measured.copy()
+            goal[self.enabled] = observed
+            if not getattr(self.p, 'manual_tuning', False):
+                goal[self.enabled] = np.clip(goal[self.enabled], -math.pi/2 + .01, math.pi/2 - .01)
             valid, goal_geometry = self._check_goal(goal)
             if not valid:
                 self.clipped += 1
-                # Search only the proposed correction, never actuate passive joints.
-                lower, upper = 0., 1.
-                for _ in range(8):
-                    fraction = (lower + upper) / 2
-                    candidate = reference + fraction * (goal - reference)
-                    if self._check_goal(candidate)[0]:
-                        lower = fraction
-                    else:
-                        upper = fraction
-                goal = reference + lower * (goal - reference)
-                valid, goal_geometry = self._check_goal(goal)
             self.last_goal, self.target_geometry = goal, goal_geometry
-            self.status = 'running' if valid else 'reference constraint infeasible'
+            self.status = 'running' if valid else 'measured-section target outside opening'
         # Hold the candidate between geometry updates; filter it at every
         # physics/control tick. The next geometry update uses the new phase.
-        if self.last_goal is not None:
+        if self.last_goal is not None and self.status == 'running':
             filter_gain = 1 - math.exp(-dt / self.options.target_filter_s)
             delta = filter_gain * (self.last_goal - self.targets)
             limit = math.radians(self.options.target_rate_deg_s) * dt
@@ -167,6 +150,7 @@ class FixedSectionCompliance:
         circle=np.linalg.lstsq(np.column_stack([2*xy,np.ones(len(xy))]),np.sum(xy*xy,axis=1),rcond=None)[0]
         radius=math.sqrt(max(0,circle[2]+circle[:2]@circle[:2]))
         return dict(status=self.status,window=[self.first,self.last],geometry_updates=self.updates,
+                    control_law='direct_measured_section', nominal_restoring=False,
                     constrained_updates=self.clipped,fit_rms_m=g['fit_rms'],
                     measured_section_turn_deg=math.degrees(g['total_turn']),
                     target_section_turn_deg=math.degrees(self.target_geometry['total_turn']),

@@ -142,8 +142,13 @@ class MotorFeedbackSliding:
             raise ValueError('Finite, nonfuture feedback/control times required')
         if self.last_time is not None and feedback_time_s < self.last_time:
             raise ValueError('Motor-feedback time cannot run backwards')
-        if self.last_control_time is not None and control_time_s <= self.last_control_time:
-            raise ValueError('Control clock must increase')
+        if self.last_control_time is not None and control_time_s < self.last_control_time:
+            raise ValueError('Control clock cannot run backwards')
+        if self.last_control_time == control_time_s:
+            # A duplicate timestamp has no elapsed time. Do not invent dt,
+            # feedback, phase progress or another window transaction.
+            self.fresh_feedback = False
+            return self.targets.copy(), self.enabled.copy()
         if control_time_s-feedback_time_s > self.options.maximum_feedback_age_s:
             raise TimeoutError('Motor angles too old for sliding control')
         dt = .02 if self.last_control_time is None else min(.02, control_time_s-self.last_control_time)

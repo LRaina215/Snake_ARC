@@ -1,0 +1,26 @@
+{
+  "baseline_commit": "0caf90b",
+  "old_duplicate_clock_error": "Control clock must increase",
+  "nominal_amplitude_dependency_max_rad": {
+    "before": 0.34387390158433184,
+    "after": 0.0
+  },
+  "clocks": {
+    "monotonic": {
+      "implementation": "GetTickCount64()",
+      "monotonic": true,
+      "adjustable": false,
+      "resolution": 0.015625
+    },
+    "perf_counter": {
+      "implementation": "QueryPerformanceCounter()",
+      "monotonic": true,
+      "adjustable": false,
+      "resolution": 1e-07
+    }
+  },
+  "offline_checks_passed": 5,
+  "reference_goal_tolerance_rad": 2e-14,
+  "new_dynamics": 0,
+  "hardware_connections": 0
+}

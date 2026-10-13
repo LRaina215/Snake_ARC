@@ -52,7 +52,6 @@ OMEGA_KEY_STEP_RAD_S = 0.05     # Ctrl+右/左：角频率增加/减小
 
 # 固定截面顺应：调实机主要改这里；原始负载/电流不作为控制输入。
 COMPLIANCE_GAIN = 0.02          # 连续截面长度不变的曲率偏置，不是舵机PD增益
-SECTION_YIELDING = 0.7          # 实际形状反馈权重；保持小于1，保留名义恢复参考
 SECTION_GEOMETRY_PERIOD_S = .05 # 最短50 ms；20 ms循环通常量化为60 ms，使用最近角反馈
 SECTION_TARGET_FILTER_S = .15
 SECTION_MAX_TURN_DEG = 190.0    # 发送目标的截面转角上限
@@ -121,7 +120,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
 控制台输入后回车：apply / step / back / run / pause / hold / reverse
                   compliance / gait_basic / gait_fixed / gait_sliding / window_auto
                   release / status / help / quit
-参数：amplitude=60 omega=0.6 delta=0.1 window=8:13 gain=0.02 yielding=0.7 filter=0.15
+参数：amplitude=60 omega=0.6 delta=0.1 window=8:13 gain=0.02 filter=0.15
 window只在release后修改；自动滑窗只用全20关节角、采样时间和已知相位。
 DIY_PARAMETERS=True时三模式均可调幅值/频率，滑窗采用当前参数几何参考。
 关闭DIY才使用60度/0.6/正向冻结标定；移窗不等于已观测到支撑或卸载。
@@ -553,7 +552,8 @@ def continuous_section(points, gamma_min=math.pi*.01, original=False):
             if a>b: add(a-b,0,0,i,kind)
             add(radius*abs(turn),radius,turn,i,kind)
             if b>a: add(b-a,0,0,i,kind)
-    add(lengths[-1]/2,0,0,len(points)-2,'end')
+    # The tail half-link is a separate module after the final interior joint.
+    add(lengths[-1]/2,0,0,len(points)-1,'end')
     return result
 
 
@@ -587,7 +587,7 @@ def local_section(q,lengths,first,last,previous=None, method='plane'):
 @dataclass(frozen=True)
 class SectionOptions:
     gain: float = .02
-    yielding: float = .7
+    yielding: float = .7  # Legacy configuration field; ignored by measured-section control.
     geometry_period_s: float = .05
     target_rate_deg_s: float = 45.
     target_filter_s: float = .15
@@ -597,7 +597,7 @@ class SectionOptions:
     def __post_init__(self):
         if not all(math.isfinite(v) for v in asdict(self).values()):
             raise ValueError('Nonfinite parameter')
-        if not 0 <= self.gain < .2 or not 0 <= self.yielding < 1:
+        if not 0 <= self.gain < .2:
             raise ValueError('Invalid compliance gain')
         if min(self.geometry_period_s, self.target_rate_deg_s, self.target_filter_s) <= 0:
             raise ValueError('Geometry period, rate limit and filter time must be positive')
@@ -651,7 +651,6 @@ class FixedSectionCompliance:
         self.previous_axis = None
         self.geometry = None
         self.target_geometry = None
-        self.reference_geometry = None
         self.last_goal = None
         self.next_geometry_s = 0.
         self.status = 'initializing'
@@ -669,7 +668,7 @@ class FixedSectionCompliance:
             and gap >= self.options.minimum_gap_fraction
         )
         if getattr(self.p, 'manual_tuning', False):
-            valid = True  # DIY仍计算/显示截面，但不按研究形态阈值拒绝目标。
+            valid = True  # DIY只记录形态，不按研究阈值拒绝目标。
         return valid, geometry
 
     def update(self, measured, phase, time_s, dt, reference_targets=None):
@@ -677,6 +676,8 @@ class FixedSectionCompliance:
 
         Only self.enabled is driven by the adapter. Passive entries carry the
         measured angles so that later geometry checks use the actual boundary.
+        reference_targets is accepted for old callers but deliberately ignored:
+        an initial/nominal arc must not restore or replace measured geometry.
         """
         measured = np.asarray(measured)
         if self.targets is None:
@@ -685,48 +686,27 @@ class FixedSectionCompliance:
             self.next_geometry_s = time_s + self.options.geometry_period_s
             self.updates += 1
             geometry = local_section(measured, self.lengths, self.first, self.last, self.previous_axis)
-            reference = measured.copy()
-            nominal_targets = self.p.targets(phase) if reference_targets is None else np.asarray(reference_targets)
-            if nominal_targets.shape != measured.shape or not np.isfinite(nominal_targets).all():
-                raise ValueError('Invalid external open-arc reference')
-            reference[self.enabled] = nominal_targets[self.enabled]
-            ref_geometry = local_section(reference, self.lengths, self.first, self.last)
-            self.geometry, self.reference_geometry = geometry, ref_geometry
+            self.geometry = geometry
             self.previous_axis = geometry['axis']
             links = self.lengths[self.first-1:self.last+2]
             observed, _ = yamada_section(
                 geometry['curve'], links, self.first, self.count, phase,
                 self.options.gain, self.p.direction,
             )
-            nominal, _ = yamada_section(
-                ref_geometry['curve'], links, self.first, self.count, phase,
-                direction=self.p.direction,
-            )
-            goal = reference.copy()
-            # Calibrate the inverse approximation on the SAME phase/reference.
-            # Thus an exact reference observation with K=0 gives exact Step1.
-            goal[self.enabled] += self.options.yielding * (observed - nominal)
+            # Reference repository: deform the ACTUAL section at constant arc
+            # length, integrate its curvature, and use those angles directly.
+            goal = measured.copy()
+            goal[self.enabled] = observed
             if not getattr(self.p, 'manual_tuning', False):
                 goal[self.enabled] = np.clip(goal[self.enabled], -math.pi/2 + .01, math.pi/2 - .01)
             valid, goal_geometry = self._check_goal(goal)
             if not valid:
                 self.clipped += 1
-                # Search only the proposed correction, never actuate passive joints.
-                lower, upper = 0., 1.
-                for _ in range(8):
-                    fraction = (lower + upper) / 2
-                    candidate = reference + fraction * (goal - reference)
-                    if self._check_goal(candidate)[0]:
-                        lower = fraction
-                    else:
-                        upper = fraction
-                goal = reference + lower * (goal - reference)
-                valid, goal_geometry = self._check_goal(goal)
             self.last_goal, self.target_geometry = goal, goal_geometry
-            self.status = 'running' if valid else 'reference constraint infeasible'
+            self.status = 'running' if valid else 'measured-section target outside opening'
         # Hold the candidate between geometry updates; filter it at every
         # physics/control tick. The next geometry update uses the new phase.
-        if self.last_goal is not None:
+        if self.last_goal is not None and self.status == 'running':
             filter_gain = 1 - math.exp(-dt / self.options.target_filter_s)
             delta = filter_gain * (self.last_goal - self.targets)
             limit = math.radians(self.options.target_rate_deg_s) * dt
@@ -742,6 +722,7 @@ class FixedSectionCompliance:
         circle=np.linalg.lstsq(np.column_stack([2*xy,np.ones(len(xy))]),np.sum(xy*xy,axis=1),rcond=None)[0]
         radius=math.sqrt(max(0,circle[2]+circle[:2]@circle[:2]))
         return dict(status=self.status,window=[self.first,self.last],geometry_updates=self.updates,
+                    control_law='direct_measured_section', nominal_restoring=False,
                     constrained_updates=self.clipped,fit_rms_m=g['fit_rms'],
                     measured_section_turn_deg=math.degrees(g['total_turn']),
                     target_section_turn_deg=math.degrees(self.target_geometry['total_turn']),
@@ -773,7 +754,7 @@ class SectionReference:
 
 
 def make_section_options():
-    return SectionOptions(gain=COMPLIANCE_GAIN, yielding=SECTION_YIELDING,
+    return SectionOptions(gain=COMPLIANCE_GAIN,
         geometry_period_s=SECTION_GEOMETRY_PERIOD_S, target_rate_deg_s=MAX_TARGET_RATE_DEG_S,
         target_filter_s=SECTION_TARGET_FILTER_S, maximum_section_turn_deg=SECTION_MAX_TURN_DEG,
         minimum_gap_fraction=SECTION_MIN_GAP_FRACTION)
@@ -1348,8 +1329,13 @@ class MotorFeedbackSliding:
             raise ValueError('Finite, nonfuture feedback/control times required')
         if self.last_time is not None and feedback_time_s < self.last_time:
             raise ValueError('Motor-feedback time cannot run backwards')
-        if self.last_control_time is not None and control_time_s <= self.last_control_time:
-            raise ValueError('Control clock must increase')
+        if self.last_control_time is not None and control_time_s < self.last_control_time:
+            raise ValueError('Control clock cannot run backwards')
+        if self.last_control_time == control_time_s:
+            # A duplicate timestamp has no elapsed time. Do not invent dt,
+            # feedback, phase progress or another window transaction.
+            self.fresh_feedback = False
+            return self.targets.copy(), self.enabled.copy()
         if control_time_s-feedback_time_s > self.options.maximum_feedback_age_s:
             raise TimeoutError('Motor angles too old for sliding control')
         dt = .02 if self.last_control_time is None else min(.02, control_time_s-self.last_control_time)
@@ -2337,12 +2323,14 @@ class RollingArcController:
         self.section_block_reason, self.actual_section = None, None
         self.sliding, self.pending_gait = None, None
         self.sliding_fault = False
-        self.motor_clock_origin_s = time.monotonic()
+        self.motor_clock_origin_s = time.perf_counter()
+        self.feedback_motor_clock_s = None
         self.feedback_phase_rad = self.command_phase
         self.preview_feedback = False
 
     def refresh_compliance_feedback(self):
         started = time.monotonic()
+        sample_clock = time.perf_counter()  # 最早读角时刻，与控制时刻共用高精度计时器
         acquisition_phase = self.command_phase  # 扫读期间控制线程不改相位
         states = self.bus.read_states()
         if time.monotonic()-started > MAX_FEEDBACK_AGE_S:
@@ -2352,15 +2340,14 @@ class RollingArcController:
             raise RuntimeError('全关节位置反馈不完整或不是有限值')
         self.states = states
         self.last_feedback = {i: state['angle_deg'] for i, state in states.items()}
+        self.feedback_motor_clock_s = sample_clock-self.motor_clock_origin_s
         self.feedback_wall_s = started  # 顺序扫读，按最早样本计龄
         self.feedback_phase_rad = acquisition_phase
         self.feedback_sequence += 1
 
     def motor_sample_clock(self):
         """控制时间/最早反馈时间共用单调时钟；MuJoCo子类改用仿真时钟。"""
-        now = time.monotonic()-self.motor_clock_origin_s
-        sample = None if self.feedback_wall_s is None else self.feedback_wall_s-self.motor_clock_origin_s
-        return now, sample
+        return time.perf_counter()-self.motor_clock_origin_s, self.feedback_motor_clock_s
 
     def section_reference(self):
         """扩缩后切回基础/固定模式，继续使用当前长度的半圆参考。"""
@@ -2402,10 +2389,6 @@ class RollingArcController:
         if kind == 'fixed':
             reference = self.section_reference()
             core = FixedSectionCompliance(reference, LINK_LENGTHS_M, self.options)
-            nominal = np.radians(measured)
-            nominal[core.enabled] = reference.targets(self.phase)[core.enabled]
-            if not core._check_goal(nominal)[0]:
-                raise ValueError('当前名义参考不满足开放约束，未切换')
             core.targets = np.radians(self.targets)
             core.next_geometry_s = self.section_clock_s
             self.sliding, self.compliance = None, core
@@ -2459,6 +2442,11 @@ class RollingArcController:
             raise TimeoutError('自动滑窗全关节反馈已过期，结束运行并尝试失能')
         measured = np.asarray(self.measured_angles(), float)
         if self.sliding_fault:
+            self.bus.send_targets(self.targets, self.enabled)
+            return
+        if slider.last_control_time == control_time:
+            # 同时刻重复调用（例如暂停的仿真）：不消耗单步相位、不重复交接。
+            slider.fresh_feedback = False
             self.bus.send_targets(self.targets, self.enabled)
             return
         self.section_clock_s += dt
@@ -2569,10 +2557,6 @@ class RollingArcController:
         if not valid:
             raise ValueError('实测固定窗口不是有效开放圆弧，未开启顺应：'+str(geometry))
         core = FixedSectionCompliance(reference, LINK_LENGTHS_M, self.options)
-        nominal = np.radians(measured)
-        nominal[core.enabled] = reference.targets(self.phase)[core.enabled]
-        if not core._check_goal(nominal)[0]:
-            raise ValueError('当前幅值的名义参考不满足开放约束，未开启顺应')
         core.targets = np.radians(self.targets)  # 保留最近发送目标，软接入反馈
         core.next_geometry_s = self.section_clock_s
         self.compliance = core
@@ -2614,7 +2598,7 @@ class RollingArcController:
             target = self.compliance.update(np.radians(measured), self.phase, self.section_clock_s, dt)
             valid_command = self.compliance._check_goal(target)[0]
             if self.compliance.status != 'running' or not valid_command:
-                raise ValueError('名义参考或过滤后发送目标不满足开放约束')
+                raise ValueError('实测截面生成的目标不满足开放约束')
             targets = np.degrees(target).tolist()
             for i, active in enumerate(self.enabled):
                 if active:
@@ -2674,7 +2658,7 @@ class RollingArcController:
                     raise ValueError('自动滑窗使用60度缩放/0.6正向相位参考；改幅值/频率/窗口先切回基础模式')
         amplitude, omega, delta = self.amplitude, self.omega, self.phase_step
         first, last, options = self.first, self.last, self.options
-        option_keys = {'gain': 'gain', 'yielding': 'yielding', 'filter': 'target_filter_s'}
+        option_keys = {'gain': 'gain', 'filter': 'target_filter_s'}
         for assignment in command.split():
             key, value = assignment.split('=', 1)
             if key == 'amplitude':
@@ -2685,10 +2669,12 @@ class RollingArcController:
                 delta = float(value)
             elif key == 'window':
                 first, last = map(int, value.split(':'))
+            elif key == 'yielding':
+                raise ValueError('yielding恢复权重已取消；顺应直接使用实测截面，只需调整gain/filter')
             elif key in option_keys:
                 options = replace(options, **{option_keys[key]: float(value)})
             else:
-                raise ValueError('参数：amplitude omega delta window gain yielding filter；本版不用support/load')
+                raise ValueError('参数：amplitude omega delta window gain filter；本版不用support/load')
         validate_parameters(amplitude, omega, first, last)
         normalized = last-first+1 != 6 if self.mode == 'released' else self.length_normalized
         validate_arc_reference(amplitude, omega, first, last, normalized)
@@ -2698,9 +2684,6 @@ class RollingArcController:
             raise ValueError('手动修改window前先release')
         if self.compliance is not None:
             reference = replace(self.compliance.p, amplitude_deg=amplitude)
-            # 半圆预算随amplitude/60缩放；保留既有保守参考上限。
-            if not DIY_PARAMETERS and 3*amplitude > options.maximum_section_turn_deg:
-                raise ValueError('该幅值使名义半圆参考超过截面开放上限')
         if amplitude != self.amplitude and self.mode != 'released' and self.compliance is None:
             self.forming, self.settle_remaining = True, SETTLE_S
         self.amplitude, self.omega, self.phase_step = amplitude, omega, delta
@@ -2870,7 +2853,7 @@ class RollingArcController:
               f'omega={self.omega:g}rad/s | phase={self.phase:.4f}rad | delta={self.phase_step:g}rad', flush=True)
         if self.compliance is not None:
             window_state = '窗口固定' if self.sliding is None else f'自动选窗={self.sliding.automatic} 等相位={self.sliding.phase_hold}'
-            print(f'截面K={self.options.gain:g} yielding={self.options.yielding:g} | '
+            print(f'实测截面直接顺应 K={self.options.gain:g} | '
                   f'{window_state} | 阻塞原因={self.section_block_reason or "无"}', flush=True)
         if self.sliding is not None and self.sliding.observation is not None:
             o = self.sliding.observation
