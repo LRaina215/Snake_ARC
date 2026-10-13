@@ -2,7 +2,7 @@
 
 直接运行本文件，自动查找CH340串口；所有实验配置在文件顶部修改。
 DRY_RUN=True时使用内存串口，不连接机器人；日志自动保存在本文件旁的logs目录。
-默认启动只读全身预览；显示实测角、使能和算法候选，估计上下方向，不测世界位置或水平朝向。
+默认启动只读预览；正视由关节重建的局部截面，显示全身实测角、使能和算法候选。
 Ctrl+U 形成圆弧，Ctrl+J/H 正/反单步，Ctrl+G 连续/暂停，Ctrl+X 全部失能。
 Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动移窗与数量自适应。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
@@ -27,7 +27,6 @@ BAUD_RATE = 115200
 DRY_RUN = False                # False：真实机器人；True：内存串口演练，不打开设备
 SAVE_LOG = True                # 自动保存实测角、目标、使能与模式；每次运行生成新文件
 SHOW_PREVIEW = True            # 随实机脚本启动全身构型窗口；关闭窗口不停止控制
-PREVIEW_GRAVITY_ALIGN = True    # 双侧重力代理对齐；窗口按钮可切回头部坐标
 PREVIEW_PERIOD_S = .2          # 独立进程刷新，绘图不占用串口控制循环
 LOG_DIRECTORY = Path(__file__).resolve().parent / 'logs'  # 不依赖终端/IDE工作目录
 NUM_JOINTS = 20
@@ -2992,7 +2991,7 @@ def preview_payload(controller):
 
 
 class JointPreviewFigure:
-    """实测/目标骨架与使能；可选双侧重力对齐，始终没有世界定位输入。"""
+    """正视控制器由关节重建的截面平面；所有曲线共用实测截面坐标。"""
     def __init__(self):
         import matplotlib.pyplot as plt
         plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'DejaVu Sans']
@@ -3007,18 +3006,9 @@ class JointPreviewFigure:
         self.header = self.figure.suptitle('等待实测角度；预览不会使能或驱动舵机', fontsize=12)
         self.note = self.figure.text(.04, .04, '', fontsize=10, va='bottom')
         self.figure.subplots_adjust(left=.05, right=.97, top=.88, bottom=.24, wspace=.24, hspace=.65)
-        self.section_horizontal = None
-        from matplotlib.widgets import Button
-        self.gravity = DualEndGravityPreview(LINK_LENGTHS_M)
-        self.gravity_align = PREVIEW_GRAVITY_ALIGN
+        self.section_origin = self.section_basis = None
+        self.smooth_display = {}
         self.latest_row = None
-        self.view_button = Button(self.figure.add_axes([.79, .93, .16, .035]), 'Gravity / Head')
-        self.view_button.on_clicked(self.toggle_view)
-
-    def toggle_view(self, _event):
-        self.gravity_align = not self.gravity_align
-        if self.latest_row is not None:
-            self.update(self.latest_row)
 
     def update(self, row):
         self.latest_row = row
@@ -3046,92 +3036,12 @@ class JointPreviewFigure:
             shift = sum(candidate)-sum(window)
             direction = '向头端' if shift < 0 else '向尾端' if shift > 0 else '中心不变'
             direction += f' → J{candidate[0]}–J{candidate[1]}'
-        gravity = self.gravity.result
-        sample_time = row.get('gravity_time_s', row['feedback_wall_s'])
-        if row['angles_deg'] is not None and sample_time is not None and not stale:
-            if self.gravity.last_time is not None and sample_time < self.gravity.last_time:
-                self.gravity = DualEndGravityPreview(row['lengths'])  # 仿真明确重置为新episode。
-                self.section_horizontal = None
-            gravity = self.gravity.update(row['angles_deg'], window, sample_time)
-        aligned = self.gravity_align and gravity['basis'] is not None
-        states = {'dual': '双侧融合', 'single_degraded': '单侧补充（降级）', 'conflict_hold': '双侧冲突，保留方向',
-                  'unobservable_hold': '无可信悬垂段，保留方向', 'reacquiring': '重新获取', 'waiting': '等待悬垂参考'}
-        view_label = '重力对齐' if aligned else '头部坐标'
-        gravity_label = '反馈陈旧' if stale else states[gravity['state']]
-        self.note.set_text(f'{view_label}截面 | {gravity_label}；折线：实测 / 已发目标。\n'
+        self.note.set_text('关节重建截面平面；目标与实测共用实测截面坐标。\n'
             f"自动={row['automatic']} | 决策={decision} {direction} | 数量估计={count_text}\n"
             f"状态：{row['block_reason'] or ', '.join(row['reasons']) or '正常'}；关闭此窗口不停止控制，Ctrl+X失能。")
         if row['angles_deg'] is not None:
-            points = forward(np.radians(row['angles_deg']), row['lengths'])
-            target = forward(np.radians(row['target_deg']), row['lengths'])
-            up = -np.array(gravity['down_head']) if aligned else np.array([0., 0., 1.])
-            # 用实测圆弧的水平展宽确定含Z轴的截面；目标共用投影，不单独对齐掩盖误差。
-            arc = points[window[0]:window[1]+2]
-            centered = arc-arc.mean(axis=0)
-            flat = centered-np.outer(centered@up, up)
-            values, vectors = np.linalg.eigh(flat.T@flat)
-            horizontal = vectors[:, -1]
-            previous = self.section_horizontal
-            if values[-1] < 1e-10 or values[-1]-values[-2] < values[-1]*.05:
-                horizontal = previous.copy() if previous is not None else np.eye(3)[np.argmin(abs(up))]
-            horizontal -= (horizontal@up)*up
-            if np.linalg.norm(horizontal) < 1e-8:
-                horizontal = np.eye(3)[np.argmin(abs(up))]; horizontal -= (horizontal@up)*up
-            horizontal /= np.linalg.norm(horizontal)
-            reference = previous if previous is not None else arc[-1]-arc[0]
-            if horizontal@reference < 0:
-                horizontal = -horizontal
-            self.section_horizontal = horizontal
-            projection = np.array([horizontal, up])
-            points, target = points@projection.T, target@projection.T
-            for i in range(NUM_JOINTS+1):
-                colour = colours[max(0, i-1)]
-                self.body.plot(*points[i:i+2].T, color=colour, lw=1.5, alpha=.35 if stale else .65)
-            self.body.plot([], [], color='#147bb5', lw=1.5, label='实测连杆（紫：失能）')
-            self.body.plot(*target.T, '--', color='#e38b27', lw=1.5, label='已发目标连杆')
-            smooth_points, smooth_note = [], '平滑截面：等待控制器更新'
-            section = row.get('smooth_section')
-            self.smooth_display = {}  # 便于离线核对；不传回控制线程。
-            try:
-                if section is None:
-                    # 基础步态没有顺应控制截面，必须标注为同法重建而非控制输入。
-                    section = dict(source='reconstructed', window=window,
-                        measured=preview_section_geometry(local_section(np.radians(row['angles_deg']), row['lengths'], *window)),
-                        candidate=preview_section_geometry(local_section(np.radians(row['target_deg']), row['lengths'], *window)))
-                if list(section['window']) != list(window):
-                    smooth_note = '平滑截面：等待新窗口几何，暂不显示旧窗口曲线'
-                else:
-                    used = section['source'] == 'control'
-                    smooth_note = (f"平滑截面：控制缓存 #{section.get('updates', '?')}；洋红为滤波前候选，橙色折线为已发目标。"
-                                   if used else '平滑截面：同法重建，当前未参与顺应控制。')
-                    for key, color, style, label in (
-                        ('measured', '#008d82', '-', '实测平滑（控制输入）' if used else '实测平滑（重建）'),
-                        ('candidate', '#c33786', '--', '顺应目标平滑（滤波前）' if used else '已发目标平滑（重建）')):
-                        if section.get(key) is not None:
-                            curve = preview_smooth_points(section[key])@projection.T
-                            self.smooth_display[key] = curve
-                            smooth_points.append(curve)
-                            self.body.plot(*curve.T, style, color=color, lw=2.3, alpha=.4 if stale else 1., label=label)
-                    if not smooth_points:
-                        smooth_note = '平滑截面：等待控制器更新'
-            except (ValueError, np.linalg.LinAlgError) as exc:
-                smooth_note = '平滑截面不可用：'+str(exc)
+            smooth_note = self.draw_section(row, colours, stale)
             self.note.set_text(self.note.get_text()+'\n'+smooth_note)
-            self.body.legend(loc='best', fontsize=8)
-            self.body.scatter(*points[1:-1].T, c=colours, s=24)
-            for j, point in enumerate(points[1:-1], 1):
-                self.body.text(*point, str(j), fontsize=8)
-            self.body.text(*points[0], ' HEAD', color='#17354b')
-            self.body.text(*points[-1], ' TAIL', color='#17354b')
-            if candidate:
-                a = points[window[0]:window[1]+2].mean(axis=0)
-                b = points[candidate[0]:candidate[1]+2].mean(axis=0)
-                self.body.annotate('', xy=b, xytext=a, arrowprops=dict(arrowstyle='->', color='#e38b27', lw=2))
-            both = np.concatenate([points, target]+smooth_points)
-            center = (both.min(axis=0)+both.max(axis=0))/2
-            radius = max(.1, float(np.ptp(both, axis=0).max())*.55)
-            self.body.set(xlim=(center[0]-radius, center[0]+radius),
-                          ylim=(center[1]-radius, center[1]+radius))
             self.angles.plot(ids, row['angles_deg'], 'o-', color='#17354b', label='实测')
             active = np.asarray(row['enabled'], bool)
             targets = np.where(active, row['target_deg'], np.nan)
@@ -3141,13 +3051,66 @@ class JointPreviewFigure:
             self.angles.set_title('使能关节最大角差：'+(f'{error.max():.2f}°' if len(error) else '无使能关节'), fontsize=11)
         else:
             self.body.text(.05, .5, '等待全20关节实测角', transform=self.body.transAxes)
-        self.body.set(xlabel='截面横向距离 / m', ylabel='Z 估计竖直高度 / m' if aligned else 'Z 头部坐标 / m',
-                      title='目标 / 实测截面叠加（不显示面外偏差）')
+        self.body.set(xlabel='截面坐标 u / m', ylabel='截面坐标 v / m',
+                      title='正视关节重建截面（局部使能段及边界连杆）')
         self.body.set_aspect('equal', adjustable='box')
         self.body.grid(alpha=.2)
         self.angles.set(ylabel='控制器坐标角度 / °', xticks=ids, ylim=(-100, 100))
         self.angles.grid(alpha=.2)
         self.figure.canvas.draw_idle()
+
+    def draw_section(self, row, colours, stale):
+        """直接使用控制的实测截面平面，不引入重力或另一张侧视平面。"""
+        window = row['window']
+        self.smooth_display = {}
+        self.section_origin = self.section_basis = None
+        section = row.get('smooth_section')
+        try:
+            if section is None:
+                # 基础模式使用完全相同的关节重建方法，明确不是控制缓存。
+                q = np.radians(row['angles_deg'])
+                arc = forward(q, row['lengths'])[window[0]:window[1]+2]
+                if np.linalg.svd(arc-arc.mean(axis=0), compute_uv=False)[1] < 1e-7:
+                    raise ValueError('圆弧尚未形成，不能确定截面平面')
+                section = dict(source='reconstructed', window=window,
+                    measured=preview_section_geometry(local_section(q, row['lengths'], *window)),
+                    candidate=preview_section_geometry(local_section(np.radians(row['target_deg']), row['lengths'], *window)))
+            if list(section['window']) != list(window) or section.get('measured') is None:
+                self.body.text(.08, .5, '等待控制器更新截面', transform=self.body.transAxes)
+                return '平滑截面：等待控制器更新，不使用其他平面替代。'
+            measured = section['measured']
+            self.section_origin = origin = np.array(measured['origin'])
+            self.section_basis = basis = np.array(measured['basis'])
+            # 截面范围与local_section一致：使能段，加两端相邻边界连杆。
+            indices = range(window[0]-1, window[1]+3)
+            points = (forward(np.radians(row['angles_deg']), row['lengths'])-origin)@basis
+            targets = (forward(np.radians(row['target_deg']), row['lengths'])-origin)@basis
+            for i in list(indices)[:-1]:
+                self.body.plot(*points[i:i+2].T, color=colours[max(0, i-1)], lw=1.5, alpha=.35 if stale else .7)
+            self.body.plot([], [], color='#147bb5', lw=1.5, label='实测连杆（紫：失能）')
+            self.body.plot(*targets[list(indices)].T, '--', color='#e38b27', lw=1.5, label='已发目标连杆')
+            self.body.scatter(*points[list(indices)].T, c=[colours[max(0, min(NUM_JOINTS-1, i-1))] for i in indices], s=24)
+            for i in indices:
+                label = f'J{i}' if 1 <= i <= NUM_JOINTS else '端点'
+                self.body.annotate(label, points[i], xytext=(3, 4), textcoords='offset points', fontsize=8)
+            used = section['source'] == 'control'
+            for key, color, style, label in (
+                ('measured', '#008d82', '-', '实测平滑（控制输入）' if used else '实测平滑（重建）'),
+                ('candidate', '#c33786', '--', '顺应目标平滑（滤波前）' if used else '已发目标平滑（重建）')):
+                if section.get(key) is not None:
+                    curve = (preview_smooth_points(section[key])-origin)@basis
+                    self.smooth_display[key] = curve
+                    self.body.plot(*curve.T, style, color=color, lw=2.3, alpha=.4 if stale else 1., label=label)
+            self.body.legend(loc='best', fontsize=8)
+            both = np.concatenate([points[list(indices)], targets[list(indices)]]+list(self.smooth_display.values()))
+            center = (both.min(axis=0)+both.max(axis=0))/2
+            radius = max(.04, float(np.ptp(both, axis=0).max())*.65)
+            self.body.set(xlim=(center[0]-radius, center[0]+radius), ylim=(center[1]-radius, center[1]+radius))
+            return (f"控制实测截面 #{section.get('updates', '?')}；洋红：滤波前候选，橙色：已发目标。"
+                    if used else '平滑截面：同法重建，当前未参与顺应控制。')
+        except (ValueError, np.linalg.LinAlgError) as exc:
+            self.body.text(.08, .5, '等待有效的关节重建截面', transform=self.body.transAxes)
+            return '截面不可用：'+str(exc)
 
 
 def _preview_worker(inbox, stopped, ready):

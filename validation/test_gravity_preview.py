@@ -43,7 +43,7 @@ class GravityPreviewTests(unittest.TestCase):
         self.assertEqual(held['state'],'unobservable_hold')
         self.assertFalse(held['reliable'])
 
-    def test_display_toggle_and_incomplete_feedback_do_not_modify_control(self):
+    def test_reconstructed_plane_display_does_not_modify_control(self):
         path=next((REPORT/'physics').glob('*/actual_trace.jsonl.gz'))
         with gzip.open(path,'rt',encoding='utf8') as f:
             r=next(r for r in map(json.loads,f) if r['time_s']>=8.)
@@ -56,21 +56,18 @@ class GravityPreviewTests(unittest.TestCase):
         figure=real.JointPreviewFigure()
         try:
             figure.update(row)
-            self.assertIsNotNone(figure.gravity.result['basis'])
-            figure.toggle_view(None)
-            self.assertFalse(figure.gravity_align)
-            figure.toggle_view(None)
-            self.assertTrue(figure.gravity_align)
-            stamp=figure.gravity.last_time
+            self.assertIsNotNone(figure.section_basis)
+            basis = figure.section_basis.copy()
             figure.update(row)
-            self.assertEqual(figure.gravity.last_time,stamp)
+            np.testing.assert_allclose(figure.section_basis, basis)
             self.assertEqual((c.enabled,c.targets,c.phase,c.mode),before)
             self.assertFalse(hasattr(bus,'target'))
-            # A stale display frame must not masquerade as a new gravity observation.
+            # Old feedback stays visibly stale; there is no gravity estimator in this view.
             row['feedback_wall_s']=time.monotonic()-2.
             row['gravity_time_s']+=1.
             figure.update(row)
-            self.assertEqual(figure.gravity.last_time,stamp)
+            self.assertIn('陈旧', figure.header.get_text())
+            self.assertFalse(hasattr(figure, 'gravity'))
         finally:
             figure.plt.close(figure.figure)
 

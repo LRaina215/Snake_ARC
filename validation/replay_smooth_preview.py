@@ -23,7 +23,7 @@ from validation.test_repeated_motor_port import AngleBus
 from validation.test_posture_port import references
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT/'validation/reports/smooth_preview'
+REPORT = ROOT/'validation/reports/reconstructed_section_preview'
 
 
 def main(path):
@@ -41,7 +41,7 @@ def main(path):
         c.mode, c.length_normalized, c.touched_hardware = 'hold', True, True
         bus.enabled = p.enabled.copy()
     REPORT.mkdir(parents=True, exist_ok=True)
-    output = ROOT/'validation/results/smooth_preview'; output.mkdir(parents=True, exist_ok=True)
+    output = ROOT/'validation/results/reconstructed_section_preview'; output.mkdir(parents=True, exist_ok=True)
     figure, seen, writer = real.JointPreviewFigure(), set(), None
     summary = dict(source=path.name, control_frames=0, display_frames=0, cached_curve_frames=0,
                    maximum_target_error_rad=0., hardware_connections=0, new_dynamics=0, passed=False)
@@ -92,7 +92,15 @@ def main(path):
                 after = (controllers[0].targets, controllers[0].enabled, controllers[0].phase,
                          real.preview_payload(controllers[0])['smooth_section'], buses[0].target.tolist())
                 assert before == after
-                if core.geometry is not None: assert set(figure.smooth_display) == {'measured', 'candidate'}
+                if core.geometry is not None:
+                    assert set(figure.smooth_display) == {'measured', 'candidate'}
+                    np.testing.assert_allclose(figure.section_basis, core.geometry['axis']['basis'][:, :2], atol=1e-12)
+                    np.testing.assert_allclose(figure.section_origin, core.geometry['axis']['point'], atol=1e-12)
+                    # Crucial: the drawn measured curve IS the controller's 2D section,
+                    # not another plane chosen using gravity or global Z.
+                    np.testing.assert_allclose(figure.smooth_display['measured'], real.sample_section(core.geometry['curve']), atol=1e-12)
+                    candidate_in_measured_plane = (real.preview_smooth_points(payload['smooth_section']['candidate'])-figure.section_origin)@figure.section_basis
+                    np.testing.assert_allclose(figure.smooth_display['candidate'], candidate_in_measured_plane, atol=1e-12)
                 pixels = np.asarray(figure.figure.canvas.buffer_rgba())[:, :, :3]
                 if writer is None:
                     writer = cv2.VideoWriter(str(output/'smooth_section_preview.mp4'), cv2.VideoWriter_fourcc(*'mp4v'),
@@ -109,9 +117,10 @@ def main(path):
         empty['smooth_section'] = None
         figure.update(empty); assert '当前未参与顺应控制' in figure.note.get_text()
         assert set(figure.smooth_display) == {'measured', 'candidate'}
-        figure.toggle_view(None); figure.toggle_view(None)
+        assert not hasattr(figure, 'gravity') and not hasattr(figure, 'view_button')
         summary.update(passed=True, adapter_curve_parity=True, control_curves_match_archive=True,
-                       display_does_not_mutate_control=True, fallback_labels_checked=True)
+                       display_does_not_mutate_control=True, fallback_labels_checked=True,
+                       actual_controller_plane_used=True, displayed_measured_curve_equals_controller_2d=True)
     finally:
         if writer is not None: writer.release()
         figure.plt.close(figure.figure)
