@@ -1,0 +1,28 @@
+{
+  "hardware_run": false,
+  "dynamics_run": false,
+  "observer_existing_record_checks": [
+    {
+      "record": "main_20261014_014331",
+      "samples": 175,
+      "delta_error_rmse_mm": 4.29485530193755,
+      "delta_error_maximum_mm": 10.124375601125307,
+      "input": "actual angles resampled 0.2s; no world inputs"
+    },
+    {
+      "record": "repair_20261014_015043",
+      "samples": 219,
+      "delta_error_rmse_mm": 2.199393647052519,
+      "delta_error_maximum_mm": 7.54805705163486,
+      "input": "actual angles resampled 0.2s; no world inputs"
+    }
+  ],
+  "small_valid_path_replay": {
+    "record": "small_20261014_023006",
+    "samples": 1311,
+    "target_maximum_error_deg": 5.470554052117249e-13,
+    "mask_mismatch_frames": 0,
+    "passed": true,
+    "new_physics": false
+  }
+}

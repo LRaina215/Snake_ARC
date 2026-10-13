@@ -1,0 +1,238 @@
+{
+  "termination": "task_complete",
+  "fault": null,
+  "final_time_s": 26.220000000009062,
+  "statistics": {
+    "steps": 26220,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 209,
+    "floor_contact_steps": 0,
+    "maximum_enabled_count": 7,
+    "minimum_enabled_count": 6,
+    "maximum_shared_target_step_deg": 0.9000000000011017
+  },
+  "baseline_time_s": 6.000000000000338,
+  "requested_transfer_m": -0.0645,
+  "hardware_run": false,
+  "stage_results": [
+    {
+      "stage": "feed_out",
+      "start_s": 6.020000000000345,
+      "end_s": 13.799999999997791,
+      "last_head_change_mm": -71.75594079703896,
+      "last_tail_change_mm": 68.55653480159151,
+      "last_transfer_delta_mm": -70.15623779931524,
+      "true_goal_error_mm": -5.6562377993152335,
+      "true_goal_error_range_mm": [
+        -7.865154102466132,
+        64.50116809270057
+      ],
+      "last_position_joints": -1.226257237722775
+    },
+    {
+      "stage": "review_out",
+      "start_s": 13.81999999999778,
+      "end_s": 15.819999999996671,
+      "last_head_change_mm": -72.6120536422919,
+      "last_tail_change_mm": 75.09721449965912,
+      "last_transfer_delta_mm": -73.85463407097551,
+      "true_goal_error_mm": -9.354634070975504,
+      "true_goal_error_range_mm": [
+        -9.354634070975504,
+        -4.602452387780481
+      ],
+      "last_position_joints": -1.1348078680841875
+    },
+    {
+      "stage": "feed_return",
+      "start_s": 15.83999999999666,
+      "end_s": 24.200000000006593,
+      "last_head_change_mm": 1.672892432499018,
+      "last_tail_change_mm": -6.531360656630181,
+      "last_transfer_delta_mm": 4.1021265445646,
+      "true_goal_error_mm": 4.1021265445646,
+      "true_goal_error_range_mm": [
+        -73.93605383917581,
+        4.145304776406011
+      ],
+      "last_position_joints": 0.18937392605484607
+    },
+    {
+      "stage": "review_return",
+      "start_s": 24.220000000006618,
+      "end_s": 26.200000000009037,
+      "last_head_change_mm": 11.659140941579714,
+      "last_tail_change_mm": -12.280694510688473,
+      "last_transfer_delta_mm": 11.969917726134094,
+      "true_goal_error_mm": 11.969917726134094,
+      "true_goal_error_range_mm": [
+        4.1088130776348315,
+        11.969917726134094
+      ],
+      "last_position_joints": 0.09070332498889974
+    },
+    {
+      "stage": "complete",
+      "start_s": 26.220000000009062,
+      "end_s": 26.220000000009062,
+      "last_head_change_mm": 11.742134435276386,
+      "last_tail_change_mm": -12.344931901164923,
+      "last_transfer_delta_mm": 12.043533168220655,
+      "true_goal_error_mm": 12.043533168220655,
+      "true_goal_error_range_mm": [
+        12.043533168220655,
+        12.043533168220655
+      ],
+      "last_position_joints": 0.08886947762741507
+    }
+  ],
+  "spatial": {
+    "support_point_world_m": {
+      "maximum_displacement_mm": 42.84043201287958,
+      "maximum_absolute_axis_displacement_mm": [
+        2.8240040572652947,
+        40.72741373460471,
+        13.28467633786068
+      ],
+      "final_delta_mm": [
+        -0.14948891470256687,
+        -10.964030302496253,
+        -0.5624084900488491
+      ],
+      "missing_samples": 0
+    },
+    "crown_world_m": {
+      "maximum_displacement_mm": 45.667630295667145,
+      "maximum_absolute_axis_displacement_mm": [
+        0.26886591872732346,
+        45.199694592972804,
+        12.930878673824253
+      ],
+      "final_delta_mm": [
+        -0.22347084832408104,
+        -7.844509471831848,
+        -0.6938488952739075
+      ],
+      "missing_samples": 0
+    },
+    "mean_body_world_m": {
+      "maximum_displacement_mm": 37.954301457908215,
+      "maximum_absolute_axis_displacement_mm": [
+        0.4154747215734389,
+        36.78526093761389,
+        12.821244548604893
+      ],
+      "final_delta_mm": [
+        -0.04199040785468622,
+        -10.99252251042729,
+        0.13931218756435548
+      ],
+      "missing_samples": 0
+    }
+  },
+  "section_turn_deg": {
+    "min": 179.61922404856722,
+    "max": 192.44880925714668
+  },
+  "enabled_gap_fraction": {
+    "min": 0.5138061203888866,
+    "max": 0.6339014705817568
+  },
+  "plane_rms_m": {
+    "min": 1.2379538808570596e-08,
+    "max": 3.924498103032623e-06
+  },
+  "maximum_curvature_per_m": {
+    "min": 18.000716911339705,
+    "max": 21.923883015014418
+  },
+  "support_up_n": {
+    "min": 25.88606326604018,
+    "max": 29.370403557351118
+  },
+  "legacy_enabled_wrap_deg": {
+    "min": 212.66750776662286,
+    "max": 237.64283480020288
+  },
+  "min_z_m": {
+    "min": 0.6375150547755223,
+    "max": 0.6969989667673979
+  },
+  "whole_body_bend": {
+    "positive_turn_deg": {
+      "min": 175.46896001205528,
+      "max": 202.30906434846102
+    },
+    "reverse_turn_deg": {
+      "min": 0.6429066844470734,
+      "max": 21.522694506659025
+    },
+    "pipe_wrap_deg": {
+      "min": 180.14108215431992,
+      "max": 293.41690767472846
+    },
+    "gap_fraction": {
+      "min": 0.37647213197699664,
+      "max": 0.6998436958990798
+    }
+  },
+  "invalid_length_samples": 0,
+  "zero_support_samples": 0,
+  "first_invalid_time_s": null,
+  "bearing_bias_at_limit_s": 14.22,
+  "feedback_aligned_delta_error_mm": {
+    "rmse": 7.1213013081748535,
+    "maximum": 17.345277095324963
+  },
+  "mask_handovers": [
+    {
+      "kind": "mask_handover",
+      "time_s": 6.020000000000345,
+      "entering": [
+        7
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 7,
+      "release_means": "straight_angle_proxy_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 20.32000000000185,
+      "entering": [
+        14,
+        15
+      ],
+      "released": [
+        7,
+        8
+      ],
+      "exit_angles_deg": [
+        0.7647515835177133,
+        -0.00026903897975735086
+      ],
+      "enabled_count": 7,
+      "release_means": "straight_angle_proxy_not_measured_unloading"
+    }
+  ],
+  "phase_max_absolute_rad": 0.0,
+  "external_force_max": 0.0,
+  "all_inputs_angles_only": true,
+  "finite_actual_states": true,
+  "acceptance": {
+    "completed": true,
+    "outbound_sustained_length": true,
+    "return_sustained_length": true,
+    "final_length": false,
+    "open_enabled_section": true,
+    "whole_bend_turn_le218": true,
+    "whole_pipe_wrap_le218": false,
+    "no_floor_or_limits": true,
+    "continuous_support_at_recorded_samples": true,
+    "passive_active_torque_zero": true,
+    "body_axial_displacement_le10mm": true,
+    "all_passed": false
+  }
+}
