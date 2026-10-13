@@ -79,11 +79,11 @@ class PhaseShapeReference:
 
 class MotorShapeObserver:
     """Angle-only corroborated recommendation; cannot operate any actuator."""
-    def __init__(self, lengths, reference, amplitude_deg=60., options=MotorObserverOptions()):
+    def __init__(self, lengths, reference, amplitude_deg=60., options=MotorObserverOptions(), width=6):
         self.lengths = np.asarray(lengths, float)
         self.reference = reference
         self.options = options
-        self.geometry_observer = AngleShapeObserver(lengths, amplitude_deg, ObserverOptions())
+        self.geometry_observer = AngleShapeObserver(lengths, amplitude_deg, ObserverOptions(width=width))
         self.filtered = None
         self.pending_direction = 0
         self.pending_since = None

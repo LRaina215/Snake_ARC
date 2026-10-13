@@ -1,0 +1,67 @@
+{
+  "case": "baseline",
+  "source": "baseline_20261013_081646_022244",
+  "shape_pass": true,
+  "mechanics_pass": true,
+  "strict_pipe_pass": true,
+  "resize_pass": false,
+  "completed_widths": [],
+  "summary": {
+    "samples": 5605,
+    "body_turn_range_deg": [
+      160.10273998916347,
+      187.128585950158
+    ],
+    "minimum_gap": 0.5554664907769388,
+    "maximum_plane_rms_m": 0.008524664477310245,
+    "body_violations": 0,
+    "command_violations": 0,
+    "pipe_unobservable": 0,
+    "pipe_wrap_range_deg": [
+      151.49091287661614,
+      216.82256736164632
+    ],
+    "pipe_violations": 0,
+    "minimum_support_n": 16.506919793254404,
+    "minimum_support_coverage": 0.0,
+    "widths": {
+      "6": 5504
+    },
+    "observation_states": {
+      "none": 10,
+      "retain": 2780,
+      "blocked_candidate_shape": 784,
+      "confirming": 490,
+      "reject_crest_without_bending_migration": 80,
+      "recommend_head": 980,
+      "unobservable": 380
+    },
+    "length_states": {
+      "none": 5504
+    },
+    "displacement_m": [
+      1.8744327535322598,
+      -0.011632446969611153,
+      0.008952955137366825
+    ],
+    "events": [],
+    "statistics_1ms": {
+      "physical_steps": 112080,
+      "passive_torque_max_nm": 0.0,
+      "active_torque_max_nm": 2.355,
+      "joint_limit_excess_max_rad": 0.0,
+      "saturation_joint_steps": 42484,
+      "mask_violation_steps": 0,
+      "floor_contact_steps": 0,
+      "finite": true
+    },
+    "post_exit_cycles": 2.0015325643237505,
+    "continuous_exit_start_s": 94.74000000008832,
+    "continuous_exit_cycles": 1.6558480279281407,
+    "post_last_change_cycles": 10.509955822009054,
+    "orphan_seven_frames": 0
+  },
+  "passed": false,
+  "resize_mechanism_pass": false,
+  "exit_duration_pass": false
+}

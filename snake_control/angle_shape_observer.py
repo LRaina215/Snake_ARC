@@ -148,7 +148,13 @@ class AngleShapeObserver:
     def reference_crest(self, window, phase):
         q = np.zeros(self.n)
         indices = np.arange(window[0] - 1, window[1])
-        q[indices] = self.amplitude * np.where(indices % 2 == 0, math.cos(phase), math.sin(phase))
+        if len(indices) == 6:
+            q[indices] = self.amplitude * np.where(indices % 2 == 0, math.cos(phase), math.sin(phase))
+        else:
+            # Variable-width observers preserve each axis family's half-turn.
+            for parity, factor in ((0, math.cos(phase)), (1, math.sin(phase))):
+                family = indices[indices % 2 == parity]
+                q[family] = math.pi/len(family)*factor
         points = forward(q, self.lengths)
         down, _ = self.infer_down(points, window)
         _, _, section = self.geometry(q, window)
@@ -170,7 +176,7 @@ class AngleShapeObserver:
             raise ValueError('Observer requires fresh, increasing feedback timestamps')
         active = np.flatnonzero(mask)
         if len(active) != self.options.width or np.any(np.diff(active) != 1):
-            raise ValueError('Expected one contiguous six-joint enable mask')
+            raise ValueError('Expected one contiguous enable mask matching observer width')
         window = (int(active[0] + 1), int(active[-1] + 1))
         dt = 0. if self.last_time is None else feedback_time_s - self.last_time
         changed = self.window is not None and window != self.window

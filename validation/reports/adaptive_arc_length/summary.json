@@ -1,0 +1,84 @@
+{
+  "dynamics_attempts": 5,
+  "planned_maximum": 5,
+  "actual_hardware_runs": 0,
+  "all_requested_acceptance_complete": false,
+  "current_user_debug_and_real_entries_updated": false,
+  "cases": [
+    {
+      "source": "adaptive_20261013_081901_624965",
+      "case": "adaptive",
+      "full_pass": false,
+      "shape_pass": true,
+      "mechanics_pass": true,
+      "resize_mechanism_pass": false,
+      "strict_pipe_pass": false,
+      "continuous_exit_cycles": 2.001532564323752,
+      "post_last_change_cycles": 5.99122867774769,
+      "actual_width_chain": [
+        8
+      ],
+      "position_transfers": 0
+    },
+    {
+      "source": "adaptive_repair_20261013_082802_005160",
+      "case": "adaptive",
+      "full_pass": false,
+      "shape_pass": true,
+      "mechanics_pass": true,
+      "resize_mechanism_pass": true,
+      "strict_pipe_pass": true,
+      "continuous_exit_cycles": 1.8009973360279559,
+      "post_last_change_cycles": 4.201690497626196,
+      "actual_width_chain": [
+        8,
+        6
+      ],
+      "position_transfers": 0
+    },
+    {
+      "source": "baseline_20261013_081646_022244",
+      "case": "baseline",
+      "full_pass": false,
+      "shape_pass": true,
+      "mechanics_pass": true,
+      "resize_mechanism_pass": false,
+      "strict_pipe_pass": true,
+      "continuous_exit_cycles": 1.6558480279281407,
+      "post_last_change_cycles": 10.509955822009054,
+      "actual_width_chain": [],
+      "position_transfers": 0
+    },
+    {
+      "source": "calibration_20261013_081414_692753",
+      "case": "calibration",
+      "full_pass": true,
+      "shape_pass": true,
+      "mechanics_pass": true,
+      "resize_mechanism_pass": false,
+      "strict_pipe_pass": true,
+      "continuous_exit_cycles": null,
+      "post_last_change_cycles": null,
+      "actual_width_chain": [],
+      "position_transfers": 0
+    },
+    {
+      "source": "combined_20261013_083240_926004",
+      "case": "combined",
+      "full_pass": false,
+      "shape_pass": true,
+      "mechanics_pass": true,
+      "resize_mechanism_pass": true,
+      "strict_pipe_pass": false,
+      "continuous_exit_cycles": 5.462197646914055,
+      "post_last_change_cycles": 1.6405691533913194,
+      "actual_width_chain": [
+        8,
+        6
+      ],
+      "position_transfers": 3
+    }
+  ],
+  "timing_fix_dynamics_verified": false,
+  "conclusion": "6/8 resizing and serialised migration mechanisms observed; complete exit-duration and sharp-corner pipe-axis validation remain incomplete. No efficiency or diameter-identification claim."
+}

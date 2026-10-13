@@ -1,0 +1,846 @@
+{
+  "source": "combined_20261013_083240_926004",
+  "low_nearest_axis_span_frames": 27,
+  "active_contacts_on_both_axes_frames": 0,
+  "contact_nearest_axis_mismatch_frames": 27,
+  "frames": [
+    {
+      "time_s": 33.42000000001281,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 149.93211804179305,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.440000000012766,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 149.4241419099961,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.46000000001272,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 148.84929521756143,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.48000000001267,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 148.22358429445595,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.500000000012626,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 147.65561279730977,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.52000000001258,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 147.04502571202397,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.54000000001253,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 146.3911845569781,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.56000000001249,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 145.7419979478411,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.58000000001244,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 145.12394104188752,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.60000000001239,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 144.55456273962002,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.62000000001235,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 144.03151178595593,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.6400000000123,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 143.47044750584675,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.66000000001225,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 142.87137106651832,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.68000000001221,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 142.2751125830084,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.70000000001216,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 141.63739284073844,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.720000000012114,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 140.9777867476569,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.74000000001207,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 140.34435600897572,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.76000000001202,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 139.6805906895098,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.780000000011974,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 139.00590736846158,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.80000000001193,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 138.3606431419819,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.82000000001188,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 137.5977967969517,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.840000000011834,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 136.75959265053277,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.86000000001179,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 135.93580756493083,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.88000000001174,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 135.05141958727995,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.900000000011694,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 134.17299038962042,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.92000000001165,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 133.3534284728786,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "time_s": 33.9400000000116,
+      "window": [
+        7,
+        12
+      ],
+      "nearest_axis_span_deg": 132.46886574366061,
+      "nearest_axis_spread_deg": 0.0,
+      "active_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "nearest_axes": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "contact_axis_not_in_nearest": true,
+      "all_robot_contact_axes": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ]
+    }
+  ],
+  "inference": "Nearest-centerline wrap can be ambiguous even before its 90deg axis-spread flag; these alerts alone cannot prove inadequate physical coverage. Full sharp-corner pipe verification remains incomplete."
+}

@@ -1,0 +1,53 @@
+[
+  {
+    "time_s": 24.800000000007326,
+    "old": [
+      8,
+      13
+    ],
+    "new": [
+      7,
+      12
+    ],
+    "true_gravity_crown_offset": -0.537204308927814,
+    "down_error_deg": 0.09540436032422793,
+    "new_support_coverage": 1.0,
+    "exiting_torque_before_nm": [
+      -0.027893795826632352
+    ]
+  },
+  {
+    "time_s": 110.800000000165,
+    "old": [
+      7,
+      12
+    ],
+    "new": [
+      6,
+      11
+    ],
+    "true_gravity_crown_offset": -0.6919684729215861,
+    "down_error_deg": 0.9706251619972452,
+    "new_support_coverage": 0.846956634334375,
+    "exiting_torque_before_nm": [
+      -0.015054144400779953
+    ]
+  },
+  {
+    "time_s": 132.80000000027005,
+    "old": [
+      6,
+      11
+    ],
+    "new": [
+      5,
+      10
+    ],
+    "true_gravity_crown_offset": -0.7883526795959753,
+    "down_error_deg": 1.6312318392903216,
+    "new_support_coverage": 0.9100453614599433,
+    "exiting_torque_before_nm": [
+      -0.025143335062390255
+    ]
+  }
+]

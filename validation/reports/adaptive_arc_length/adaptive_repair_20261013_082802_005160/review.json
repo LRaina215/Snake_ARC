@@ -1,0 +1,337 @@
+{
+  "case": "adaptive",
+  "source": "adaptive_repair_20261013_082802_005160",
+  "shape_pass": true,
+  "mechanics_pass": true,
+  "strict_pipe_pass": true,
+  "resize_pass": false,
+  "completed_widths": [
+    8,
+    6
+  ],
+  "summary": {
+    "samples": 5532,
+    "body_turn_range_deg": [
+      161.43731781383443,
+      189.21459057910792
+    ],
+    "minimum_gap": 0.5554664907769388,
+    "maximum_plane_rms_m": 0.008524664477310245,
+    "body_violations": 0,
+    "command_violations": 0,
+    "pipe_unobservable": 0,
+    "pipe_wrap_range_deg": [
+      152.76078078866968,
+      216.82256736164632
+    ],
+    "pipe_violations": 0,
+    "minimum_support_n": 25.869260324613062,
+    "minimum_support_coverage": 0.32886032558601463,
+    "widths": {
+      "6": 4191,
+      "7": 420,
+      "8": 820
+    },
+    "observation_states": {
+      "none": 50,
+      "retain": 3310,
+      "confirming": 450,
+      "reject_crest_without_bending_migration": 350,
+      "blocked_candidate_shape": 660,
+      "recommend_tail": 10,
+      "recommend_head": 601
+    },
+    "length_states": {
+      "none": 1220,
+      "retain": 3651,
+      "confirming": 50,
+      "recommend_expand": 220,
+      "try_shorter_feasible_arc": 290
+    },
+    "displacement_m": [
+      1.8706270795112347,
+      0.013664785779927949,
+      0.0007808430019845547
+    ],
+    "events": [
+      {
+        "kind": "resize_request",
+        "time_s": 37.40000000000354,
+        "old": [
+          8,
+          13
+        ],
+        "to": [
+          7,
+          14
+        ],
+        "first_step": [
+          8,
+          14
+        ],
+        "evidence": {
+          "state": "recommend_expand",
+          "actual_body_circle": {
+            "radius_m": 0.138606907991054,
+            "circle_rms_m": 0.0013674502867300543,
+            "turn_deg": 165.41105773579642
+          },
+          "nominal_body_circle": {
+            "radius_m": 0.12137982883015778,
+            "circle_rms_m": 0.0006886081877913063,
+            "turn_deg": 178.35213452910517
+          },
+          "filtered_radius_ratio": 1.128283047046438,
+          "filtered_turn_deg": 164.97435369400557,
+          "direction": 1,
+          "observes_pipe_radius": false,
+          "observes_support": false,
+          "persistent_s": 0.9999999999976694
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 38.64000000000065,
+        "operation": "resize",
+        "phase_rad": 21.98399999998822,
+        "changed": [
+          14
+        ]
+      },
+      {
+        "kind": "resize_step",
+        "time_s": 41.79999999999328,
+        "old": [
+          8,
+          13
+        ],
+        "to": [
+          8,
+          14
+        ],
+        "final": [
+          7,
+          14
+        ],
+        "gate": {
+          "time_s": 41.79999999999328,
+          "candidate_geometry": {
+            "turn_deg": 163.00074386379586,
+            "fit_rms_m": 0.0008251332281495794,
+            "gap_fraction": 0.6089920910060893
+          },
+          "command_open": true,
+          "changed_joint": [
+            14
+          ],
+          "changed_angle_deg": [
+            3.594512633020573
+          ],
+          "changed_velocity_deg_s": [
+            -1.1750738789887736
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 44.419999999987176,
+        "operation": "resize",
+        "phase_rad": 23.555999999984557,
+        "changed": [
+          7
+        ]
+      },
+      {
+        "kind": "resize_complete",
+        "time_s": 46.99999999998116,
+        "old": [
+          8,
+          14
+        ],
+        "to": [
+          7,
+          14
+        ],
+        "final": [
+          7,
+          14
+        ],
+        "gate": {
+          "time_s": 46.99999999998116,
+          "candidate_geometry": {
+            "turn_deg": 188.39598925890988,
+            "fit_rms_m": 0.00010009779947743209,
+            "gap_fraction": 0.5636159823700082
+          },
+          "command_open": true,
+          "changed_joint": [
+            7
+          ],
+          "changed_angle_deg": [
+            -3.7758887480500305
+          ],
+          "changed_velocity_deg_s": [
+            1.080622005176382
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "resize_request",
+        "time_s": 57.59999999995646,
+        "old": [
+          7,
+          14
+        ],
+        "to": [
+          8,
+          13
+        ],
+        "first_step": [
+          8,
+          14
+        ],
+        "evidence": {
+          "state": "try_shorter_feasible_arc",
+          "direction": -1,
+          "complete_phase_cycles": 1.0122254380620952,
+          "actual_geometry": {
+            "turn_deg": 184.09244112769886,
+            "fit_rms_m": 0.000520251702935523,
+            "gap_fraction": 0.579899979289305
+          },
+          "observes_pipe_radius": false,
+          "observes_support": false
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 62.69999999994457,
+        "operation": "resize",
+        "phase_rad": 32.9759999999626,
+        "changed": [
+          7
+        ]
+      },
+      {
+        "kind": "resize_step",
+        "time_s": 63.39999999994294,
+        "old": [
+          7,
+          14
+        ],
+        "to": [
+          8,
+          14
+        ],
+        "final": [
+          8,
+          13
+        ],
+        "gate": {
+          "time_s": 63.39999999994294,
+          "candidate_geometry": {
+            "turn_deg": 186.65503618230682,
+            "fit_rms_m": 0.00015187063811272091,
+            "gap_fraction": 0.6815257861617581
+          },
+          "command_open": true,
+          "changed_joint": [
+            7
+          ],
+          "changed_angle_deg": [
+            0.5755724789405675
+          ],
+          "changed_velocity_deg_s": [
+            -0.759504966681943
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 66.01999999995118,
+        "operation": "resize",
+        "phase_rad": 34.54799999996181,
+        "changed": [
+          14
+        ]
+      },
+      {
+        "kind": "resize_complete",
+        "time_s": 66.59999999995395,
+        "old": [
+          8,
+          14
+        ],
+        "to": [
+          8,
+          13
+        ],
+        "final": [
+          8,
+          13
+        ],
+        "gate": {
+          "time_s": 66.59999999995395,
+          "candidate_geometry": {
+            "turn_deg": 165.21899090319502,
+            "fit_rms_m": 0.00010997210091355885,
+            "gap_fraction": 0.6501726962970384
+          },
+          "command_open": true,
+          "changed_joint": [
+            14
+          ],
+          "changed_angle_deg": [
+            0.5695185906076426
+          ],
+          "changed_velocity_deg_s": [
+            -1.583340127769675
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "six_feasibility_review",
+        "time_s": 77.20000000000456,
+        "accepted": true,
+        "measured_only": true,
+        "observes_support": false,
+        "actual_geometry": {
+          "turn_deg": 181.14022069705126,
+          "fit_rms_m": 0.000700265088599762,
+          "gap_fraction": 0.5678995309003216
+        },
+        "trial": {
+          "start_phase": 34.54799999996181,
+          "good": true,
+          "samples": 54
+        }
+      }
+    ],
+    "statistics_1ms": {
+      "physical_steps": 110620,
+      "passive_torque_max_nm": 0.0,
+      "active_torque_max_nm": 2.355,
+      "joint_limit_excess_max_rad": 0.0,
+      "saturation_joint_steps": 23915,
+      "mask_violation_steps": 0,
+      "floor_contact_steps": 0,
+      "finite": true
+    },
+    "post_exit_cycles": 2.001532564323752,
+    "continuous_exit_start_s": 91.76000000007409,
+    "continuous_exit_cycles": 1.8009973360279559,
+    "post_last_change_cycles": 4.201690497626196,
+    "orphan_seven_frames": 0
+  },
+  "passed": false,
+  "resize_mechanism_pass": true,
+  "exit_duration_pass": false
+}

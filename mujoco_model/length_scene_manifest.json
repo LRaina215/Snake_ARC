@@ -1,0 +1,36 @@
+[
+  {
+    "scene": "length_taper_return",
+    "sections": 31,
+    "radius_min_m": 0.055,
+    "radius_max_m": 0.105,
+    "feature_span_m": [
+      1.0,
+      2.1
+    ],
+    "route_end_m": 4.6999999999999975,
+    "diameters_mm": [
+      110,
+      210,
+      110
+    ],
+    "continuous_solid": true,
+    "bend_deg": 0.0
+  },
+  {
+    "scene": "length_calibration210",
+    "sections": 1,
+    "radius_min_m": 0.105,
+    "radius_max_m": 0.105,
+    "feature_span_m": [
+      0.0,
+      0.0
+    ],
+    "route_end_m": 3.7,
+    "diameters_mm": [
+      210,
+      210
+    ],
+    "bend_deg": 0.0
+  }
+]

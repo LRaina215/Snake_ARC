@@ -24,15 +24,18 @@ class MotorSlidingOptions:
 
 class MotorFeedbackSliding:
     def __init__(self, parameters, lengths, reference, execute=True,
-                 section_options=SectionOptions(), options=MotorSlidingOptions(), feedback_period_s=.02):
-        if parameters.last_joint-parameters.first_joint+1 != 6:
-            raise ValueError('Exactly six consecutive enabled joints required')
+                 section_options=SectionOptions(), options=MotorSlidingOptions(), feedback_period_s=.02,
+                 allowed_widths=(6,)):
+        width = parameters.last_joint-parameters.first_joint+1
+        if width not in allowed_widths:
+            raise ValueError('Enabled width is outside the explicitly allowed set')
+        self.allowed_widths = tuple(allowed_widths)
         self.p, self.lengths, self.options = parameters, np.asarray(lengths), options
         self.section_options, self.execute = section_options, execute
         self.window = (parameters.first_joint, parameters.last_joint)
         self.core = FixedSectionCompliance(parameters, lengths, section_options)
         self.observer = MotorShapeObserver(lengths, reference, parameters.amplitude_deg,
-            MotorObserverOptions(maximum_feedback_gap_s=max(.1, 2.5*feedback_period_s)))
+            MotorObserverOptions(maximum_feedback_gap_s=max(.1, 2.5*feedback_period_s)), width=width)
         self.feedback_period_s = feedback_period_s
         self.enabled = parameters.enabled.copy()
         self.phase = parameters.initial_phase_rad
@@ -197,8 +200,8 @@ class MotorFeedbackSliding:
         else:
             self.fault = None
             self.targets = proposed
-        if self.enabled.sum() != 6:
-            raise RuntimeError('Six-joint mask invariant violated')
+        if self.enabled.sum() not in self.allowed_widths:
+            raise RuntimeError('Allowed-width mask invariant violated')
         return self.targets.copy(), self.enabled.copy()
 
     def snapshot(self):

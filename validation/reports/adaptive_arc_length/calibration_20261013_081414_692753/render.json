@@ -1,0 +1,18 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\adaptive_arc_length\\calibration_20261013_081414_692753.mp4",
+  "frames": 351,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    35.00000000000913
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    2.8199999999998004,
+    7.140000000000719,
+    8.260000000000861,
+    35.00000000000913
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}

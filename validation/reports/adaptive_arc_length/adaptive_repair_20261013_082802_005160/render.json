@@ -1,0 +1,25 @@
+{
+  "movie": "D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\results\\adaptive_arc_length\\adaptive_repair_20261013_082802_005160.mp4",
+  "frames": 1107,
+  "fps": 10,
+  "full_time_range_s": [
+    0.0,
+    110.62000000016414
+  ],
+  "snapshot_times_s": [
+    0.0,
+    2.0,
+    41.77999999999328,
+    41.819999999993286,
+    46.97999999998116,
+    47.01999999998117,
+    63.37999999994294,
+    63.419999999942945,
+    66.57999999995396,
+    66.61999999995395,
+    7.940000000000986,
+    47.85999999997916,
+    110.62000000016414
+  ],
+  "method": "mj_forward saved actual qpos/qvel; no mj_step"
+}

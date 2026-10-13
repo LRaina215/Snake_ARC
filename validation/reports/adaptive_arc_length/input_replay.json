@@ -1,0 +1,47 @@
+[
+  {
+    "source": "adaptive_20261013_081901_624965",
+    "frames": 5488,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "events_match": true,
+    "passed": true
+  },
+  {
+    "source": "adaptive_repair_20261013_082802_005160",
+    "frames": 5531,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "events_match": true,
+    "passed": true
+  },
+  {
+    "source": "baseline_20261013_081646_022244",
+    "frames": 5604,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "events_match": true,
+    "passed": true
+  },
+  {
+    "source": "calibration_20261013_081414_692753",
+    "frames": 1750,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "events_match": true,
+    "passed": true
+  },
+  {
+    "source": "combined_20261013_083240_926004",
+    "frames": 7500,
+    "maximum_target_error_rad": 0.0,
+    "maximum_phase_error_rad": 0.0,
+    "mask_mismatches": 0,
+    "events_match": true,
+    "passed": true
+  }
+]

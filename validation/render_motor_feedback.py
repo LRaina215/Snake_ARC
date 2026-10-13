@@ -64,7 +64,8 @@ def main():
         return
     evaluation = load(args.path/'evaluation.jsonl.gz')
     status = json.loads((args.path/'status.json').read_text(encoding='utf8'))
-    model = mujoco.MjModel.from_xml_path(str(ROOT/'mujoco_model/Snake_Robot_o20_Rolling_Arc_straight.xml'))
+    scene_name = status.get('scene', 'straight')
+    model = mujoco.MjModel.from_xml_path(str(ROOT/'mujoco_model'/f'Snake_Robot_o20_Rolling_Arc_{scene_name}.xml'))
     data = mujoco.MjData(model)
     if not glfw.init():
         raise RuntimeError('Cannot initialize archived-state renderer')
@@ -89,7 +90,8 @@ def main():
     def render(row):
         data.qpos[:], data.qvel[:], data.time = row['actual_qpos'], row['actual_qvel'], row['time_s']
         mujoco.mj_forward(model, data)
-        camera.lookat[:] = [backbone(model, data).mean(axis=0)[0], 0., .95]
+        center = backbone(model, data).mean(axis=0)
+        camera.lookat[:] = [center[0], center[1], .95]
         model.geom_rgba[model.geom_bodyid >= model.body('head').id] = [.50, .26, .70, 1]
         active = np.flatnonzero(row['enabled'])+1
         for j in active:
@@ -99,7 +101,7 @@ def main():
         for _ in range(2):
             mujoco.mjr_render(viewport, scene, context)
             o = row['controller']['observation']
-            text = f"t={row['time_s']:.2f}s | enabled J{active[0]}-J{active[-1]} | six joints\n"
+            text = f"t={row['time_s']:.2f}s | enabled J{active[0]}-J{active[-1]} | {len(active)} joints\n"
             text += f"observer: {'settle' if o is None else o['state']} | hold={row['controller']['phase_hold']}"
             force = np.asarray(row.get('external_force_world', []))
             magnitude = float(np.linalg.norm(force[:, :3], axis=1).sum()) if force.size else 0.
@@ -114,19 +116,19 @@ def main():
         for row in rows[::5]:
             writer.write(cv2.cvtColor(render(row), cv2.COLOR_RGB2BGR)); frames += 1
         wanted = [0., 2.]
-        complete = [e for e in status['events'] if e['kind'] == 'complete']
+        complete = [e for e in status['events'] if e['kind'] in ('complete', 'resize_step', 'resize_complete')]
         if complete:
             for event in complete:
                 switch = event['time_s']
                 wanted += [switch-.02, switch+.02]
         else:
-            wanted += [next(r['time_s'] for r in evaluation if r.get('observation', {}).get('direction')),
-                       max(evaluation, key=lambda r: r['pipe_angular_span_deg'])['time_s']]
+            wanted += [next((r['time_s'] for r in evaluation if (r.get('observation') or {}).get('direction')), rows[-1]['time_s'])]
         stimulus = status.get('stimulation', {})
         if stimulus.get('kind', 'none') != 'none':
             start, end = stimulus['interval_s']
             wanted += [start, (start+end)/2, end, end+2, 50.]
-        wanted += [max(evaluation, key=lambda r: r['body_geometry']['turn_deg'])['time_s'], rows[-1]['time_s']]
+        wanted += [max(evaluation, key=lambda r: r.get('pipe_angular_span_deg', r.get('pipe_shape', {}).get('wrap_deg', 0.)))['time_s'],
+                   max(evaluation, key=lambda r: r['body_geometry']['turn_deg'])['time_s'], rows[-1]['time_s']]
         for index, timestamp in enumerate(wanted):
             row = min(rows, key=lambda r: abs(r['time_s']-timestamp))
             picture = Image.fromarray(render(row))

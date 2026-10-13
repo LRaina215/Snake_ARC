@@ -1,0 +1,51 @@
+{
+  "(8, 13)": {
+    "phases": 48,
+    "command_open": true,
+    "turn_range_deg": [
+      178.36334122058588,
+      179.99999999999997
+    ],
+    "minimum_gap": 0.5773502691896258,
+    "maximum_plane_rms_m": 0.008031802527211286
+  },
+  "(7, 13)": {
+    "phases": 48,
+    "command_open": true,
+    "turn_range_deg": [
+      176.44217949273096,
+      179.99999999999997
+    ],
+    "minimum_gap": 0.5150787536377128,
+    "maximum_plane_rms_m": 0.007139011777689776
+  },
+  "(8, 14)": {
+    "phases": 48,
+    "command_open": true,
+    "turn_range_deg": [
+      176.442179492731,
+      179.99999999999997
+    ],
+    "minimum_gap": 0.5150787536377128,
+    "maximum_plane_rms_m": 0.007139011777689778
+  },
+  "(7, 14)": {
+    "phases": 48,
+    "command_open": true,
+    "turn_range_deg": [
+      178.94107297506497,
+      180.0
+    ],
+    "minimum_gap": 0.603553390593274,
+    "maximum_plane_rms_m": 0.006156271358735993
+  },
+  "historical_overlap_failure": {
+    "source": "s1_head_trace.npz",
+    "frames": 622,
+    "actual_pipe_wrap_max_deg": 242.0991764925242,
+    "command_body_turn_max_deg": 196.56164643731134,
+    "rule": "A body-open gate alone did not prevent excessive actual pipe wrapping; check both in dynamics"
+  },
+  "wrong_expanded_60_rejected": true,
+  "passed": true
+}

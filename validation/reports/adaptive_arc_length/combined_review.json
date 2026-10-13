@@ -1,0 +1,878 @@
+{
+  "case": "combined",
+  "source": "combined_20261013_083240_926004",
+  "shape_pass": true,
+  "mechanics_pass": true,
+  "strict_pipe_pass": false,
+  "resize_pass": false,
+  "completed_widths": [
+    8,
+    6
+  ],
+  "summary": {
+    "samples": 7501,
+    "body_turn_range_deg": [
+      159.82234616711952,
+      188.75457473943484
+    ],
+    "minimum_gap": 0.5474862630934373,
+    "maximum_plane_rms_m": 0.008525173779134764,
+    "body_violations": 0,
+    "command_violations": 0,
+    "pipe_unobservable": 2923,
+    "contact_axis_conflict_frames": 1179,
+    "pipe_wrap_range_deg": [
+      152.8567157775954,
+      216.12295337707175
+    ],
+    "pipe_violations": 0,
+    "minimum_support_n": 23.938367148084108,
+    "minimum_support_coverage": 0.07935837470843612,
+    "widths": {
+      "6": 6100,
+      "7": 480,
+      "8": 820
+    },
+    "observation_states": {
+      "none": 50,
+      "retain": 4490,
+      "blocked_candidate_shape": 1280,
+      "confirming": 200,
+      "recommend_head": 1240,
+      "reject_crest_without_bending_migration": 50,
+      "unobservable": 90
+    },
+    "length_states": {
+      "none": 1570,
+      "retain": 3490,
+      "confirming": 50,
+      "recommend_expand": 1910,
+      "try_shorter_feasible_arc": 290,
+      "unobservable": 90
+    },
+    "displacement_m": [
+      0.21766201042745895,
+      1.3652970068589128,
+      0.024047577383842
+    ],
+    "events": [
+      {
+        "kind": "prepare",
+        "time_s": 14.599999999997348,
+        "old": [
+          8,
+          13
+        ],
+        "to": [
+          7,
+          12
+        ],
+        "observation": {
+          "feedback_time_s": 14.599999999997348,
+          "current_window": [
+            8,
+            13
+          ],
+          "external_window_change": false,
+          "valid": true,
+          "reasons": [],
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "direction": -1,
+          "suggested_window": [
+            7,
+            12
+          ],
+          "state": "recommend_head",
+          "down_head": [
+            0.9919124490556346,
+            0.07838314044436835,
+            -0.09982873685733862
+          ],
+          "end_quality": {
+            "head_straightness": 0.999948450608882,
+            "tail_straightness": 0.9999713166655372,
+            "end_disagreement_deg": 13.709631039221813,
+            "head_direction": [
+              0.9999686037119527,
+              0.006358422197193025,
+              -0.004728853722627628
+            ],
+            "tail_direction": [
+              0.9696754682238079,
+              0.1492872580873368,
+              -0.19350142350304264
+            ],
+            "end_link_counts": [
+              4,
+              4
+            ]
+          },
+          "current_geometry": {
+            "turn_deg": 166.24133736078093,
+            "fit_rms_m": 0.005872707680690137,
+            "gap_fraction": 0.6940479181664251
+          },
+          "crest": {
+            "joint_coordinate": 10.089031769993603,
+            "point_head_m": [
+              -0.5720488627627404,
+              -0.09731642336202626,
+              -0.08135900425911674
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9933822332118163,
+            "top_coordinate_span": [
+              9.541536810375757,
+              10.62517256664109
+            ]
+          },
+          "features": {
+            "bending_center_joint": 10.116519165028667,
+            "head_boundary_turn_deg": 7.403014007394698,
+            "tail_boundary_turn_deg": 1.8260288817540855,
+            "reverse_boundary_turn_deg": 4.873263507289384
+          },
+          "phase_reference": [
+            0.21910508506008342,
+            -0.005258319330151015,
+            13.519896020011988
+          ],
+          "feature_error": [
+            -0.63007331506648,
+            -0.3782225156411824,
+            -19.0968811456526
+          ],
+          "filtered_feature_error": [
+            -0.6396844783082255,
+            -0.3706835859148449,
+            -19.296239590078414
+          ],
+          "filtered_error_joints": -0.6396844783082255,
+          "candidate_window": [
+            7,
+            12
+          ],
+          "candidate_geometry": {
+            "turn_deg": 163.68537775889024,
+            "fit_rms_m": 0.005398845174596219,
+            "gap_fraction": 0.6493789786968465
+          },
+          "persistence_s": 0.5999999999996675
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 15.079999999997082,
+        "phase_rad": 7.84799999999745,
+        "entering": [
+          7
+        ],
+        "exiting": [
+          13
+        ]
+      },
+      {
+        "kind": "complete",
+        "time_s": 24.800000000007326,
+        "old": [
+          8,
+          13
+        ],
+        "to": [
+          7,
+          12
+        ],
+        "gate": {
+          "time_s": 24.800000000007326,
+          "actual_candidate": {
+            "turn_deg": 186.97345547165318,
+            "fit_rms_m": 0.00010396857819443437,
+            "gap_fraction": 0.5480967283013923
+          },
+          "switch_angles_deg": [
+            3.727085651589235,
+            0.37978527405636714
+          ],
+          "switch_velocity_deg_s": [
+            -0.8132668366520388,
+            0.0020240059395182607
+          ],
+          "velocity_from_continuous_fresh_feedback": true,
+          "candidate_open": true,
+          "command_open": true,
+          "unloading_observed": false
+        },
+        "strategy": "motor-angle geometric trial"
+      },
+      {
+        "kind": "resize_request",
+        "time_s": 35.00000000000913,
+        "old": [
+          7,
+          12
+        ],
+        "to": [
+          6,
+          13
+        ],
+        "first_step": [
+          7,
+          13
+        ],
+        "evidence": {
+          "state": "recommend_expand",
+          "actual_body_circle": {
+            "radius_m": 0.13699372221103992,
+            "circle_rms_m": 0.007086633533328717,
+            "turn_deg": 160.30494688542598
+          },
+          "nominal_body_circle": {
+            "radius_m": 0.11522543009578691,
+            "circle_rms_m": 0.007737714922511159,
+            "turn_deg": 179.74091201693918
+          },
+          "filtered_radius_ratio": 1.172502067855386,
+          "filtered_turn_deg": 162.46482478144455,
+          "direction": 1,
+          "observes_pipe_radius": false,
+          "observes_support": false,
+          "persistent_s": 0.9999999999976694
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 35.260000000008525,
+        "operation": "resize",
+        "phase_rad": 14.123999999993044,
+        "changed": [
+          13
+        ]
+      },
+      {
+        "kind": "resize_reject",
+        "time_s": 55.01999999996247,
+        "actual_window": [
+          7,
+          12
+        ],
+        "reason": "new angle/shape gate timed out",
+        "transaction": {
+          "kind": "resize",
+          "to": [
+            7,
+            13
+          ],
+          "final": [
+            6,
+            13
+          ],
+          "origin": [
+            7,
+            12
+          ],
+          "time_s": 35.00000000000913,
+          "ready_since": null,
+          "hold_since": 35.260000000008525,
+          "wanted_width": 8
+        },
+        "gate": {
+          "time_s": 54.99999999996252,
+          "candidate_geometry": {
+            "turn_deg": 172.86093018830633,
+            "fit_rms_m": 0.0019693687542789457,
+            "gap_fraction": 0.5577419597957185
+          },
+          "command_open": true,
+          "changed_joint": [
+            13
+          ],
+          "changed_angle_deg": [
+            8.319213375980537
+          ],
+          "changed_velocity_deg_s": [
+            -0.025904496998723634
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "resize_request",
+        "time_s": 60.1999999999504,
+        "old": [
+          7,
+          12
+        ],
+        "to": [
+          6,
+          13
+        ],
+        "first_step": [
+          7,
+          13
+        ],
+        "evidence": {
+          "state": "recommend_expand",
+          "actual_body_circle": {
+            "radius_m": 0.13258082482203348,
+            "circle_rms_m": 0.007578356167806845,
+            "turn_deg": 162.05346758009037
+          },
+          "nominal_body_circle": {
+            "radius_m": 0.11477106860663264,
+            "circle_rms_m": 0.008171659652501636,
+            "turn_deg": 179.9712500819289
+          },
+          "filtered_radius_ratio": 1.1667901280110087,
+          "filtered_turn_deg": 162.3292085582392,
+          "direction": 1,
+          "observes_pipe_radius": false,
+          "observes_support": false,
+          "persistent_s": 26.19999999993894
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 60.25999999995026,
+        "operation": "resize",
+        "phase_rad": 17.26799999998572,
+        "changed": [
+          13
+        ]
+      },
+      {
+        "kind": "resize_step",
+        "time_s": 73.19999999998547,
+        "old": [
+          7,
+          12
+        ],
+        "to": [
+          7,
+          13
+        ],
+        "final": [
+          6,
+          13
+        ],
+        "gate": {
+          "time_s": 73.19999999998547,
+          "candidate_geometry": {
+            "turn_deg": 165.9153862392202,
+            "fit_rms_m": 0.0008950005581101586,
+            "gap_fraction": 0.593428901412825
+          },
+          "command_open": true,
+          "changed_joint": [
+            13
+          ],
+          "changed_angle_deg": [
+            -3.9452325367709014
+          ],
+          "changed_velocity_deg_s": [
+            0.18250926544052812
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 75.81999999999798,
+        "operation": "resize",
+        "phase_rad": 18.83999999998578,
+        "changed": [
+          6
+        ]
+      },
+      {
+        "kind": "resize_complete",
+        "time_s": 79.60000000001602,
+        "old": [
+          7,
+          13
+        ],
+        "to": [
+          6,
+          13
+        ],
+        "final": [
+          6,
+          13
+        ],
+        "gate": {
+          "time_s": 79.60000000001602,
+          "candidate_geometry": {
+            "turn_deg": 188.09360805065165,
+            "fit_rms_m": 0.00015934209328070627,
+            "gap_fraction": 0.5658989981793365
+          },
+          "command_open": true,
+          "changed_joint": [
+            6
+          ],
+          "changed_angle_deg": [
+            -3.7343671968430576
+          ],
+          "changed_velocity_deg_s": [
+            0.7847375391433153
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "resize_request",
+        "time_s": 90.20000000006664,
+        "old": [
+          6,
+          13
+        ],
+        "to": [
+          7,
+          12
+        ],
+        "first_step": [
+          7,
+          13
+        ],
+        "evidence": {
+          "state": "try_shorter_feasible_arc",
+          "direction": -1,
+          "complete_phase_cycles": 1.0122254380644928,
+          "actual_geometry": {
+            "turn_deg": 182.46797704354037,
+            "fit_rms_m": 0.000562420969163443,
+            "gap_fraction": 0.5853912500452083
+          },
+          "observes_pipe_radius": false,
+          "observes_support": false
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 95.30000000009099,
+        "operation": "resize",
+        "phase_rad": 28.259999999986135,
+        "changed": [
+          6
+        ]
+      },
+      {
+        "kind": "resize_step",
+        "time_s": 96.00000000009433,
+        "old": [
+          6,
+          13
+        ],
+        "to": [
+          7,
+          13
+        ],
+        "final": [
+          7,
+          12
+        ],
+        "gate": {
+          "time_s": 96.00000000009433,
+          "candidate_geometry": {
+            "turn_deg": 184.99305147618136,
+            "fit_rms_m": 0.0001954323913897283,
+            "gap_fraction": 0.6886907924125883
+          },
+          "command_open": true,
+          "changed_joint": [
+            6
+          ],
+          "changed_angle_deg": [
+            0.7157163800895073
+          ],
+          "changed_velocity_deg_s": [
+            -0.7391101357871518
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 98.62000000010684,
+        "operation": "resize",
+        "phase_rad": 29.831999999986195,
+        "changed": [
+          13
+        ]
+      },
+      {
+        "kind": "resize_complete",
+        "time_s": 99.20000000010961,
+        "old": [
+          7,
+          13
+        ],
+        "to": [
+          7,
+          12
+        ],
+        "final": [
+          7,
+          12
+        ],
+        "gate": {
+          "time_s": 99.20000000010961,
+          "candidate_geometry": {
+            "turn_deg": 162.16269826089248,
+            "fit_rms_m": 0.0001774499712873439,
+            "gap_fraction": 0.6648618351547347
+          },
+          "command_open": true,
+          "changed_joint": [
+            13
+          ],
+          "changed_angle_deg": [
+            -0.7858511799469079
+          ],
+          "changed_velocity_deg_s": [
+            1.581672765724656
+          ],
+          "evidence_valid": true,
+          "unloading_observed": false
+        }
+      },
+      {
+        "kind": "prepare",
+        "time_s": 106.40000000014399,
+        "old": [
+          7,
+          12
+        ],
+        "to": [
+          6,
+          11
+        ],
+        "observation": {
+          "feedback_time_s": 106.40000000014399,
+          "current_window": [
+            7,
+            12
+          ],
+          "external_window_change": false,
+          "valid": true,
+          "reasons": [],
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "direction": -1,
+          "suggested_window": [
+            6,
+            11
+          ],
+          "state": "recommend_head",
+          "down_head": [
+            0.9828924938339407,
+            0.15007601610052684,
+            0.10676860473140619
+          ],
+          "end_quality": {
+            "head_straightness": 0.9997313652432012,
+            "tail_straightness": 0.9999936539058395,
+            "end_disagreement_deg": 20.177630890365627,
+            "head_direction": [
+              0.999732092857268,
+              -0.0035562679953545823,
+              0.02287128044452022
+            ],
+            "tail_direction": [
+              0.935656736228472,
+              0.2990671676072542,
+              0.1873640872997226
+            ],
+            "end_link_counts": [
+              4,
+              4
+            ]
+          },
+          "current_geometry": {
+            "turn_deg": 161.90849782678603,
+            "fit_rms_m": 0.006748321551303052,
+            "gap_fraction": 0.7044164891127226
+          },
+          "crest": {
+            "joint_coordinate": 8.781700493712286,
+            "point_head_m": [
+              -0.4702067795652812,
+              0.08396986529677838,
+              -0.14349627645875834
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9797599061320225,
+            "top_coordinate_span": [
+              8.126820335418152,
+              9.453602477947989
+            ]
+          },
+          "features": {
+            "bending_center_joint": 9.079591730908291,
+            "head_boundary_turn_deg": 13.903901662591199,
+            "tail_boundary_turn_deg": 0.0,
+            "reverse_boundary_turn_deg": 10.613083783095615
+          },
+          "phase_reference": [
+            0.015161493807771362,
+            -0.15560902278457706,
+            11.703060760642888
+          ],
+          "feature_error": [
+            -0.7334610000954853,
+            -0.264799246307132,
+            -25.606962423234087
+          ],
+          "filtered_feature_error": [
+            -0.8135980079028229,
+            -0.26671677021044865,
+            -26.839723870155805
+          ],
+          "filtered_error_joints": -0.8135980079028229,
+          "candidate_window": [
+            6,
+            11
+          ],
+          "candidate_geometry": {
+            "turn_deg": 159.83924248412995,
+            "fit_rms_m": 0.006333607504029431,
+            "gap_fraction": 0.6833200176305069
+          },
+          "persistence_s": 0.6000000000028649
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 107.06000000014714,
+        "phase_rad": 34.547999999986374,
+        "entering": [
+          6
+        ],
+        "exiting": [
+          12
+        ]
+      },
+      {
+        "kind": "complete",
+        "time_s": 110.800000000165,
+        "old": [
+          7,
+          12
+        ],
+        "to": [
+          6,
+          11
+        ],
+        "gate": {
+          "time_s": 110.800000000165,
+          "actual_candidate": {
+            "turn_deg": 162.80673464583057,
+            "fit_rms_m": 0.00014102925087445425,
+            "gap_fraction": 0.6660841015754276
+          },
+          "switch_angles_deg": [
+            3.696391790570532,
+            0.5819836187330598
+          ],
+          "switch_velocity_deg_s": [
+            -1.2668361787724143,
+            -0.008188440850989446
+          ],
+          "velocity_from_continuous_fresh_feedback": true,
+          "candidate_open": true,
+          "command_open": true,
+          "unloading_observed": false
+        },
+        "strategy": "motor-angle geometric trial"
+      },
+      {
+        "kind": "six_feasibility_review",
+        "time_s": 113.60000000017837,
+        "accepted": true,
+        "measured_only": true,
+        "observes_support": false,
+        "actual_geometry": {
+          "turn_deg": 160.54765625182634,
+          "fit_rms_m": 0.00022256168173857716,
+          "gap_fraction": 0.729756974316554
+        },
+        "trial": {
+          "start_phase": 29.831999999986195,
+          "good": true,
+          "samples": 52
+        }
+      },
+      {
+        "kind": "prepare",
+        "time_s": 128.60000000025,
+        "old": [
+          6,
+          11
+        ],
+        "to": [
+          5,
+          10
+        ],
+        "observation": {
+          "feedback_time_s": 128.60000000025,
+          "current_window": [
+            6,
+            11
+          ],
+          "external_window_change": false,
+          "valid": true,
+          "reasons": [],
+          "execution": "observation_only",
+          "executes_window_update": false,
+          "direction": -1,
+          "suggested_window": [
+            5,
+            10
+          ],
+          "state": "recommend_head",
+          "down_head": [
+            0.9897889531828464,
+            0.07945389917030338,
+            -0.11834232574966766
+          ],
+          "end_quality": {
+            "head_straightness": 0.9980040903985579,
+            "tail_straightness": 0.9999839909572857,
+            "end_disagreement_deg": 13.951856755657438,
+            "head_direction": [
+              0.9989167343684846,
+              0.04650703974056011,
+              -0.0015662225807366757
+            ],
+            "tail_direction": [
+              0.9660068811396646,
+              0.11122440626305254,
+              -0.23336631514048756
+            ],
+            "end_link_counts": [
+              4,
+              4
+            ]
+          },
+          "current_geometry": {
+            "turn_deg": 161.0040501638628,
+            "fit_rms_m": 0.006039257705867397,
+            "gap_fraction": 0.7107554949067353
+          },
+          "crest": {
+            "joint_coordinate": 8.006708678499761,
+            "point_head_m": [
+              -0.4278204084255974,
+              -0.11819303288428222,
+              -0.09136822740205441
+            ],
+            "top_band_m": 0.0080625,
+            "projected_down_norm": 0.9816090058337158,
+            "top_coordinate_span": [
+              7.375431850384132,
+              8.62728587232135
+            ]
+          },
+          "features": {
+            "bending_center_joint": 8.078541661454887,
+            "head_boundary_turn_deg": 10.28775974214377,
+            "tail_boundary_turn_deg": 0.0,
+            "reverse_boundary_turn_deg": 6.440002615770208
+          },
+          "phase_reference": [
+            0.22990330675541612,
+            0.005726901333882678,
+            13.116390113042202
+          ],
+          "feature_error": [
+            -0.7231946282556552,
+            -0.4271852398789958,
+            -23.40414985518597
+          ],
+          "filtered_feature_error": [
+            -0.7673758001341479,
+            -0.43457641595741764,
+            -24.011341479804113
+          ],
+          "filtered_error_joints": -0.7673758001341479,
+          "candidate_window": [
+            5,
+            10
+          ],
+          "candidate_geometry": {
+            "turn_deg": 159.7895424636585,
+            "fit_rms_m": 0.005616021970856789,
+            "gap_fraction": 0.6793736126592286
+          },
+          "persistence_s": 0.6000000000028649
+        }
+      },
+      {
+        "kind": "phase_hold",
+        "time_s": 129.12000000025247,
+        "phase_rad": 45.53999999998679,
+        "entering": [
+          5
+        ],
+        "exiting": [
+          11
+        ]
+      },
+      {
+        "kind": "complete",
+        "time_s": 132.80000000027005,
+        "old": [
+          6,
+          11
+        ],
+        "to": [
+          5,
+          10
+        ],
+        "gate": {
+          "time_s": 132.80000000027005,
+          "actual_candidate": {
+            "turn_deg": 162.7266242473702,
+            "fit_rms_m": 0.00019147158819636683,
+            "gap_fraction": 0.6666957041712753
+          },
+          "switch_angles_deg": [
+            3.647584943961358,
+            0.8022990558717247
+          ],
+          "switch_velocity_deg_s": [
+            -1.5627922043183005,
+            -0.0092444965975516
+          ],
+          "velocity_from_continuous_fresh_feedback": true,
+          "candidate_open": true,
+          "command_open": true,
+          "unloading_observed": false
+        },
+        "strategy": "motor-angle geometric trial"
+      }
+    ],
+    "statistics_1ms": {
+      "physical_steps": 150000,
+      "passive_torque_max_nm": 0.0,
+      "active_torque_max_nm": 2.355,
+      "joint_limit_excess_max_rad": 0.0,
+      "saturation_joint_steps": 140836,
+      "mask_violation_steps": 0,
+      "floor_contact_steps": 0,
+      "finite": true
+    },
+    "post_exit_cycles": 5.462197646914055,
+    "continuous_exit_start_s": 84.10000000003751,
+    "continuous_exit_cycles": 5.462197646914055,
+    "post_last_change_cycles": 1.6405691533913194,
+    "orphan_seven_frames": 0
+  },
+  "passed": false,
+  "resize_mechanism_pass": true,
+  "exit_duration_pass": false
+}
