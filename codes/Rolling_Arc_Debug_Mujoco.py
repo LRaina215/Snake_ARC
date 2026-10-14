@@ -78,12 +78,18 @@ class DebugArcController(real.RollingArcController):
         self.first, self.last = session.sim.p.first_joint, session.sim.p.last_joint
         self.length_normalized = self.last-self.first+1 != 6
         self.amplitude, self.omega = session.sim.p.amplitude_deg, session.sim.p.omega_rad_s
+        self.feeding_origin = (self.first, self.last)
         self.sliding = None
         self.pending_gait = None
         self.sliding_fault = False
         self.help_text = real.HELP+'\n'+SIM_HELP
 
     def select_gait(self, kind):
+        if kind=='feeding':
+            self.session.stop_push()
+            return super().select_gait(kind)
+        if self.feeding_selected:
+            super().select_gait('basic')
         if SLIDING_FEEDBACK == 'motor_angles':
             super().select_gait(kind)
             self.session.record_event('gait_change', to=kind)
@@ -611,11 +617,17 @@ class DebugViewer:
                               mujoco.mjtCatBit.mjCAT_ALL, self.scene)
         viewport = mujoco.MjrRect(0, 0, width, height)
         mujoco.mjr_render(viewport, self.scene, self.context)
-        gait = 'sliding section' if c.sliding else 'fixed section' if c.compliance else 'basic arc'
+        gait = 'active feeding' if c.feeding_selected else 'sliding section' if c.sliding else 'fixed section' if c.compliance else 'basic arc'
         delta = backbone(sim.model, sim.data).mean(axis=0)-self.session.initial_center
         slider = c.sliding.snapshot() if c.sliding is not None else None
         if slider is None:
             cycle, handover = '-', '-'
+            if c.feeding is not None:
+                f = c.feeding
+                o = f.observation or {}
+                amount = float('nan') if f.baseline is None or not o.get('valid') else 1000*(o['transfer_coordinate_m']-f.baseline)
+                cycle = f'{f.stage}: encoder delta {amount:+.1f} mm'
+                handover = f'paused={c.feeding_paused}; {f.fault or "running"}'
         elif isinstance(c.sliding, MotorFeedbackSliding):
             o = slider['observation']
             cycle = 'waiting motor angles' if o is None else f"{o['state']} offset={o.get('filtered_error_joints', float('nan')):+.2f}"
@@ -646,8 +658,8 @@ class DebugViewer:
         mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPLEFT,
                           viewport, left, right, self.context)
         mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT,
-                          viewport, 'Ctrl+1/2/3: modes | Ctrl+U: form | Ctrl+G: run/pause\nHold Ctrl+A/D: pull left/right | Ctrl+[ / ]: force\nCtrl+W: auto window | Ctrl+R: reset preview',
-                          'Ctrl+J/H: step | Ctrl+E: compliance\nCtrl+Space: pause | Ctrl+N: freeze\nCtrl+X: release | Ctrl+Q: quit', self.context)
+                          viewport, 'Ctrl+1/2/3/4: modes | Ctrl+U: form | Ctrl+G: run/pause\nHold Ctrl+A/D: pull left/right | Ctrl+[ / ]: force\nCtrl+W: auto window | Ctrl+R: reset preview',
+                          'Ctrl+J/H: step / feed action | Ctrl+Y: return\nCtrl+L: feed frame | Ctrl+Space: pause\nCtrl+X: release | Ctrl+Q: quit', self.context)
         self.glfw.swap_buffers(self.window)
         self.glfw.poll_events()
 
@@ -691,7 +703,7 @@ def main():
                 shape_preview.publish(session.controller)
             viewer.render()
             wall_elapsed = time.monotonic()-session.start_wall
-            if log_file and wall_elapsed >= next_log:
+            if log_file and (session.controller.feeding_selected or wall_elapsed >= next_log):
                 log_file.write(json.dumps(session.snapshot(), ensure_ascii=False)+'\n')
                 log_file.flush()
                 next_log = wall_elapsed+.1

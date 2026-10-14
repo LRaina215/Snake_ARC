@@ -117,10 +117,17 @@ class RealControllerTests(unittest.TestCase):
         controller, _ = prepared_controller()
         previous = controller.snapshot()
         for command in ('amplitude=58 omega=nan', 'amplitude=58 window=7:14',
-                        'delta=0', 'window=0:13', 'omega=5'):
+                        'delta=0', 'window=0:13'):
             with self.subTest(command=command), self.assertRaises(ValueError):
                 controller.command(command)
             self.assertEqual(controller.snapshot(), previous)
+        with patch.object(real, 'DIY_PARAMETERS', False):
+            with self.assertRaises(ValueError):
+                controller.command('omega=5')
+        with patch.object(real, 'DIY_PARAMETERS', True):
+            controller.command('omega=5')
+            self.assertEqual(controller.omega, 5.)
+            controller.command('omega=0.6')
         controller.command('release')
         controller.command('window=7:14')
         controller.command('apply')

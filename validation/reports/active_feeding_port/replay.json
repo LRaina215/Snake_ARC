@@ -1,0 +1,27 @@
+{
+  "hardware_run": false,
+  "new_physics": false,
+  "records": [
+    {
+      "record": "small_20261014_140308",
+      "samples": 2002,
+      "target_maximum_error_deg": 0.0,
+      "mask_mismatch_frames": 0,
+      "serial_mask_updates": 6
+    },
+    {
+      "record": "head_large_20261014_141738",
+      "samples": 4671,
+      "target_maximum_error_deg": 0.0,
+      "mask_mismatch_frames": 0,
+      "serial_mask_updates": 12
+    },
+    {
+      "record": "tail_large_20261014_142024",
+      "samples": 4771,
+      "target_maximum_error_deg": 0.0,
+      "mask_mismatch_frames": 0,
+      "serial_mask_updates": 14
+    }
+  ]
+}
