@@ -9,7 +9,7 @@ from dataclasses import dataclass, asdict
 import math
 import numpy as np
 from .active_arc_transfer import ActiveArcTransfer, TransferOptions
-from .feeding_length_observer import FeedingLengthObserver
+from .whole_feeding_observer import WholeFeedingObserver
 from .section_geometry import forward
 
 
@@ -22,19 +22,35 @@ class ContinuousFeedingOptions:
     preparation_s: float = 6.
     length_gain_s: float = .8
     speed_damping: float = .7
-    maximum_position_rate_joints_s: float = .3
+    maximum_position_rate_joints_s: float = .1
     velocity_filter_s: float = .4
-    length_tolerance_m: float = .008
-    speed_tolerance_m_s: float = .004
+    length_tolerance_m: float = .004
+    speed_tolerance_m_s: float = .001
     persistence_s: float = .4
     review_s: float = 2.
     maximum_feed_s: float = 60.
     target_rate_deg_s: float = 45.
     exit_angle_deg: float = 8.
     bearing_bias_limit: float = .18
+    # Retained for archived option dictionaries; current bias is periodic,
+    # not the old integrated shoulder-height controller.
     bearing_bias_rate_s: float = .125
     bearing_gain: float = .4
     maximum_untrusted_s: float = 3.
+    trailing_buffer_joints: int = 2
+    release_persistence_s: float = .4
+    tracking_tolerance_deg: float = 5.
+    tracked_turn_soft_limit_deg: float = 192.
+    maximum_tracking_wait_s: float = 10.
+    travelling_bias_amplitude: float = .12
+    fractional_middle_boost_deg: float = 15.
+    middle_boost_activation_joints: float = 1.5
+    middle_boost_ramp_joints: float = 1.
+    adjacent_fold_angle_deg: float = 5.
+    adjacent_fold_distance_joints: int = 4
+    fold_retention_distance_joints: float = 1.
+    release_down_alignment: float = .97
+    minimum_passive_reference_links: int = 3
 
 
 class ContinuousFeeding:
@@ -45,7 +61,7 @@ class ContinuousFeeding:
         self.helper = ActiveArcTransfer(self.lengths, 'transfer', TransferOptions(
             first_joint=options.first_joint, last_joint=options.last_joint,
             amplitude_deg=options.amplitude_deg, hold_phase_rad=0.))
-        self.length_observer = FeedingLengthObserver(self.lengths)
+        self.length_observer = WholeFeedingObserver(self.lengths, (options.first_joint, options.last_joint))
         self.origin = (options.first_joint, options.last_joint)
         # Each transition advances two alternating hinges. The last valid
         # pair gives a coarse profile range, not a guarantee of support.
@@ -53,6 +69,10 @@ class ContinuousFeeding:
         self.maximum_bin = math.floor((self.n-1-options.last_joint-2)/2)
         self.position_bounds = (2*self.minimum_bin, 2*(self.maximum_bin+1))
         self.position = self.bias = self.phase = 0.
+        # Equal relative settling speed for one-link and larger actions.
+        # This is a motor-proxy gate, not a claim of true length stability.
+        self.goal_speed_tolerance_m_s = options.speed_tolerance_m_s*max(
+            1., abs(options.requested_transfer_m)/float(np.mean(self.lengths)))
         self.enabled = self.helper.mask(self.origin)
         self.window = self.origin
         self.targets = self.helper.template(self.origin, 0., options.amplitude_deg)
@@ -64,6 +84,11 @@ class ContinuousFeeding:
         self.observation = self.baseline = self.goal_m = None
         self.bearing_error_m = None
         self.untrusted_since = None
+        self.release_below_peak_m = None
+        self.release_since = np.full(self.n, np.nan)
+        self.fold_capture_position = np.full(self.n, np.nan)
+        self.tracking_blocked_since = None
+        self.tracking_error_deg = self.actual_enabled_turn_deg = 0.
         self.completed = False
         self.fault = None
         self.events = []
@@ -78,57 +103,53 @@ class ContinuousFeeding:
         right = self.helper.template(new, 0., self.options.amplitude_deg, bias)
         curved = np.flatnonzero(abs(left)+abs(right)>1e-10)+1
         focus = (int(curved[0]), int(curved[-1]))
-        return (1-fraction)*left+fraction*right, focus, cell, fraction
+        target = (1-fraction)*left+fraction*right
+        # Four-axis interpolation can retain extra material in the top arc.
+        # Coordinate both middle bends while preserving the pi turn budget.
+        offset = float(np.clip((abs(position)-self.options.middle_boost_activation_joints)/
+                               self.options.middle_boost_ramp_joints, 0., 1.))
+        allocation = offset*offset*(3.-2.*offset)
+        boost = math.radians(self.options.fractional_middle_boost_deg)*allocation*math.sin(math.pi*fraction)**2
+        family = curved-1
+        if len(family)==4:
+            target[family[[0,-1]]] -= boost
+            target[family[1:3]] += boost
+        return target, focus, cell, fraction
 
-    @staticmethod
-    def point_at(points, coordinate):
-        i = min(int(coordinate), len(points)-2)
-        return points[i]+(coordinate-i)*(points[i+1]-points[i])
+    def required_with_buffer(self, focus):
+        direction = 1 if self.options.requested_transfer_m > 0 else -1
+        if self.stage in ('feed_return', 'review_return'):
+            direction *= -1
+        first, last = focus
+        if direction > 0:
+            first = max(2, first-self.options.trailing_buffer_joints)
+        else:
+            last = min(self.n-1, last+self.options.trailing_buffer_joints)
+        return self.helper.mask((first, last))
 
-    def bearing_error(self, q, down, focus):
-        """Height difference of two curvature quantile shoulders.
-
-        Distribute each odd-hinge turn over its two-link material cell. This
-        avoids selecting a new endpoint just because a tiny bend crosses a
-        hard threshold. It is an intrinsic shape constraint, not contact.
-        """
-        joints = np.arange(1, self.n+1)
-        select = (joints%2 == 1) & (joints>=focus[0]) & (joints<=focus[1])
-        js = joints[select]
-        weights = np.maximum(q[select], 0.)
-        total = weights.sum()
-        if total < .1:
-            return 0.
-        points = forward(q, self.lengths)
-
-        def shoulder(fraction):
-            amount = total*fraction
-            cumulative = np.cumsum(weights)
-            k = min(int(np.searchsorted(cumulative, amount)), len(weights)-1)
-            previous = 0. if k == 0 else cumulative[k-1]
-            coordinate = js[k]-1+2*(amount-previous)/max(weights[k], 1e-12)
-            return self.point_at(points, float(coordinate))
-
-        return float(-(shoulder(.15)-shoulder(.85)) @ down)
-
-    def update_bearing(self, angles, feedback_dt):
-        down = np.array(self.observation['down_head'])
-        q = np.radians(angles)
-        target, focus, _, _ = self.profile(self.position, self.bias)
-        error = self.bearing_error(q, down, focus)
-        predictions = []
-        for bias in (self.bias-.01, self.bias+.01):
-            proposal, _, _, _ = self.profile(self.position, bias)
-            predicted = q.copy()
-            predicted[self.helper.mask(focus)] = proposal[self.helper.mask(focus)]
-            predictions.append(self.bearing_error(predicted, down, focus))
-        slope = (predictions[1]-predictions[0])/.02
-        self.bearing_error_m = error
-        if abs(slope) > .01:
-            correction = -self.options.bearing_gain*error/slope
-            limit = self.options.bearing_bias_rate_s*feedback_dt
-            self.bias = float(np.clip(self.bias+np.clip(correction, -limit, limit),
-                                      -self.options.bearing_bias_limit, self.options.bearing_bias_limit))
+    def release_ready(self, angles, required, feedback_time, fresh):
+        """Encoder geometry below the bearing arc; not a contact-force gate."""
+        leaving = self.enabled & ~required
+        if not self.observation['valid'] or self.release_below_peak_m is None:
+            self.release_since[:] = np.nan
+            return np.zeros(self.n, bool)
+        points = forward(np.radians(angles), self.lengths)
+        heights = -points @ np.array(self.observation['down_head'])
+        level = float(heights.max()-self.release_below_peak_m)
+        below = np.array([heights[max(0,j):min(len(heights),j+3)].max()<level for j in range(self.n)])
+        directions = np.diff(points,axis=0)
+        directions /= np.maximum(np.linalg.norm(directions,axis=1)[:,None],1e-12)
+        indices = np.arange(self.n)
+        active = np.flatnonzero(required)
+        towards_tip = directions[1:].copy()
+        towards_tip[indices<active[0]] *= -1
+        aligned = towards_tip @ np.array(self.observation['down_head']) >= self.options.release_down_alignment
+        eligible = leaving & (abs(angles)<=self.options.exit_angle_deg) & below & aligned
+        if fresh:
+            self.release_since[~eligible] = np.nan
+            starting = eligible & np.isnan(self.release_since)
+            self.release_since[starting] = feedback_time
+        return eligible & (feedback_time-self.release_since>=self.options.release_persistence_s-1e-8)
 
     def advance(self, angles_deg, feedback_time_s, control_time_s):
         angles = np.asarray(angles_deg, float)
@@ -148,12 +169,11 @@ class ContinuousFeeding:
         self.last_time = control_time_s
         opt = self.options
         if fresh:
-            feedback_dt = .2 if self.last_feedback is None else feedback_time_s-self.last_feedback
             self.last_feedback = feedback_time_s
             self.previous_angles = angles.copy()
             self.observation = self.length_observer.observe(angles, self.window)
-            crown = self.helper.position(angles, self.window)
-            self.observation['crest_joint'] = crown.get('crest_joint')
+            if 'crest_joint' not in self.observation:
+                self.observation['crest_joint'] = None
             if self.observation['valid']:
                 self.untrusted_since = None
                 coordinate = self.observation['transfer_coordinate_m']
@@ -164,8 +184,8 @@ class ContinuousFeeding:
                     self.velocity_m_s += amount*(raw_velocity-self.velocity_m_s)
                 self.previous_coordinate = coordinate
                 self.last_length_time = feedback_time_s
-                if self.stage != 'prepare':
-                    self.update_bearing(angles, feedback_dt)
+                # A periodic intrinsic allocation coordinates the middle
+                # hinges without an accumulated orientation bias at rest.
             elif self.stage != 'prepare':
                 self.ready_since = None
                 if self.untrusted_since is None:
@@ -179,6 +199,11 @@ class ContinuousFeeding:
                     self.fault = 'initial differential length unavailable'
                 else:
                     self.baseline = self.observation['transfer_coordinate_m']
+                    points = forward(np.radians(angles), self.lengths)
+                    heights = -points @ np.array(self.observation['down_head'])
+                    first, last = self.origin
+                    arc_depth = float(heights.max()-heights[first:last+2].min())
+                    self.release_below_peak_m = arc_depth+.5*float(np.mean(self.lengths))
                     self.goal_m = self.baseline+opt.requested_transfer_m
                     self.stage, self.stage_since = 'feed_out', control_time_s
                     self.events.append(dict(kind='start_feeding', time_s=control_time_s,
@@ -195,10 +220,53 @@ class ContinuousFeeding:
                 rate = np.clip(speed/np.mean(self.lengths),
                                -opt.maximum_position_rate_joints_s, opt.maximum_position_rate_joints_s)
                 proposed_position = float(np.clip(self.position+rate*dt, *self.position_bounds))
+                current, _, _, _ = self.profile(self.position, self.bias)
+                self.tracking_error_deg = float(np.max(abs(np.degrees(current[self.enabled])-angles[self.enabled])))
+                self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
+                blocked = (self.tracking_error_deg>opt.tracking_tolerance_deg or
+                           self.actual_enabled_turn_deg>opt.tracked_turn_soft_limit_deg)
+                if blocked:
+                    proposed_position = self.position
+                    if self.tracking_blocked_since is None:
+                        self.tracking_blocked_since = control_time_s
+                else:
+                    self.tracking_blocked_since = None
+                self.bias = -opt.travelling_bias_amplitude*math.sin(math.pi*proposed_position)
                 proposal, focus, _, _ = self.profile(proposed_position, self.bias)
-                required = self.helper.mask(focus)
+                required = self.required_with_buffer(focus)
+                actual_arc = self.observation.get('actual_arc_window')
+                if actual_arc is not None:
+                    required |= self.helper.mask(tuple(actual_arc))
+                active = np.flatnonzero(required)+1
+                radius = opt.adjacent_fold_distance_joints
+                joints = np.arange(1,self.n+1)
+                folds = joints[(abs(angles)>=opt.adjacent_fold_angle_deg) &
+                               (joints>=active[0]-radius) & (joints<=active[-1]+radius)]
+                self.fold_capture_position[folds-1] = proposed_position
+                # A straightened fold often returns under gravity immediately
+                # after torque-off. Keep its temporary straightening control
+                # until the travelling arc leaves, rather than cycling masks
+                # at a stationary length goal. This is material distance,
+                # never pipe contact or a world unloading observation.
+                retained = joints[np.isfinite(self.fold_capture_position) &
+                    (abs(proposed_position-self.fold_capture_position)<opt.fold_retention_distance_joints)]
+                folds = np.union1d(folds, retained)
+                if len(folds):
+                    first=max(2,min(int(active[0]),int(folds.min())))
+                    last=min(self.n-1,max(int(active[-1]),int(folds.max())))
+                    required |= self.helper.mask((first,last))
+                # Keep one distal torque-off reference observable. The end
+                # being lengthened on the outbound leg has the larger reserve;
+                # use the same end through return to avoid switching the
+                # observation geometry. Reserved folds remain passive and are
+                # still fully included in external whole-body shape audits.
+                reserve = opt.minimum_passive_reference_links
+                if opt.requested_transfer_m > 0:
+                    required[:reserve] = False
+                else:
+                    required[self.n-reserve:] = False
                 leaving = self.enabled & ~required
-                release = leaving & (abs(angles)<=opt.exit_angle_deg)
+                release = self.release_ready(angles, required, feedback_time_s, fresh)
                 next_mask = required | (leaving & ~release)
                 entering = next_mask & ~self.enabled
                 if np.any(entering) or np.any(release):
@@ -207,14 +275,14 @@ class ContinuousFeeding:
                         entering=(np.flatnonzero(entering)+1).tolist(),
                         released=(np.flatnonzero(release)+1).tolist(),
                         exit_angles_deg=angles[release].tolist(), enabled_count=int(next_mask.sum()),
-                        release_means='straight_angle_proxy_not_measured_unloading'))
+                        release_means='persistent_angle_and_below_arc_geometry_not_measured_unloading'))
                 self.position = proposed_position
                 self.enabled = next_mask
                 active = np.flatnonzero(self.enabled)+1
                 self.window = (int(active[0]), int(active[-1]))
                 desired = proposal
                 if fresh and self.stage in ('feed_out', 'feed_return'):
-                    reached = abs(error)<=opt.length_tolerance_m and abs(self.velocity_m_s)<=opt.speed_tolerance_m_s
+                    reached = abs(error)<=opt.length_tolerance_m and abs(self.velocity_m_s)<=self.goal_speed_tolerance_m_s
                     self.ready_since = (feedback_time_s if self.ready_since is None else self.ready_since) if reached else None
                     if self.ready_since is not None and feedback_time_s-self.ready_since >= opt.persistence_s-1e-8:
                         self.stage = 'review_out' if self.stage == 'feed_out' else 'review_return'
@@ -222,7 +290,9 @@ class ContinuousFeeding:
                         self.events.append(dict(kind='length_goal_observed', time_s=control_time_s,
                             goal_delta_m=self.goal_m-self.baseline, observed_delta_m=coordinate-self.baseline,
                             velocity_m_s=self.velocity_m_s, position_joints=self.position))
-            if self.untrusted_since is not None and control_time_s-self.untrusted_since > opt.maximum_untrusted_s:
+            if self.tracking_blocked_since is not None and control_time_s-self.tracking_blocked_since>opt.maximum_tracking_wait_s:
+                self.fault = 'measured shape tracking did not recover within bounded handover'
+            elif self.untrusted_since is not None and control_time_s-self.untrusted_since > opt.maximum_untrusted_s:
                 self.fault = 'length observation did not recover during bounded shape completion'
             elif self.stage in ('feed_out', 'feed_return') and control_time_s-self.stage_since > opt.maximum_feed_s:
                 self.fault = 'length goal not reached within bounded feeding'
@@ -245,8 +315,15 @@ class ContinuousFeeding:
             bearing_error_m=self.bearing_error_m, goal_m=self.goal_m, baseline_m=self.baseline,
             goal_delta_m=None if self.goal_m is None else self.goal_m-self.baseline,
             observation=self.observation, velocity_m_s=self.velocity_m_s, enabled=self.enabled.tolist(),
+            goal_speed_tolerance_m_s=self.goal_speed_tolerance_m_s,
             untrusted_since_s=self.untrusted_since,
+            release_below_peak_m=self.release_below_peak_m,
+            tracking_blocked_since_s=self.tracking_blocked_since,
+            tracking_error_deg=self.tracking_error_deg, actual_enabled_turn_deg=self.actual_enabled_turn_deg,
+            retained_fold_joints=(np.flatnonzero(np.isfinite(self.fold_capture_position) &
+                (abs(self.position-self.fold_capture_position)<self.options.fold_retention_distance_joints))+1).tolist(),
             completed=self.completed, fault=self.fault, options=asdict(self.options),
             profile_position_bounds_joints=list(self.position_bounds), compliance=False,
+            passive_reference_end='head' if self.options.requested_transfer_m>0 else 'tail',
             completion_means='encoder_length_and_speed_goal_not_world_truth_acceptance',
             inputs=['angles_deg', 'feedback_time_s', 'control_time_s'])

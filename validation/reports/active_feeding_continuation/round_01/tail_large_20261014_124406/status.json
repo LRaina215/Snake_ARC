@@ -1,0 +1,737 @@
+{
+  "scene": "straight",
+  "route": "continuous_feeding",
+  "case": "tail_large",
+  "repair": false,
+  "parameters": {
+    "joints": 20,
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "initial_phase_rad": 0.0,
+    "settle_s": 2.0,
+    "kp": 127.0,
+    "kd": 1.0,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5
+  },
+  "options": {
+    "first_joint": 8,
+    "last_joint": 13,
+    "amplitude_deg": 60.0,
+    "requested_transfer_m": 0.258,
+    "preparation_s": 6.0,
+    "length_gain_s": 0.8,
+    "speed_damping": 0.7,
+    "maximum_position_rate_joints_s": 0.3,
+    "velocity_filter_s": 0.4,
+    "length_tolerance_m": 0.008,
+    "speed_tolerance_m_s": 0.004,
+    "persistence_s": 0.4,
+    "review_s": 2.0,
+    "maximum_feed_s": 100.0,
+    "target_rate_deg_s": 45.0,
+    "exit_angle_deg": 8.0,
+    "bearing_bias_limit": 0.18,
+    "bearing_bias_rate_s": 0.125,
+    "bearing_gain": 0.4,
+    "maximum_untrusted_s": 3.0,
+    "trailing_buffer_joints": 2,
+    "release_persistence_s": 0.4
+  },
+  "final_time_s": 50.03999999997408,
+  "termination": "floor_or_controller_fault",
+  "error": null,
+  "statistics": {
+    "steps": 50040,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 3593,
+    "floor_contact_steps": 0,
+    "maximum_enabled_count": 12,
+    "minimum_enabled_count": 6,
+    "maximum_shared_target_step_deg": 0.9000000000011017
+  },
+  "controller": {
+    "stage": "feed_return",
+    "route": "continuous_feeding",
+    "window": [
+      5,
+      15
+    ],
+    "phase_rad": 0.0,
+    "position_joints": -1.6548298102544634,
+    "bearing_bias": -0.18,
+    "bearing_error_m": -0.07111201427162056,
+    "goal_m": 0.0353557521298396,
+    "baseline_m": 0.0353557521298396,
+    "goal_delta_m": 0.0,
+    "observation": {
+      "valid": false,
+      "reason": "no_trusted_passive_end",
+      "end_quality": {
+        "source": "no_trusted_passive_end",
+        "candidates": []
+      },
+      "crest_joint": null
+    },
+    "velocity_m_s": -0.10518658728954307,
+    "enabled": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "untrusted_since_s": 46.99999999998116,
+    "release_below_peak_m": 0.16468151215635984,
+    "completed": false,
+    "fault": "length observation did not recover during bounded shape completion",
+    "options": {
+      "first_joint": 8,
+      "last_joint": 13,
+      "amplitude_deg": 60.0,
+      "requested_transfer_m": 0.258,
+      "preparation_s": 6.0,
+      "length_gain_s": 0.8,
+      "speed_damping": 0.7,
+      "maximum_position_rate_joints_s": 0.3,
+      "velocity_filter_s": 0.4,
+      "length_tolerance_m": 0.008,
+      "speed_tolerance_m_s": 0.004,
+      "persistence_s": 0.4,
+      "review_s": 2.0,
+      "maximum_feed_s": 100.0,
+      "target_rate_deg_s": 45.0,
+      "exit_angle_deg": 8.0,
+      "bearing_bias_limit": 0.18,
+      "bearing_bias_rate_s": 0.125,
+      "bearing_gain": 0.4,
+      "maximum_untrusted_s": 3.0,
+      "trailing_buffer_joints": 2,
+      "release_persistence_s": 0.4
+    },
+    "profile_position_bounds_joints": [
+      -6,
+      6
+    ],
+    "compliance": false,
+    "completion_means": "encoder_length_and_speed_goal_not_world_truth_acceptance",
+    "inputs": [
+      "angles_deg",
+      "feedback_time_s",
+      "control_time_s"
+    ]
+  },
+  "events": [
+    {
+      "kind": "start_feeding",
+      "time_s": 6.000000000000338,
+      "goal_transfer_m": 0.258,
+      "baseline_m": 0.0353557521298396,
+      "inputs": "angles_and_time_only"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 6.020000000000345,
+      "entering": [
+        7,
+        14,
+        15
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 9,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 12.679999999998412,
+      "entering": [
+        16,
+        17
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 11,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 13.199999999998123,
+      "entering": [],
+      "released": [
+        7,
+        8
+      ],
+      "exit_angles_deg": [
+        0.1613809401360177,
+        -0.0006878647849525617
+      ],
+      "enabled_count": 9,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "length_goal_observed",
+      "time_s": 22.000000000003904,
+      "goal_delta_m": 0.258,
+      "observed_delta_m": 0.2554905849321855,
+      "velocity_m_s": 0.0013963499318366181,
+      "position_joints": 3.798933261536972
+    },
+    {
+      "kind": "start_return",
+      "time_s": 24.00000000000635
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 24.020000000006373,
+      "entering": [
+        18,
+        19
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 11,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 24.600000000007082,
+      "entering": [],
+      "released": [
+        9,
+        10
+      ],
+      "exit_angles_deg": [
+        -0.22331914773868317,
+        -0.0013440108460672374
+      ],
+      "enabled_count": 9,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 30.160000000013877,
+      "entering": [
+        9,
+        10
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 11,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 31.600000000015637,
+      "entering": [],
+      "released": [
+        19
+      ],
+      "exit_angles_deg": [
+        0.06586380837381055
+      ],
+      "enabled_count": 10,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 36.82000000000489,
+      "entering": [
+        7,
+        8
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 12,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 38.20000000000167,
+      "entering": [],
+      "released": [
+        18
+      ],
+      "exit_angles_deg": [
+        0.0004832761528105576
+      ],
+      "enabled_count": 11,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 38.60000000000074,
+      "entering": [],
+      "released": [
+        17
+      ],
+      "exit_angles_deg": [
+        0.21725543792449228
+      ],
+      "enabled_count": 10,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 45.03999999998573,
+      "entering": [
+        5,
+        6
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 12,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 46.599999999982096,
+      "entering": [],
+      "released": [
+        16
+      ],
+      "exit_angles_deg": [
+        0.00032611818349791415
+      ],
+      "enabled_count": 11,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    }
+  ],
+  "spatial_baseline": {
+    "crown_world_m": [
+      -0.49999005589931256,
+      2.1383517598939282e-06,
+      1.293735257771684
+    ],
+    "support_point_world_m": [
+      -0.49964591021895216,
+      -0.0007980015876813904,
+      1.2520104448177503
+    ],
+    "contacts": [
+      {
+        "position_world_m": [
+          -0.49942651839117275,
+          -0.01800713388960575,
+          1.2532242490594319
+        ],
+        "up_n": 16.923157899993512
+      },
+      {
+        "position_world_m": [
+          -0.4999805692908999,
+          0.025452712960242443,
+          1.2501589145891243
+        ],
+        "up_n": 11.094283271248264
+      }
+    ],
+    "mean_body_world_m": [
+      -0.5001372238076504,
+      -0.0014233958858625862,
+      1.000257333725702
+    ]
+  },
+  "pipe_centerline": [
+    [
+      -1.2,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -1.15,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -1.1,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -1.05,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -1.0,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.95,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.9,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.85,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.8,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.75,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.7,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.65,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.6,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.55,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.5,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.45,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.4,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.35,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.3,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.25,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.2,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.15,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.1,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      -0.05,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      2.220446049e-16,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.05,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.1,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.15,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.2,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.25,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.3,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.35,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.4,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.45,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.5,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.55,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.6,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.65,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.7,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.75,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.8,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.85,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.9,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      0.95,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.0,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.05,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.1,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.15,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.2,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.25,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.3,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.35,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.4,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.45,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.5,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.55,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.6,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.65,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.7,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.75,
+      0.0,
+      1.2,
+      0.0565
+    ],
+    [
+      1.8,
+      0.0,
+      1.2,
+      0.0565
+    ]
+  ],
+  "pipe_friction": [
+    2.0,
+    0.005,
+    0.002
+  ],
+  "gravity": [
+    0.0,
+    0.0,
+    -9.81
+  ],
+  "hardware_run": false,
+  "physics_period_s": 0.001,
+  "control_period_s": 0.02,
+  "feedback_period_s": 0.2
+}

@@ -33,23 +33,27 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('case', choices=CASES)
     parser.add_argument('--repair', action='store_true')
+    parser.add_argument('--report-root', type=Path, default=REPORT)
+    parser.add_argument('--round-limit', type=int, default=4)
     args = parser.parse_args()
-    REPORT.mkdir(parents=True, exist_ok=True)
-    previous = list(REPORT.glob('*/status.json'))
-    if len(previous) >= 4:
-        raise RuntimeError('Three main cases and one repair budget exhausted')
+    report = args.report_root.resolve()
+    report.mkdir(parents=True, exist_ok=True)
+    previous = list(report.glob('*/status.json'))
+    if len(previous) >= args.round_limit:
+        raise RuntimeError('Documented round budget exhausted')
     if args.repair:
-        if list(REPORT.glob('repair_*/status.json')) or not (REPORT/'repair_plan.md').exists():
+        if list(report.glob('repair_*/status.json')) or not (report/'repair_plan.md').exists():
             raise RuntimeError('Only one repair, documented before its run')
-    elif list(REPORT.glob(args.case+'_*/status.json')):
+    elif list(report.glob(args.case+'_*/status.json')):
         raise RuntimeError('This main case already ran; do not overwrite evidence')
     options = replace(ContinuousFeedingOptions(), requested_transfer_m=CASES[args.case],
                       maximum_feed_s=60. if args.case=='small' else 100.)
     sim = ContinuousFeedingSimulation(options)
     label = ('repair_' if args.repair else '')+args.case
-    folder = REPORT/(label+'_'+datetime.now().strftime('%Y%m%d_%H%M%S'))
+    folder = report/(label+'_'+datetime.now().strftime('%Y%m%d_%H%M%S'))
     folder.mkdir()
     for name in ('snake_control/continuous_feeding.py', 'snake_control/feeding_length_observer.py',
+                 'snake_control/whole_feeding_observer.py',
                  'validation/continuous_feeding_experiment.py'):
         (folder/Path(name).name).write_text((ROOT/name).read_text(encoding='utf8'), encoding='utf8')
     statistics = dict(steps=0, passive_torque_max_nm=0., active_torque_max_nm=0.,

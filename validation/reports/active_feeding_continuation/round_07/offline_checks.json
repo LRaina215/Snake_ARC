@@ -1,0 +1,23 @@
+{
+  "hardware_run": false,
+  "new_physics": false,
+  "replay": [
+    {
+      "record": "small_20261014_140308",
+      "samples": 2002,
+      "target_maximum_error_deg": 1.9968541061649365e-13,
+      "mask_mismatch_frames": 0,
+      "passed": true,
+      "inputs": "recorded motor angles, motor timestamp, control timestamp"
+    },
+    {
+      "record": "tail_large_20261014_140508",
+      "samples": 5251,
+      "target_maximum_error_deg": 9.096386388985659e-13,
+      "mask_mismatch_frames": 0,
+      "passed": true,
+      "inputs": "recorded motor angles, motor timestamp, control timestamp"
+    }
+  ],
+  "all_passed": true
+}

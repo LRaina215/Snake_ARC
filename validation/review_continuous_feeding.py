@@ -16,6 +16,7 @@ import cv2
 import mujoco
 from snake_control.simulation import ArcSimulation
 from snake_control.rolling_arc import ArcParameters
+from snake_control.section_geometry import continuous_section, sample_section
 
 REPORT = ROOT/'validation/reports/continuous_feeding'
 
@@ -50,11 +51,47 @@ def whole_body_bend(row):
         gap_fraction=float(np.linalg.norm(arc[-1]-arc[0])/np.linalg.norm(np.diff(arc, axis=0), axis=1).sum()))
 
 
+def upper_arc(row):
+    """Read-only true upper bend, excluding disconnected distal small folds.
+
+    Alternating hinges allow one near-zero hinge between curved hinges. The
+    5-degree threshold is the same as the legacy whole-bend metric. Choose
+    the connected bending group at the world-height maximum, independent of
+    the enable mask. Midpoint boundary links delimit the curved material.
+    Keep a separate ALL-joint positive-turn guard so cropping cannot hide a
+    second wrap. World coordinates here are evaluation only.
+    """
+    xy = np.array(row['backbone_world_m'])[:, [1, 2]]
+    d = np.diff(xy, axis=0)
+    turns = np.arctan2(d[:-1, 0]*d[1:, 1]-d[:-1, 1]*d[1:, 0],
+                       np.sum(d[:-1]*d[1:], axis=1))
+    peak = int(np.argmax(xy[:, 1]))
+    winding = 1 if turns[max(0, peak-3):min(len(turns), peak+2)].sum() >= 0 else -1
+    selected = np.flatnonzero(winding*turns > math.radians(5.))+1
+    if not len(selected):
+        return dict(valid=False)
+    groups = np.split(selected, np.flatnonzero(np.diff(selected)>2)+1)
+    group = min(groups, key=lambda g: max(int(g[0])-peak, peak-int(g[-1]), 0))
+    first, last = int(group[0]), int(group[-1])
+    points = np.vstack([.5*(xy[first-1]+xy[first]), xy[first:last+1],
+                        .5*(xy[last]+xy[last+1])])
+    curve = continuous_section(points)
+    samples = sample_section(curve)
+    return dict(valid=True, interval=[first, last], threshold_deg=5.,
+        crown_in_interval=first-1<=peak<=last+1,
+        turn_deg=math.degrees(sum(abs(s.turn) for s in curve)),
+        reverse_turn_deg=math.degrees(float(np.maximum(-winding*turns[first-1:last], 0.).sum())),
+        whole_positive_turn_deg=math.degrees(float(np.maximum(winding*turns, 0.).sum())),
+        smooth_gap_fraction=float(np.linalg.norm(samples[-1]-samples[0])/sum(s.length for s in curve)),
+        polyline_gap_fraction=float(np.linalg.norm(points[-1]-points[0])/np.linalg.norm(np.diff(points, axis=0), axis=1).sum()))
+
+
 def review(folder, render=False):
     status = json.loads((folder/'status.json').read_text(encoding='utf8'))
     rows = [json.loads(s) for s in gzip.open(folder/'actual_trace.jsonl.gz', 'rt', encoding='utf8')]
     for row in rows:
         row['review_whole_bend'] = whole_body_bend(row)
+        row['review_upper_arc'] = upper_arc(row)
     rr = [r for r in rows if r['time_s']>=6.]
     base = rr[0]; baseline = transfer(base)
     t = np.array([r['time_s'] for r in rows])
@@ -69,11 +106,15 @@ def review(folder, render=False):
             continue
         last = group[-1]; m = last['evaluation']['material']; bm = base['evaluation']['material']
         errors = [(transfer(r)-baseline-r['controller']['goal_delta_m'])*1000 for r in group]
+        head_errors = [(r['evaluation']['material']['head_hanging_m']-bm['head_hanging_m']-r['controller']['goal_delta_m'])*1000 for r in group]
+        tail_errors = [(r['evaluation']['material']['tail_hanging_m']-bm['tail_hanging_m']+r['controller']['goal_delta_m'])*1000 for r in group]
         summary['stage_results'].append(dict(stage=stage, start_s=group[0]['time_s'], end_s=last['time_s'],
             last_head_change_mm=(m['head_hanging_m']-bm['head_hanging_m'])*1000,
             last_tail_change_mm=(m['tail_hanging_m']-bm['tail_hanging_m'])*1000,
             last_transfer_delta_mm=(transfer(last)-baseline)*1000,
             true_goal_error_mm=errors[-1], true_goal_error_range_mm=[min(errors), max(errors)],
+            head_goal_error_range_mm=[min(head_errors), max(head_errors)],
+            tail_goal_error_range_mm=[min(tail_errors), max(tail_errors)],
             last_position_joints=last['controller']['position_joints']))
     summary['spatial'] = {}
     for key in ('support_point_world_m', 'crown_world_m', 'mean_body_world_m'):
@@ -88,6 +129,10 @@ def review(folder, render=False):
     for key in ('positive_turn_deg', 'reverse_turn_deg', 'pipe_wrap_deg', 'gap_fraction'):
         values = [r['review_whole_bend'][key] for r in rr if r['review_whole_bend']['valid']]
         summary['whole_body_bend'][key] = dict(min=min(values), max=max(values))
+    summary['actual_upper_arc'] = {}
+    for key in ('turn_deg', 'reverse_turn_deg', 'whole_positive_turn_deg', 'smooth_gap_fraction', 'polyline_gap_fraction'):
+        values = [r['review_upper_arc'][key] for r in rr if r['review_upper_arc']['valid']]
+        summary['actual_upper_arc'][key] = dict(min=min(values), max=max(values))
     invalid = [r for r in rr if not r['controller']['observation']['valid']]
     summary['invalid_length_samples'] = len(invalid)
     summary['zero_support_samples'] = sum(r['evaluation']['support_up_n']<=1e-9 for r in rr)
@@ -123,6 +168,22 @@ def review(folder, render=False):
         body_axial_displacement_le10mm=summary['spatial']['mean_body_world_m']['maximum_absolute_axis_displacement_mm'][0]<=10.)
     summary['acceptance'] = {key:bool(value) for key, value in summary['acceptance'].items()}
     summary['acceptance']['all_passed'] = all(summary['acceptance'].values())
+    summary['research_goal_acceptance'] = dict(
+        completed=summary['acceptance']['completed'],
+        both_outbound_lengths_sustained=all(stage in stages and all(max(abs(np.array(stages[stage][key])))<=12.
+            for key in ('head_goal_error_range_mm', 'tail_goal_error_range_mm')) for stage in ('review_out',)),
+        both_return_lengths_sustained=all(stage in stages and all(max(abs(np.array(stages[stage][key])))<=12.
+            for key in ('head_goal_error_range_mm', 'tail_goal_error_range_mm')) for stage in ('review_return', 'complete')),
+        actual_upper_arc_open=all(r['review_upper_arc']['valid'] and r['review_upper_arc']['crown_in_interval']
+            and 150.<=r['review_upper_arc']['turn_deg']<=218. and r['review_upper_arc']['smooth_gap_fraction']>=.4 for r in rr),
+        all_joint_positive_turn_le218=all(r['review_upper_arc']['valid'] and r['review_upper_arc']['whole_positive_turn_deg']<=218. for r in rr),
+        continuous_support_at_recorded_samples=summary['acceptance']['continuous_support_at_recorded_samples'],
+        no_floor_or_limits=summary['acceptance']['no_floor_or_limits'],
+        passive_active_torque_zero=summary['acceptance']['passive_active_torque_zero'],
+        body_axial_displacement_le10mm=summary['acceptance']['body_axial_displacement_le10mm'],
+        encoder_only_input=summary['all_inputs_angles_only'])
+    summary['research_goal_acceptance'] = {key:bool(value) for key,value in summary['research_goal_acceptance'].items()}
+    summary['research_goal_acceptance']['all_passed'] = all(summary['research_goal_acceptance'].values())
     (folder/'review.json').write_text(json.dumps(summary, indent=2), encoding='utf8')
 
     fig, axes = plt.subplots(6, 1, figsize=(12, 15), sharex=True, constrained_layout=True)
@@ -137,6 +198,7 @@ def review(folder, render=False):
     axes[2].plot(t, [r['evaluation']['section_turn_deg'] for r in rows], label='enabled smooth section turn')
     axes[2].plot(t, [r['review_whole_bend'].get('positive_turn_deg', np.nan) for r in rows], label='whole-body bend positive turn')
     axes[2].plot(t, [r['review_whole_bend'].get('pipe_wrap_deg', np.nan) for r in rows], label='whole-body pipe polar wrap')
+    axes[2].plot(t, [r['review_upper_arc'].get('turn_deg', np.nan) for r in rows], label='connected upper actual smooth arc')
     axes[2].axhline(218., color='red', ls='--'); axes[2].set_ylabel('degrees')
     axes[3].plot(t, [(r['evaluation']['mean_x_m']-base['evaluation']['mean_x_m'])*1000 for r in rows], label='body mean pipe axis mm')
     for key, label in (('support_point_world_m', 'support 3D excursion'), ('crown_world_m', 'crown 3D excursion')):
@@ -153,23 +215,31 @@ def review(folder, render=False):
     fig.savefig(folder/'timeline.png', dpi=110); plt.close(fig)
     outbound = [r for r in rows if r['controller']['stage']=='review_out']
     selected_rows = [outbound[-1] if outbound else base,
-                     max(rr, key=lambda r:r['review_whole_bend'].get('positive_turn_deg', 0.)), rows[-1]]
-    fig, axes = plt.subplots(1, 3, figsize=(11, 6), constrained_layout=True)
+                     max(rr, key=lambda r:r['review_whole_bend'].get('positive_turn_deg', 0.)),
+                     min((r for r in rr if r['review_upper_arc']['valid']), key=lambda r:r['review_upper_arc']['smooth_gap_fraction']), rows[-1]]
+    fig, axes = plt.subplots(1, 4, figsize=(14, 6), constrained_layout=True)
     for ax, row in zip(axes, selected_rows):
         points = np.array(row['backbone_world_m'])
         ax.add_patch(Circle((0., 1.2), .0565, color='gray', alpha=.35))
         ax.plot(points[:, 1], points[:, 2], '-o', color='purple', ms=3, label='actual full backbone')
         first, last = row['controller']['window']
         ax.plot(points[first:last+2, 1], points[first:last+2, 2], '-o', color='royalblue', ms=3, label='enabled region')
+        upper = row['review_upper_arc']
+        if upper['valid']:
+            a,b = upper['interval']
+            xy = points[:,[1,2]]
+            arc = np.vstack([.5*(xy[a-1]+xy[a]), xy[a:b+1], .5*(xy[b]+xy[b+1])])
+            smooth = sample_section(continuous_section(arc))
+            ax.plot(smooth[:,0], smooth[:,1], color='green', lw=1, label='actual upper smooth arc')
         for contact in row['evaluation']['spatial']['contacts']:
             ax.plot(contact['position_world_m'][1], contact['position_world_m'][2], 'x', color='red')
-        ax.set_title(f"t={row['time_s']:.2f}s\nnet transfer={(transfer(row)-baseline)*1000:.1f}mm")
+        ax.set_title(f"t={row['time_s']:.2f}s\nnet={(transfer(row)-baseline)*1000:.1f}mm\nupper gap={upper.get('smooth_gap_fraction', float('nan')):.3f}")
         ax.set_xlim(-.3, .3); ax.set_ylim(.3, 1.4); ax.set_aspect('equal')
         ax.set_xlabel('world transverse Y m'); ax.set_ylabel('world Z m'); ax.legend(fontsize=7)
     fig.savefig(folder/'actual_sections.png', dpi=120); plt.close(fig)
     if render and not (folder/'actual_full.mp4').exists():
         render_actual(folder, rows, status, baseline)
-    print(folder.name, json.dumps(dict(stages=summary['stage_results'], acceptance=summary['acceptance']), ensure_ascii=False), flush=True)
+    print(folder.name, json.dumps(dict(stages=summary['stage_results'], acceptance=summary['research_goal_acceptance']), ensure_ascii=False), flush=True)
 
 
 def render_actual(folder, rows, status, baseline):
@@ -224,6 +294,7 @@ def render_actual(folder, rows, status, baseline):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('--render', action='store_true')
+    parser.add_argument('--report-root', type=Path, default=REPORT)
     args = parser.parse_args()
-    for path in sorted(REPORT.glob('*/status.json')):
+    for path in sorted(args.report_root.glob('*/status.json')):
         review(path.parent, args.render)

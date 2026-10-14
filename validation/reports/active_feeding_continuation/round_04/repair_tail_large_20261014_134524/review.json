@@ -1,0 +1,486 @@
+{
+  "termination": "floor_or_controller_fault",
+  "fault": "length observation did not recover during bounded shape completion",
+  "final_time_s": 90.62000000006864,
+  "statistics": {
+    "steps": 90620,
+    "passive_torque_max_nm": 0.0,
+    "active_torque_max_nm": 2.355,
+    "joint_limit_excess_max_rad": 0.0,
+    "saturation_joint_steps": 106,
+    "floor_contact_steps": 0,
+    "maximum_enabled_count": 17,
+    "minimum_enabled_count": 6,
+    "maximum_shared_target_step_deg": 0.9000000000042983
+  },
+  "baseline_time_s": 6.000000000000338,
+  "requested_transfer_m": 0.258,
+  "hardware_run": false,
+  "stage_results": [
+    {
+      "stage": "feed_out",
+      "start_s": 6.020000000000345,
+      "end_s": 47.1999999999807,
+      "last_head_change_mm": 268.59749608506434,
+      "last_tail_change_mm": -265.89099431944,
+      "last_transfer_delta_mm": 267.24424520225216,
+      "true_goal_error_mm": 9.244245202252143,
+      "true_goal_error_range_mm": [
+        -258.9452799878626,
+        9.244245202252143
+      ],
+      "head_goal_error_range_mm": [
+        -258.9970381333464,
+        10.597496085064328
+      ],
+      "tail_goal_error_range_mm": [
+        -7.890994319439959,
+        258.8935218423788
+      ],
+      "last_position_joints": 3.7388937723011826
+    },
+    {
+      "stage": "review_out",
+      "start_s": 47.21999999998065,
+      "end_s": 49.21999999997599,
+      "last_head_change_mm": 271.0747438761699,
+      "last_tail_change_mm": -268.25090795126306,
+      "last_transfer_delta_mm": 269.66282591371646,
+      "true_goal_error_mm": 11.662825913716478,
+      "true_goal_error_range_mm": [
+        9.294978379489393,
+        11.662825913716478
+      ],
+      "head_goal_error_range_mm": [
+        10.64426222935344,
+        13.074743876169915
+      ],
+      "tail_goal_error_range_mm": [
+        -10.250907951263045,
+        -7.945694529625347
+      ],
+      "last_position_joints": 3.722685417887178
+    },
+    {
+      "stage": "feed_return",
+      "start_s": 49.23999999997594,
+      "end_s": 90.62000000006864,
+      "last_head_change_mm": 11.702107110438176,
+      "last_tail_change_mm": -18.99039522741697,
+      "last_transfer_delta_mm": 15.346251168927571,
+      "true_goal_error_mm": 15.346251168927571,
+      "true_goal_error_range_mm": [
+        14.589342561666385,
+        269.66997798247513
+      ],
+      "head_goal_error_range_mm": [
+        10.461595778158749,
+        271.2528801164428
+      ],
+      "tail_goal_error_range_mm": [
+        -268.25475151089006,
+        -18.709857279191166
+      ],
+      "last_position_joints": -0.0016551963509208178
+    }
+  ],
+  "spatial": {
+    "support_point_world_m": {
+      "maximum_displacement_mm": 41.91204925080897,
+      "maximum_absolute_axis_displacement_mm": [
+        3.9977792729936623,
+        39.52994594007036,
+        15.823128297913103
+      ],
+      "final_delta_mm": [
+        -1.6131581106667015,
+        9.994544977105,
+        3.3243486586884696
+      ],
+      "missing_samples": 0
+    },
+    "crown_world_m": {
+      "maximum_displacement_mm": 43.72672502686783,
+      "maximum_absolute_axis_displacement_mm": [
+        1.9504564150080173,
+        43.397953364496125,
+        13.040120980462033
+      ],
+      "final_delta_mm": [
+        -0.6039470547309911,
+        -26.405427896724547,
+        2.443887694474345
+      ],
+      "missing_samples": 0
+    },
+    "mean_body_world_m": {
+      "maximum_displacement_mm": 63.95286294681613,
+      "maximum_absolute_axis_displacement_mm": [
+        1.84257176501601,
+        44.325320996540945,
+        61.90743567425139
+      ],
+      "final_delta_mm": [
+        -1.3159792309339613,
+        13.177489389759405,
+        5.365881572218623
+      ],
+      "missing_samples": 0
+    }
+  },
+  "section_turn_deg": {
+    "min": 179.42435251836548,
+    "max": 193.66619852597663
+  },
+  "enabled_gap_fraction": {
+    "min": 0.20891134863167013,
+    "max": 0.575108588036312
+  },
+  "plane_rms_m": {
+    "min": 1.3271576663085818e-08,
+    "max": 1.8103867272021373e-05
+  },
+  "maximum_curvature_per_m": {
+    "min": 17.91820125660534,
+    "max": 24.233680838794804
+  },
+  "support_up_n": {
+    "min": 27.06884567128135,
+    "max": 29.155744558083843
+  },
+  "legacy_enabled_wrap_deg": {
+    "min": 212.66750776662286,
+    "max": 327.2757445343104
+  },
+  "min_z_m": {
+    "min": 0.38753403683852466,
+    "max": 0.6495053507197827
+  },
+  "whole_body_bend": {
+    "positive_turn_deg": {
+      "min": 173.94802848750044,
+      "max": 185.61008364132513
+    },
+    "reverse_turn_deg": {
+      "min": 0.04987914118294724,
+      "max": 25.287837491827933
+    },
+    "pipe_wrap_deg": {
+      "min": 171.14119831289526,
+      "max": 295.36739130339873
+    },
+    "gap_fraction": {
+      "min": 0.40248512462451863,
+      "max": 0.6962501105307537
+    }
+  },
+  "actual_upper_arc": {
+    "turn_deg": {
+      "min": 173.9480284875005,
+      "max": 180.6504178373331
+    },
+    "reverse_turn_deg": {
+      "min": 0.0,
+      "max": 0.0004682161882514002
+    },
+    "whole_positive_turn_deg": {
+      "min": 178.7855242546784,
+      "max": 186.8089418682578
+    },
+    "smooth_gap_fraction": {
+      "min": 0.45153897875199916,
+      "max": 0.7226814851951923
+    },
+    "polyline_gap_fraction": {
+      "min": 0.43213888479269097,
+      "max": 0.6962501105307543
+    }
+  },
+  "invalid_length_samples": 151,
+  "zero_support_samples": 0,
+  "first_invalid_time_s": 87.62000000005432,
+  "bearing_bias_at_limit_s": 0.0,
+  "feedback_aligned_delta_error_mm": {
+    "rmse": 8.555897987321398,
+    "maximum": 26.302849222395675
+  },
+  "mask_handovers": [
+    {
+      "kind": "mask_handover",
+      "time_s": 6.020000000000345,
+      "entering": [
+        7,
+        14,
+        15
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 9,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 12.399999999998567,
+      "entering": [
+        5,
+        6
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 11,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 12.799999999998345,
+      "entering": [
+        16,
+        17
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 13,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 23.20000000000537,
+      "entering": [],
+      "released": [
+        5,
+        6
+      ],
+      "exit_angles_deg": [
+        -0.0025277585560160368,
+        -0.003800968216111583
+      ],
+      "enabled_count": 11,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 26.80000000000977,
+      "entering": [],
+      "released": [
+        7,
+        8
+      ],
+      "exit_angles_deg": [
+        -0.02362626268720144,
+        -0.0008687140475437484
+      ],
+      "enabled_count": 9,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 36.200000000006334,
+      "entering": [
+        18
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 10,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 43.59999999998909,
+      "entering": [
+        7,
+        8
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 12,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 45.19999999998536,
+      "entering": [
+        5,
+        6
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 14,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 47.599999999979765,
+      "entering": [
+        19
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 15,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 60.399999999949934,
+      "entering": [],
+      "released": [
+        5,
+        6
+      ],
+      "exit_angles_deg": [
+        -0.0831079231103005,
+        -0.00019353750703004604
+      ],
+      "enabled_count": 13,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 66.45999999995328,
+      "entering": [
+        5,
+        6
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 15,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 67.19999999995682,
+      "entering": [],
+      "released": [
+        18,
+        19
+      ],
+      "exit_angles_deg": [
+        -0.00018112587231207666,
+        0.025669335100995547
+      ],
+      "enabled_count": 13,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 69.79999999996923,
+      "entering": [
+        18,
+        19
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 15,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 77.40000000000552,
+      "entering": [],
+      "released": [
+        5,
+        6,
+        7
+      ],
+      "exit_angles_deg": [
+        -0.07490675492624052,
+        -0.00014505227528566485,
+        -0.19427142220760948
+      ],
+      "enabled_count": 12,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 78.00000000000838,
+      "entering": [
+        7
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 13,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 79.00000000001316,
+      "entering": [
+        5,
+        6
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 15,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 80.80000000002175,
+      "entering": [],
+      "released": [
+        18,
+        19
+      ],
+      "exit_angles_deg": [
+        -0.00024981477866165046,
+        0.02075093162769767
+      ],
+      "enabled_count": 13,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 84.80000000004085,
+      "entering": [
+        18,
+        19
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 15,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    },
+    {
+      "kind": "mask_handover",
+      "time_s": 87.50000000005375,
+      "entering": [
+        3,
+        4
+      ],
+      "released": [],
+      "exit_angles_deg": [],
+      "enabled_count": 17,
+      "release_means": "persistent_angle_and_below_arc_geometry_not_measured_unloading"
+    }
+  ],
+  "phase_max_absolute_rad": 0.0,
+  "external_force_max": 0.0,
+  "all_inputs_angles_only": true,
+  "finite_actual_states": true,
+  "acceptance": {
+    "completed": false,
+    "outbound_sustained_length": true,
+    "return_sustained_length": false,
+    "final_length": false,
+    "open_enabled_section": false,
+    "whole_bend_turn_le218": true,
+    "whole_pipe_wrap_le218": false,
+    "no_floor_or_limits": true,
+    "continuous_support_at_recorded_samples": true,
+    "passive_active_torque_zero": true,
+    "body_axial_displacement_le10mm": true,
+    "all_passed": false
+  },
+  "research_goal_acceptance": {
+    "completed": false,
+    "both_outbound_lengths_sustained": false,
+    "both_return_lengths_sustained": false,
+    "actual_upper_arc_open": true,
+    "all_joint_positive_turn_le218": true,
+    "continuous_support_at_recorded_samples": true,
+    "no_floor_or_limits": true,
+    "passive_active_torque_zero": true,
+    "body_axial_displacement_le10mm": true,
+    "encoder_only_input": true,
+    "all_passed": false
+  }
+}

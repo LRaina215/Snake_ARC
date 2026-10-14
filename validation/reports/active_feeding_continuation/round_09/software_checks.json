@@ -1,0 +1,7 @@
+{
+  "command": "conda run --no-capture-output -n mujoco python -X utf8 validation/test_continuous_feeding.py",
+  "tests": 6,
+  "passed": true,
+  "new_physics": false,
+  "sha_check": false
+}

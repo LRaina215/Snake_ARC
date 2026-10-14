@@ -1,0 +1,26 @@
+[
+  {
+    "record": "validation\\reports\\continuous_feeding\\tail_large_20261014_023914",
+    "valid_samples": 194,
+    "invalid_samples": 0,
+    "error_rms_mm": 16.377413093048244,
+    "error_max_mm": 59.924852343697935,
+    "last": [
+      44.61999999998671,
+      0.24531136646725604,
+      0.24078373549347648
+    ]
+  },
+  {
+    "record": "validation\\reports\\active_feeding_continuation\\round_01\\tail_large_20261014_124406",
+    "valid_samples": 211,
+    "invalid_samples": 10,
+    "error_rms_mm": 43.231632655576085,
+    "error_max_mm": 225.7672858891256,
+    "last": [
+      50.019999999974125,
+      0.19980372188717005,
+      0.17524770260894512
+    ]
+  }
+]
