@@ -2,7 +2,8 @@
 
 Position is a travelling curvature profile in material joint coordinates,
 not a world displacement. A new local transition follows each old one.
-The left/right curvature allocation can change while its total stays pi.
+Manual entries translate the captured measured bend; historical experiments
+may still construct a pi-turn template by omitting seed_angles_deg.
 All contact/world support and true length checks belong to the experiment.
 """
 from dataclasses import dataclass, asdict, replace
@@ -10,7 +11,7 @@ import math
 import numpy as np
 from .active_arc_transfer import ActiveArcTransfer, TransferOptions
 from .whole_feeding_observer import WholeFeedingObserver
-from .section_geometry import forward
+from .section_geometry import forward,local_section
 
 
 @dataclass(frozen=True)
@@ -58,10 +59,21 @@ class ContinuousFeedingOptions:
 
 
 class ContinuousFeeding:
-    def __init__(self, lengths, options=ContinuousFeedingOptions()):
+    def __init__(self, lengths, options=ContinuousFeedingOptions(), seed_angles_deg=None):
         self.lengths = np.asarray(lengths, float)
         self.n = len(self.lengths)-1
         self.options = options
+        self.measured_seed = None
+        self.seed_turn_deg = None
+        if seed_angles_deg is not None:
+            seed=np.asarray(seed_angles_deg,float)
+            if seed.shape!=(self.n,) or not np.isfinite(seed).all():
+                raise ValueError('Feeding seed requires complete measured motor angles')
+            self.measured_seed=np.zeros(self.n)
+            first,last=options.first_joint,options.last_joint
+            self.measured_seed[first-1:last]=np.radians(seed[first-1:last])
+            section=local_section(np.radians(seed),self.lengths,first,last)
+            self.seed_turn_deg=math.degrees(section['total_turn'])
         self.reference_direction = 1 if options.requested_transfer_m > 0 else -1
         self.helper = ActiveArcTransfer(self.lengths, 'transfer', TransferOptions(
             first_joint=options.first_joint, last_joint=options.last_joint,
@@ -70,8 +82,12 @@ class ContinuousFeeding:
         self.origin = (options.first_joint, options.last_joint)
         # Each transition advances two alternating hinges. The last valid
         # pair gives a coarse profile range, not a guarantee of support.
-        self.minimum_bin = math.ceil((2-options.first_joint)/2)
-        self.maximum_bin = math.floor((self.n-1-options.last_joint-2)/2)
+        bearing_first,bearing_last=self.origin
+        if self.measured_seed is not None:
+            curved=np.flatnonzero(abs(self.measured_seed)>1e-8)+1
+            bearing_first,bearing_last=int(curved[0]),int(curved[-1])
+        self.minimum_bin = math.ceil((2-bearing_first)/2)
+        self.maximum_bin = math.floor((self.n-1-bearing_last-2)/2)
         self.position_bounds = (2*self.minimum_bin, 2*(self.maximum_bin+1))
         # A profile endpoint is reachable only if every nonzero bend can be
         # enabled while preserving the chosen passive reference. Never clip a
@@ -95,7 +111,7 @@ class ContinuousFeeding:
             1., abs(options.requested_transfer_m)/float(np.mean(self.lengths)))
         self.enabled = self.helper.mask(self.origin)
         self.window = self.origin
-        self.targets = self.helper.template(self.origin, 0., options.amplitude_deg)
+        self.targets = self.helper.template(self.origin, 0., options.amplitude_deg) if self.measured_seed is None else self.measured_seed.copy()
         self.stage = 'prepare'
         self.stage_since = self.ready_since = None
         self.last_time = self.last_feedback = self.last_length_time = None
@@ -119,6 +135,7 @@ class ContinuousFeeding:
         self.recovery = None
         self.observation_recovery = None
         self.reference_epoch = None
+        self.buffer_release_since = np.full(self.n, np.nan)
 
     def reference_mask(self):
         reserved = np.zeros(self.n, bool)
@@ -312,13 +329,32 @@ class ContinuousFeeding:
         return desired
 
     def profile(self, position, bias):
-        """Interpolate the travelling profile; totals of each axis stay fixed."""
+        """Interpolate the travelling profile; retain each captured axis budget."""
         cell = int(np.clip(math.floor(position/2), self.minimum_bin, self.maximum_bin))
         fraction = float(np.clip(position/2-cell, 0., 1.))
         old = tuple(j+2*cell for j in self.origin)
         new = tuple(j+2 for j in old)
-        left = self.helper.template(old, 0., self.options.amplitude_deg, bias)
-        right = self.helper.template(new, 0., self.options.amplitude_deg, bias)
+        if self.measured_seed is None:
+            left = self.helper.template(old, 0., self.options.amplitude_deg, bias)
+            right = self.helper.template(new, 0., self.options.amplitude_deg, bias)
+        else:
+            # Translate the captured bend in material coordinates. Preserve
+            # each alternating family's signed shape/amplitude; no phase-zero
+            # or 60-degree reconstruction on entering mode 4.
+            seed=self.measured_seed.copy()
+            source=np.arange(self.origin[0]-1,self.origin[1])
+            allocation=np.linspace(1.,-1.,len(source))
+            for parity in (0,1):
+                family=source[source%2==parity]
+                factor=1.+bias*allocation[source%2==parity]
+                total=float(abs(seed[family]).sum())
+                seed[family]*=factor
+                if total>1e-12:seed[family]*=total/abs(seed[family]).sum()
+            left,right=np.zeros(self.n),np.zeros(self.n)
+            for result,shift in ((left,2*cell),(right,2*(cell+1))):
+                inside=(source+shift>=0) & (source+shift<self.n)
+                if np.any(abs(seed[source[~inside]])>1e-8):raise ValueError('Measured bend outside robot')
+                result[source[inside]+shift]=seed[source[inside]]
         curved = np.flatnonzero(abs(left)+abs(right)>1e-10)+1
         focus = (int(curved[0]), int(curved[-1]))
         target = (1-fraction)*left+fraction*right
@@ -329,7 +365,7 @@ class ContinuousFeeding:
         allocation = offset*offset*(3.-2.*offset)
         boost = math.radians(self.options.fractional_middle_boost_deg)*allocation*math.sin(math.pi*fraction)**2
         family = curved-1
-        if len(family)==4:
+        if len(family)==4 and self.measured_seed is None:
             target[family[[0,-1]]] -= boost
             target[family[1:3]] += boost
         return target, focus, cell, fraction
@@ -350,10 +386,14 @@ class ContinuousFeeding:
         actual_arc = self.observation.get('actual_arc_window')
         if actual_arc is not None:
             required |= self.helper.mask(tuple(actual_arc))
-        active = np.flatnonzero(required)+1
+        # Neighbour capture is relative to the travelling feature, never to
+        # last frame's expanded mask or a length-measurement cut.
+        active = np.arange(focus[0],focus[1]+1)
         radius = self.options.adjacent_fold_distance_joints
         joints = np.arange(1,self.n+1)
         folds = joints[(abs(angles)>=self.options.adjacent_fold_angle_deg) &
+                       ~self.reference_mask() &
+                       (joints>=2) & (joints<=self.n-1) &
                        (joints>=active[0]-radius) & (joints<=active[-1]+radius)]
         self.fold_capture_position[folds-1] = position
         # A straightened fold often returns under gravity immediately
@@ -362,6 +402,7 @@ class ContinuousFeeding:
         # at a stationary length goal. This is material distance,
         # never pipe contact or a world unloading observation.
         retained = joints[np.isfinite(self.fold_capture_position) &
+            ~self.reference_mask() &
             (abs(position-self.fold_capture_position)<self.options.fold_retention_distance_joints)]
         folds = np.union1d(folds, retained)
         if len(folds):
@@ -379,6 +420,37 @@ class ContinuousFeeding:
             raise ValueError('Profile requires a reserved passive joint; recover inward first')
         required[reserved] = False
         return required
+
+    def retire_straight_buffers(self, angles, feedback_time, fresh):
+        """Retire settled zero-target buffers even if they exhausted the down reference.
+
+        Keep the travelling bend and its immediate/trailing neighbours. Remove
+        only contiguous outer zero-command joints, after fresh angle dwell.
+        This is a motor/shape handover, not a contact unloading measurement.
+        """
+        desired, focus, _, _ = self.profile(self.position, self.bias)
+        protected = self.required_with_buffer((max(2,focus[0]-1),min(self.n-1,focus[1]+1)))
+        eligible = (self.enabled & ~protected & (abs(desired)<1e-8) &
+                    (abs(np.degrees(self.targets))<=self.options.exit_angle_deg) &
+                    (abs(angles)<=self.options.exit_angle_deg))
+        if fresh:
+            self.buffer_release_since[~eligible] = np.nan
+            self.buffer_release_since[eligible & np.isnan(self.buffer_release_since)] = feedback_time
+        ready = eligible & (feedback_time-self.buffer_release_since>=self.options.release_persistence_s-1e-8)
+        active = np.flatnonzero(self.enabled)
+        release = np.zeros(self.n,bool)
+        for sequence in (active, active[::-1]):
+            for j in sequence:
+                if not ready[j]:break
+                release[j]=True
+        if release.any():
+            self.enabled[release]=False
+            self.fold_capture_position[release]=np.nan
+            self.buffer_release_since[release]=np.nan
+            active=np.flatnonzero(self.enabled)+1
+            self.window=(int(active[0]),int(active[-1]))
+            self.events.append(dict(kind='retire_straight_buffers',time_s=feedback_time,
+                released=(np.flatnonzero(release)+1).tolist(),observes_unloading=False))
 
     def release_ready(self, angles, required, feedback_time, fresh):
         """Encoder geometry below the bearing arc; not a contact-force gate."""
@@ -421,6 +493,8 @@ class ContinuousFeeding:
         dt = .02 if self.last_time is None else control_time_s-self.last_time
         self.last_time = control_time_s
         opt = self.options
+        if self.stage in ('acquire','feed_out','feed_return','review_out','review_return'):
+            self.retire_straight_buffers(angles,feedback_time_s,fresh)
         if fresh:
             previously_valid = self.observation is not None and self.observation['valid']
             self.last_feedback = feedback_time_s
@@ -483,7 +557,7 @@ class ContinuousFeeding:
 
         desired = self.targets.copy()
         if self.stage == 'prepare':
-            desired = self.helper.template(self.origin, 0., opt.amplitude_deg)
+            desired = self.helper.template(self.origin, 0., opt.amplitude_deg) if self.measured_seed is None else self.measured_seed.copy()
             if control_time_s >= opt.preparation_s-1e-8 and fresh:
                 if not self.observation['valid']:
                     # A fresh sample at the nominal preparation boundary may
@@ -516,9 +590,15 @@ class ContinuousFeeding:
                 proposed_position = float(np.clip(self.position+rate*dt, *self.position_bounds))
                 current, _, _, _ = self.profile(self.position, self.bias)
                 self.tracking_error_deg = float(np.max(abs(np.degrees(current[self.enabled])-angles[self.enabled])))
-                self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
+                # Alternating motor angles add to more than planar curvature
+                # when the captured rolling phase uses both hinge families.
+                if self.measured_seed is None:
+                    self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
+                else:
+                    self.actual_enabled_turn_deg = self.observation['arc_feature']['best']['turn_deg']
+                turn_limit=opt.tracked_turn_soft_limit_deg if self.seed_turn_deg is None else max(opt.tracked_turn_soft_limit_deg,self.seed_turn_deg+12.)
                 blocked = (self.tracking_error_deg>opt.tracking_tolerance_deg or
-                           self.actual_enabled_turn_deg>opt.tracked_turn_soft_limit_deg)
+                           self.actual_enabled_turn_deg>turn_limit)
                 if blocked:
                     proposed_position = self.position
                     if self.tracking_blocked_since is None:
@@ -581,6 +661,9 @@ class ContinuousFeeding:
 
     def snapshot(self):
         return dict(stage=self.stage, route='continuous_feeding', window=list(self.window),
+            seed_source='configured_template' if self.measured_seed is None else 'measured_feature_arc',
+            measured_seed_deg=None if self.measured_seed is None else np.degrees(self.measured_seed).tolist(),
+            seed_turn_deg=self.seed_turn_deg,
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
             acquisition_metrics=self.acquisition_metrics,

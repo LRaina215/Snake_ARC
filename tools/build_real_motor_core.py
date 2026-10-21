@@ -35,7 +35,7 @@ def main():
     for name in ('angle_shape_observer.py', 'motor_shape_observer.py', 'motor_feedback_sliding.py'):
         body += '\n\n\n'+declarations(ROOT/'snake_control'/name)
     body += '\n\n\n'+declarations(ROOT/'snake_control/adaptive_arc_length.py', {'HalfArcParameters', 'circle_shape'})
-    for name in ('rolling_shape_observer.py', 'phase_balanced_count.py', 'posture_window.py'):
+    for name in ('feature_arc.py', 'rolling_shape_observer.py', 'phase_balanced_count.py', 'posture_window.py'):
         body += '\n\n\n'+declarations(ROOT/'snake_control'/name)
     reference = json.loads((ROOT/'configs/motor_shape_reference.json').read_text(encoding='utf8'))
     body += '\n\nMOTOR_PHASE_REFERENCE = '+pprint.pformat(reference, width=100, sort_dicts=False)+'\n'

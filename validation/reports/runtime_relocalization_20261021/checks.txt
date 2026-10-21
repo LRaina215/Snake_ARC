@@ -1,0 +1,42 @@
+test_full_normal_cycle_does_not_recommend_false_migration (validation.test_runtime_relocalization.RuntimeRecoveryTests) ... ok
+test_global_relocation_reaches_real_torque_mask_adapter (validation.test_runtime_relocalization.RuntimeRecoveryTests) ... ok
+test_mode1_or3_to4_preserves_measured_radius_and_nonzero_rolling_phase (validation.test_runtime_relocalization.RuntimeRecoveryTests) ... ok
+test_mode4_to3_needs_no_passive_direction_and_matches_debug (validation.test_runtime_relocalization.RuntimeRecoveryTests) ... ok
+test_motion_not_reported_complete_when_old_arc_does_not_follow (validation.test_runtime_relocalization.RuntimeRecoveryTests) ... ok
+test_recorded_feeding_buffers_release_and_static_feedback_can_acquire (validation.test_runtime_relocalization.RuntimeRecoveryTests) ... ok
+test_recorded_wrong_arc_relocates_with_bounded_commands_and_same_embedded_result (validation.test_runtime_relocalization.RuntimeRecoveryTests) ... ok
+test_shared_feature_turns_match_control_smooth_section (validation.test_runtime_relocalization.RuntimeRecoveryTests) ... ok
+test_failed_reselection_holds_old_mask_without_claiming_mode3 (validation.test_feeding_reference_recovery.ModeSwitchTests) ... ok
+test_initial_rejection_records_specific_reason_without_enabling (validation.test_feeding_reference_recovery.ModeSwitchTests) ... ok
+test_mode4_to3_trims_straight_buffers_without_spurious_motion (validation.test_feeding_reference_recovery.ModeSwitchTests) ... ok
+test_real_and_debug_reselect_recorded_feeding_pose_and_run_observers (validation.test_feeding_reference_recovery.ModeSwitchTests) ... ok
+test_recorded_released_pose_with_bent_tips_can_initialize_from_crest (validation.test_feeding_reference_recovery.ModeSwitchTests) ... ok
+test_reselection_writes_exact_torque_mask_and_only_sends_selected_ids (validation.test_feeding_reference_recovery.ModeSwitchTests) ... ok
+test_actual_tracking_stall_is_identified_and_not_accepted_as_stable (validation.test_feeding_reference_recovery.ReferenceRecoveryTests) ... ok
+test_enabled_old_reference_is_never_used_for_continuity (validation.test_feeding_reference_recovery.ReferenceRecoveryTests) ... ok
+test_failed_section_fit_cannot_refresh_the_last_valid_reference (validation.test_feeding_reference_recovery.ReferenceRecoveryTests) ... ok
+test_long_gap_requires_stable_redatum_and_never_credits_unknown_motion (validation.test_feeding_reference_recovery.ReferenceRecoveryTests) ... ok
+test_qualified_backup_joins_without_an_artificial_length_step (validation.test_feeding_reference_recovery.ReferenceRecoveryTests) ... ok
+test_review_does_not_complete_or_return_while_reference_is_missing (validation.test_feeding_reference_recovery.ReferenceRecoveryTests) ... ok
+test_serial_cadence_keeps_three_samples_without_loosening_thresholds (validation.test_feeding_reference_recovery.ReferenceRecoveryTests) ... ok
+test_short_missing_observation_recovers_without_velocity_spike (validation.test_feeding_reference_recovery.ReferenceRecoveryTests) ... ok
+test_bounds_cover_every_required_bend_with_both_reference_sides (validation.test_feeding_boundary.BoundaryTests) ... ok
+test_ctrl3_arms_measured_offset_arc_and_ctrl_u_keeps_configured_seed (validation.test_feeding_boundary.BoundaryTests) ... ok
+test_ctrl3_rejects_unobservable_straight_pose_without_enabling (validation.test_feeding_boundary.BoundaryTests) ... ok
+test_debug_ctrl3_uses_same_selector_and_configured_reset (validation.test_feeding_boundary.BoundaryTests) ... ok
+test_recorded_j15_stall_has_an_inward_bridge_and_matches_embedded_core (validation.test_feeding_boundary.BoundaryTests) ... ok
+test_recorded_slide_does_not_require_a_radius_fit (validation.test_feeding_boundary.BoundaryTests) ... ok
+test_release_arm_restores_configuration_after_sliding_and_manual_edit (validation.test_feeding_boundary.BoundaryTests) ... ok
+test_repeated_j_boundary_and_h_returns_without_reset (validation.test_feeding_boundary.BoundaryTests) ... ok
+test_relative_actions_keep_profile_and_hold_without_return (validation.test_manual_feeding.ManualFeedingTests) ... ok
+test_task19_straightening_is_before_baseline (validation.test_manual_feeding.ManualFeedingTests) ... ok
+test_unsettled_measurement_never_creates_progress (validation.test_manual_feeding.ManualFeedingTests) ... ok
+test_count_expands_contracts_independent_of_initial_amplitude (validation.test_half_circle_window.HalfCircleTests) ... ok
+test_discrete_inverse_preserves_actual_curve_contraction (validation.test_half_circle_window.HalfCircleTests) ... ok
+test_real_record_intrinsic_recommendation_can_complete_exact_slide (validation.test_half_circle_window.HalfCircleTests) ... ok
+test_reverse_phase_accumulates_and_hold_does_not (validation.test_half_circle_window.HalfCircleTests) ... ok
+
+----------------------------------------------------------------------
+Ran 37 tests in 85.859s
+
+OK

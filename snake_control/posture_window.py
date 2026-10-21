@@ -154,6 +154,9 @@ class PostureWindow(MotorFeedbackSliding):
         self.trial = None
         self.resize_fault = None
         self.adaptive_enabled = True
+        self.relocalization = None
+        self.relocation_intent = None
+        self.relocation_since = None
         self._new_observer()
 
     @property
@@ -191,6 +194,8 @@ class PostureWindow(MotorFeedbackSliding):
         o = self.observation
         if not o or not o.get('valid') or not o.get('position_valid', False):
             return None
+        if o.get('global_arc',{}).get('chosen'):
+            return 'whole_body_measured_arc_feature'
         if 'down_head' in o:
             return 'passive_down_and_bending'
         suggested = o.get('suggested_window')
@@ -210,7 +215,7 @@ class PostureWindow(MotorFeedbackSliding):
             resizing = window[1]-window[0] != self.window[1]-self.window[0]
             reason = ('candidate_shape_unreliable' if not good else
                       'candidate_circle_fit_unreliable' if resizing and measured['circle_rms_m'] > self.posture_options.circle_rms_max_m else
-                      'candidate_has_no_position_reference' if down is None and not intrinsic else None)
+                      'candidate_has_no_position_reference' if down is None and not intrinsic and self._position_evidence(window)!='whole_body_measured_arc_feature' else None)
             return dict(window=list(window), eligible=reason is None,
                         geometry=geometry, actual_body_circle=measured,
                         circle_fit_required=resizing,
@@ -247,6 +252,32 @@ class PostureWindow(MotorFeedbackSliding):
 
     def _select(self, angles, time_s):
         o, count = self.observation, self.count_observation
+        if o and o.get('state')=='relocalize':
+            destination=tuple(o['relocalize_window'])
+            if self.relocation_intent!=destination:
+                self.relocation_intent,self.relocation_since=destination,time_s
+            self.selection=dict(state='confirming_global_relocation',chosen=list(destination),
+                global_arc=o['global_arc'],length_reason='current_window_lost_upper_arc')
+            if time_s-self.relocation_since>=self.posture_options.persistence_s:
+                union=(min(self.window[0],destination[0]),max(self.window[1],destination[1]))
+                _,quality=self.observer.passive_down(forward(np.radians(angles),self.lengths),union,None)
+                if quality.get('source')=='candidate_would_enable_direction_reference':
+                    self.selection['state']='relocation_reference_conflict'
+                    return
+                mask=(np.arange(1,self.p.joints+1)>=union[0]) & (np.arange(1,self.p.joints+1)<=union[1])
+                goal=self.targets.copy();goal[~self.enabled]=np.radians(angles)[~self.enabled]
+                keep=(np.arange(1,self.p.joints+1)>=destination[0]) & (np.arange(1,self.p.joints+1)<=destination[1])
+                goal[mask & ~keep]=0.
+                self.targets[mask & ~self.enabled]=np.radians(angles)[mask & ~self.enabled]
+                self.relocalization=dict(old=list(self.window),to=list(destination),goal=goal,
+                    keep=keep,start_time=time_s,ready_since=None)
+                self.enabled,self.window=mask,union
+                self.phase_hold=True
+                self.pending,self.trial=None,None
+                self.events.append(dict(kind='relocalization_start',time_s=time_s,to=list(destination),
+                    old=self.relocalization['old'],phase_paused=True,observes_support=False))
+            return
+        self.relocation_intent=self.relocation_since=None
         evidence = self._position_evidence()
         if evidence is None:
             self.intent = self.intent_since = None
@@ -277,6 +308,8 @@ class PostureWindow(MotorFeedbackSliding):
         bending = o['filtered_feature_error']
         corroborated = sign*bending[0] >= self.observer.options.bending_threshold_joints or sign*bending[1] >= self.observer.options.boundary_threshold_deg
         migration = sign if abs(offset) >= self.observer.options.crest_threshold_joints and corroborated else 0
+        if evidence=='whole_body_measured_arc_feature':
+            migration=int(o['direction']) if o.get('state') in ('recommend_head','recommend_tail') else 0
         if evidence == 'persistent_intrinsic_bending_and_boundary':
             migration = int(o['direction'])
         first, last = self.window
@@ -323,6 +356,9 @@ class PostureWindow(MotorFeedbackSliding):
             self.selection['state'] = 'waiting_moving_handover'
 
     def _handover(self, angles, time_s):
+        if self.observation and self.observation.get('state')=='relocalize':
+            self.pending=None
+            return
         request, new = self.pending, tuple(self.pending['to'])
         if self.fresh_feedback:
             p = replace(self.p, first_joint=new[0], last_joint=new[1])
@@ -412,23 +448,82 @@ class PostureWindow(MotorFeedbackSliding):
             self.trial = None
 
     def advance(self, angles_deg, feedback_time_s, control_time_s, commanded_phase_rad=None, **kwargs):
+        if self.relocalization is not None:
+            return self._advance_relocalization(angles_deg,feedback_time_s,control_time_s,kwargs.get('freeze_targets',False))
         rolling_back = self.pending is not None and self.pending.get('rollback', False)
         if self.resize_fault or (self.fault and not rolling_back):
             kwargs['freeze_targets'] = True
-        result = super().advance(angles_deg, feedback_time_s, control_time_s, commanded_phase_rad, **kwargs)
-        if self.fresh_feedback:
+        try:
+            result = super().advance(angles_deg, feedback_time_s, control_time_s, commanded_phase_rad, **kwargs)
+        except (ValueError,np.linalg.LinAlgError):
+            if not self.observation or self.observation.get('state')!='relocalize':raise
+            # A straight/degenerate old section cannot veto a different valid
+            # full-body feature. Keep its last commands while acquiring that arc.
+            result=self.targets.copy(),self.enabled.copy()
+        relocating=self.observation is not None and self.observation.get('state')=='relocalize'
+        if self.fresh_feedback and not relocating:
             self._observe_count(np.asarray(angles_deg), control_time_s)
-        self._review_trial(np.asarray(angles_deg), control_time_s)
+        if not relocating:self._review_trial(np.asarray(angles_deg), control_time_s)
         if (self.automatic and self.fresh_feedback and self.pending is None and self.trial is None and
                 control_time_s >= self.cooldown_until and not self.fault and not self.resize_fault and
                 not kwargs.get('freeze_targets', False)):
             self._select(np.asarray(angles_deg), control_time_s)
-        if self.phase_hold:
+        if self.phase_hold and self.relocalization is None:
             raise RuntimeError('Normal posture-window exchanges must keep rolling')
-        return result
+        return self.targets.copy(),self.enabled.copy()
+
+    def _advance_relocalization(self, angles_deg, feedback_time, time_s, frozen):
+        """Acquire the measured upper arc, then straighten/release old motors.
+
+        This exceptional recovery holds phase; normal adjacent slides still
+        roll continuously. Every entering joint starts at its measured angle.
+        """
+        if not 0.<=time_s-feedback_time<=self.options.maximum_feedback_age_s:
+            raise TimeoutError('Relocation needs fresh motor feedback')
+        if self.last_control_time is not None and time_s<=self.last_control_time:
+            if time_s<self.last_control_time:raise ValueError('Control clock cannot run backwards')
+            return self.targets.copy(),self.enabled.copy()
+        fresh=self.last_time is None or feedback_time>self.last_time
+        if self.last_time is not None and feedback_time<self.last_time:raise ValueError('Feedback time cannot run backwards')
+        angles=np.asarray(angles_deg,float);q=np.radians(angles)
+        if not fresh and not np.array_equal(angles,self.previous_angles):raise ValueError('Changed angles with an unchanged feedback timestamp')
+        dt=min(.02,time_s-self.last_control_time)
+        self.last_control_time=time_s;self.fresh_feedback=fresh
+        if fresh:self.previous_angles,self.last_time=angles.copy(),feedback_time
+        r=self.relocalization
+        error=float(abs(np.degrees(self.targets[self.enabled])-angles[self.enabled]).max())
+        retiring=self.enabled & ~r['keep']
+        if not frozen and error<=5. and self.fault is None:
+            step=math.radians(self.section_options.target_rate_deg_s)*dt
+            self.targets[self.enabled]+=np.clip(r['goal'][self.enabled]-self.targets[self.enabled],-step,step)
+        self.targets[~self.enabled]=q[~self.enabled]
+        exit_error=float(abs(angles[retiring]).max()) if retiring.any() else 0.
+        target_error=float(abs(np.degrees(self.targets[retiring])).max()) if retiring.any() else 0.
+        self.selection=dict(state='relocalizing_upper_arc',chosen=r['to'],tracking_error_deg=error,
+            retiring_max_angle_deg=exit_error,phase_paused=True,length_reason='controlled_old_arc_release')
+        if fresh and not frozen and self.fault is None:
+            ready=exit_error<=self.options.switch_angle_deg and target_error<=self.options.switch_angle_deg and error<=5.
+            r['ready_since']=(feedback_time if r['ready_since'] is None else r['ready_since']) if ready else None
+            if r['ready_since'] is not None and feedback_time-r['ready_since']>=.2:
+                self.window=tuple(r['to']);self.enabled=r['keep'].copy()
+                p=replace(self.p,first_joint=self.window[0],last_joint=self.window[1])
+                self.core=FixedSectionCompliance(p,self.lengths,self.section_options)
+                self.core.targets=self.targets.copy()
+                self.targets[~self.enabled]=q[~self.enabled]
+                self.events.append(dict(kind='relocalization_complete',time_s=time_s,to=list(self.window),
+                    max_exit_angle_deg=exit_error,observes_unloading=False))
+                self.relocalization=None;self.phase_hold=False
+                self.relocation_intent=self.relocation_since=None
+                self.cooldown_until=time_s+self.posture_options.cooldown_s
+                self._new_observer()
+        if self.relocalization is not None and time_s-r['start_time']>10.:
+            self.fault='global relocation tracking did not settle; hold and reselect mode'
+        return self.targets.copy(),self.enabled.copy()
 
     def snapshot(self):
         result = super().snapshot()
+        result['relocalization']=None if self.relocalization is None else {
+            k:v for k,v in self.relocalization.items() if k not in ('goal','keep')}
         result.update(active_count=int(self.enabled.sum()), selection=copy.deepcopy(self.selection),
                       length_observation=copy.deepcopy(self.selection), trial=copy.deepcopy(self.trial),
                       resize_fault=self.resize_fault, posture_options=asdict(self.posture_options),

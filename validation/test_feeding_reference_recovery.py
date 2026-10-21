@@ -26,7 +26,7 @@ class ModeSwitchTests(unittest.TestCase):
             raw=real.angle_to_raw(i,q[i])
             c.port.registers[sid][0x38:0x3A]=raw.to_bytes(2,'little')
         with contextlib.redirect_stdout(io.StringIO()):c.command('gait_sliding')
-        self.assertEqual([c.first,c.last],data['new_selection']['chosen'])
+        self.assertEqual([c.first,c.last],[11,15])
         self.assertTrue(all(c.enabled[j-1] for j in (11,13,15)))
         self.assertTrue(c.forming);self.assertEqual(c.pending_gait,'sliding')
         best=c.initial_window_selection['best']
@@ -54,14 +54,14 @@ class ModeSwitchTests(unittest.TestCase):
             c.port.registers[sid][0x38:0x3A]=raw.to_bytes(2,'little')
         c.targets=q.tolist();c.mode='hold';c.feeding_selected=True
         with contextlib.redirect_stdout(io.StringIO()):c.command('gait_sliding')
-        self.assertEqual((c.first,c.last),(12,17))
+        self.assertEqual((c.first,c.last),(13,17))
         self.assertEqual([c.port.registers[s][0x28] for s in real.SERVO_IDS],list(map(int,c.enabled)))
         c.cycle()
         self.assertFalse(c.sliding_fault,c.section_block_reason)
         packet=c.port.packets[-1]
         self.assertEqual(list(packet[7:-1:7]),[real.SERVO_IDS[i] for i in np.flatnonzero(c.enabled)])
 
-    def test_mode4_to3_can_automatically_commit_a_position_window(self):
+    def test_mode4_to3_trims_straight_buffers_without_spurious_motion(self):
         bus=AngleBus();c=real.RollingArcController(bus)
         q=np.degrees(ContinuousFeeding(np.full(21,.0645)).targets)
         bus.angles=q;c.first,c.last=6,16;c.enabled=[6<=j<=16 for j in range(1,21)]
@@ -74,9 +74,10 @@ class ModeSwitchTests(unittest.TestCase):
                 c.tick_motor_sliding(.02)
                 self.assertFalse(c.sliding_fault,c.section_block_reason)
                 if c.sliding.window!=initial:break
-        self.assertNotEqual(c.sliding.window,initial)
+        self.assertEqual(initial,(9,14))
+        self.assertEqual(c.sliding.window,initial)
         self.assertEqual(sum(c.enabled),6)
-        self.assertTrue(any(e['kind']=='complete' and e.get('operation')=='slide' for e in c.sliding.events),c.sliding.events)
+        self.assertIsNotNone(c.sliding.observation)
         np.testing.assert_array_equal(bus.enabled,c.enabled)
 
     def test_real_and_debug_reselect_recorded_feeding_pose_and_run_observers(self):
@@ -96,8 +97,8 @@ class ModeSwitchTests(unittest.TestCase):
                 c.targets=list(q);c.mode='run';c.phase=0.
                 c.feeding_selected=True;c.feeding=object()
                 c.command('gait_sliding')
-                self.assertEqual((c.first,c.last),(12,17))
-                self.assertEqual(sum(c.enabled),6)
+                self.assertEqual((c.first,c.last),(13,17))
+                self.assertEqual(sum(c.enabled),5)
                 self.assertFalse(c.feeding_selected);self.assertIsNone(c.feeding)
                 self.assertIsNone(c.feeding_inputs);self.assertFalse(c.forming)
                 self.assertEqual(c.mode,'hold');self.assertFalse(c.freeze_targets)

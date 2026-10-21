@@ -8,6 +8,7 @@ import math
 from dataclasses import dataclass, asdict
 import numpy as np
 from .section_geometry import forward, local_section
+from .feature_arc import feature_arc_candidates
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class WholeFeedingObserver:
         self._coordinate_offset_m = 0.
         self._last_valid_time = None
         self._current_candidates = {}
+        self._feature_cache = None
 
     def down_direction(self, points, window, angles_deg, feedback_time_s):
         """Search wholly passive spans; retain an eligible span to avoid chatter.
@@ -252,9 +254,14 @@ class WholeFeedingObserver:
             levels=np.array(locations)
             w=np.maximum(0.,levels-levels.max()+np.mean(self.lengths)/8)*weights
             crest=float(w@coordinates/w.sum())
-            # Cover the actual upper span plus neighbours. This is geometry,
-            # not the contact support span; it cannot prove unloading.
-            arc_window=(max(2,left-1),min(len(q)-1,right+1))
+            # Use the same measured feature as initial arming and rolling.
+            # The length cut must not also define an expanding torque buffer.
+            key=(tuple(angles),tuple(down))
+            if self._feature_cache is None or self._feature_cache[0]!=key:
+                self._feature_cache=(key,feature_arc_candidates(angles,self.lengths,down=down))
+            feature=self._feature_cache[1]
+            if feature['chosen'] is None:raise ValueError('no_open_arc_feature_for_feeding')
+            arc_window=tuple(feature['chosen'])
             section=local_section(q,self.lengths,*arc_window)
             # Commit the reference only after the whole measurement succeeds.
             # Failed section reconstruction is not a fresh valid datum.
@@ -266,6 +273,7 @@ class WholeFeedingObserver:
                 above_cut_length_m=float(self.distance[-1]-head-tail),
                 cut_height_head_frame_m=cut, cut_depth_m=self.cut_depth_m, crest_joint=crest,
                 actual_arc_window=list(arc_window), down_head=down.tolist(), end_quality=quality,
+                arc_feature=feature,
                 plane_rms_m=section['fit_rms'], observes_pipe_contact=False, observes_world_position=False)
         except (ValueError,np.linalg.LinAlgError) as exc:
             return dict(valid=False,reason=str(exc))

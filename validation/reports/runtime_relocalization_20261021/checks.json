@@ -1,0 +1,15 @@
+{
+  "tests": 37,
+  "failures": 0,
+  "errors": 0,
+  "elapsed_s": 85.8602189,
+  "hardware_connected": false,
+  "new_dynamics": false,
+  "modules": [
+    "validation.test_runtime_relocalization",
+    "validation.test_feeding_reference_recovery",
+    "validation.test_feeding_boundary",
+    "validation.test_manual_feeding",
+    "validation.test_half_circle_window"
+  ]
+}

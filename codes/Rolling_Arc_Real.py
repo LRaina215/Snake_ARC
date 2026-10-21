@@ -79,10 +79,10 @@ POSTURE_CONTRACT_EXIT_ANGLE_DEG = 12.0
 POSTURE_EXPANSION_TURN_ERROR_DEG = -5.0
 POSTURE_CONTRACTION_TURN_ERROR_DEG = 5.0
 
-# 主动送链：只用角度/时间，普通滚动相位固定0；不是管径顺应。
+# 主动送链：只用角度/时间，暂停滚动并保留实测起态；不是管径顺应。
 FEED_DISTANCE_M = .0645        # Ctrl+J/H一次任务的材料量；四连杆试验改为.258
-FEED_AMPLITUDE_DEG = 60.0      # 送链起态自己的幅值，不覆盖你的基础/顺应参数
-FEED_PREPARATION_S = 6.0       # 首次形成；之后另等接管展直稳定才标定本步基线
+FEED_AMPLITUDE_DEG = 60.0      # 历史模板参数；实机接入使用当前实测圆弧，不据此重建半径
+FEED_PREPARATION_S = 6.0       # 历史模板形成时间；实测起态不重复形成，接管后另标定本步基线
 FEED_AUTOMATIC_RETURN = False  # 手调默认单程，到位保持；不自动反向
 FEED_OPTIONS_OVERRIDE = {}     # 可覆盖第3C段ContinuousFeedingOptions字段，单位见定义
 FEED_DIRECTION_OVERRIDE = {}   # 第3C段FeedingDirectionOptions：选段/直线度/稳定时间
@@ -1505,6 +1505,86 @@ def circle_shape(section):
                 turn_deg=math.degrees(section['total_turn']))
 
 
+def feature_arc_candidates(angles_deg,lengths,down=None,focus=None,current_window=None):
+    angles=np.asarray(angles_deg,float);lengths=np.asarray(lengths,float)
+    n=len(lengths)-1
+    if angles.shape!=(n,) or not np.isfinite(angles).all():
+        raise ValueError('全关节角反馈必须完整且有限')
+    points=forward(np.radians(angles),lengths)
+    crest=None
+    if down is not None:
+        down=np.asarray(down,float);down=down/np.linalg.norm(down)
+        heights=-points @ down
+        crest=float(np.mean(np.flatnonzero(heights>=heights.max()-1e-8)))
+    support=None
+    if focus is not None:
+        joints=np.arange(1,n+1)
+        curved=joints[(joints>=focus[0]) & (joints<=focus[1]) & (abs(angles)>=5.)]
+        if len(curved):support=(int(curved[0]),int(curved[-1]))
+    candidates=[];rejections={}
+    for first in range(2,n-1):
+        for last in range(first+2,n):
+            if support is not None and not (first<=support[0] and last>=support[1]):continue
+            captured=float(abs(angles[first-1:last]).sum())
+            if captured<90.:
+                rejections['局部弯曲不足90°']=rejections.get('局部弯曲不足90°',0)+1
+                continue
+            # Prune only obvious multiple-fold spans before expensive fitting.
+            if captured>540.:continue
+            try:
+                # Reuse one FK for every candidate. The absolute polyline
+                # turns equal the smooth A/B/C construction's module turns;
+                # constructing all those curve objects would waste serial time.
+                arc=points[first:last+2]
+                center=arc.mean(axis=0)
+                _,_,basis=np.linalg.svd(arc-center,full_matrices=False)
+                plane_rms=float(np.sqrt(np.mean(((arc-center)@basis[-1])**2)))
+                projected=(points[first-1:last+3]-center)@basis[:2].T
+                xy=projected[1:-1]
+                gap=float(np.linalg.norm(arc[-1]-arc[0])/np.linalg.norm(np.diff(arc,axis=0),axis=1).sum())
+                delta=np.diff(projected,axis=0);norm=np.linalg.norm(delta,axis=1)
+                if norm.min()<1e-8:continue
+                tangents=delta/norm[:,None]
+                turns=np.arctan2(tangents[:-1,0]*tangents[1:,1]-tangents[:-1,1]*tangents[1:,0],
+                                (tangents[:-1]*tangents[1:]).sum(axis=1))
+                turns[abs(turns)<1e-7]=0.  # same straight-module tolerance as continuous_section
+                turn=math.degrees(float(abs(turns[:last-first+1]).sum()))
+                if not 90.<=turn<=240. or gap<.35 or plane_rms>.025:continue
+                fit=np.linalg.lstsq(np.column_stack([2*xy,np.ones(len(xy))]),(xy*xy).sum(axis=1),rcond=None)[0]
+                radius=math.sqrt(max(0.,fit[2]+fit[:2]@fit[:2]));radial=xy-fit[:2]
+                rms=float(np.sqrt(np.mean((np.linalg.norm(radial,axis=1)-radius)**2)))
+                polar=np.unwrap(np.arctan2(radial[:,1],radial[:,0]))
+                coverage=math.degrees(abs(polar[-1]-polar[0]))
+                if not 90.<=coverage<=240. or rms>.025:continue
+                score=abs(turn-180.)/60.+abs(coverage-180.)/60.+rms/.015+.03*(last-first+1)
+                alignment=None
+                if down is not None:
+                    opening=(arc[0]+arc[-1])/2-arc.mean(axis=0)
+                    alignment=float(opening@down/max(np.linalg.norm(opening),1e-12))
+                    # Direction is ranking evidence; the feature exists even
+                    # without it. A reversed old arc must not veto this scan.
+                    score+=3.*max(0.,.5-alignment)
+                    if not first<crest<last+1:score+=3.
+                if current_window is not None:
+                    score+=.04*abs(sum((first,last))-sum(current_window))
+                candidates.append(dict(window=[first,last],score=score,turn_deg=turn,coverage_deg=coverage,
+                    gap_fraction=gap,plane_rms_m=plane_rms,circle_rms_m=rms,
+                    opening_alignment=alignment,conditional_crest_joint=crest,
+                    captured_bending_fraction=captured/max(float(abs(angles).sum()),1e-12)))
+            except (ValueError,np.linalg.LinAlgError):continue
+    candidates.sort(key=lambda c:(c['score'],c['window']))
+    return dict(chosen=None if not candidates else candidates[0]['window'],
+        best=None if not candidates else candidates[0],candidates=candidates[:5],crest_joint=crest,
+        diagnostics=dict(eligible_count=len(candidates),rejection_counts=rejections),
+        input='whole_measured_link_geometry',uses_down=down is not None,uses_feeding_focus=support is not None,
+        observes_pipe_contact=False)
+
+
+def locate_measured_arc(angles_deg, lengths, width, down, current_window=None):
+    """Compatibility entry: width is no longer a constraint on feature search."""
+    return feature_arc_candidates(angles_deg,lengths,down=down,current_window=current_window)
+
+
 class RollingShapeObserver:
     def __init__(self, lengths, reference, amplitude_deg=60.,
                  options=MotorObserverOptions(), width=6):
@@ -1515,6 +1595,10 @@ class RollingShapeObserver:
         self.last_time = self.window = self.filtered = self.pending_since = None
         self.pending_direction = 0
         self.filtered_crest = None
+        self.direction_observer = WholeFeedingObserver(lengths,(2,3))
+        self.runtime_down = None
+        self.runtime_quality = None
+        self.feature_cache = None
 
     def passive_down(self, points, window, section):
         """Conditional gravity proxy; one straight long end is not a sensor.
@@ -1522,6 +1606,12 @@ class RollingShapeObserver:
         The open-side hemisphere rejects a pulled-up end, but cannot rule out
         every force/contact that tilts a straight arm. Truth is evaluated later.
         """
+        if self.runtime_quality is not None:
+            # Candidate evaluation may not borrow a reference it would enable.
+            for name,links,_ in self.direction_observer.reference_recipe(self.runtime_quality) if self.runtime_down is not None else []:
+                if not (links[1]-1 < window[0] or links[0] > window[1]):
+                    return None,dict(source='candidate_would_enable_direction_reference')
+            return self.runtime_down,self.runtime_quality
         ends = []
         arc = section['points'][1:-1]
         opening = (arc[0]+arc[-1])/2-arc.mean(axis=0)
@@ -1569,57 +1659,51 @@ class RollingShapeObserver:
             self.filtered, self.pending_since, self.pending_direction = None, None, 0
             self.filtered_crest = None
         self.window, self.last_time = window, feedback_time_s
+        points=forward(np.radians(angles),self.lengths)
+        self.runtime_down,self.runtime_quality=self.direction_observer.down_direction(
+            points,window,angles,feedback_time_s)
         r = dict(feedback_time_s=feedback_time_s, current_window=list(window), external_window_change=changed,
                  execution='observation_only', executes_window_update=False, valid=False, reasons=[],
                  direction=0, suggested_window=None, state='unobservable',
                  localisation='intrinsic_same_winding_bending', observes_absolute_down=False)
         try:
-            good, geometry, section = self.geometry_observer.geometry(np.radians(angles), window)
-            r['current_geometry'] = geometry
-            if not good:
-                raise ValueError('Current body outside open-shape limits')
-            features = bending_features(angles, self.lengths, window)
-            center = sum(window)/2
-            values = np.array([features['bending_center_joint']-center,
-                               features['tail_boundary_turn_deg']-features['head_boundary_turn_deg']])
-            baseline = self.reference.at(phase_rad, window[0])[1:]
-            error = values-baseline
-            if self.filtered is None:
-                self.filtered = error.copy()
-            else:
-                self.filtered += (1-math.exp(-dt/self.options.filter_s))*(error-self.filtered)
-            r.update(valid=True, features=features, phase_reference=baseline.tolist(), feature_error=error.tolist(),
-                     filtered_feature_error=self.filtered.tolist(), filtered_error_joints=float(self.filtered[0]),
-                     estimated_bending_center_joint=float(center+self.filtered[0]))
-            r['position_valid'] = not self.reference.metadata.get('transition_only', False)
-            if not r['position_valid']:
-                r['state'] = 'transition_geometry_only'
+            key=(tuple(angles),window,None if self.runtime_down is None else tuple(self.runtime_down))
+            if self.feature_cache is None or self.feature_cache[0]!=key:
+                self.feature_cache=(key,feature_arc_candidates(angles,self.lengths,down=self.runtime_down,current_window=window))
+            feature=self.feature_cache[1]
+            r.update(global_arc=feature,end_quality=self.runtime_quality,
+                     localisation='whole_body_measured_arc_feature')
+            if feature['chosen'] is None:
+                raise ValueError('No reconstructed open arc feature in full measured body')
+            try:
+                good,geometry,section=self.geometry_observer.geometry(np.radians(angles),window)
+            except (ValueError,np.linalg.LinAlgError) as exc:
+                good,geometry,section=False,dict(error=str(exc)),None
+            r['current_geometry']=geometry
+            center=sum(window)/2
+            desired=tuple(feature['chosen']);offset=sum(desired)/2-center
+            r.update(valid=True,position_valid=True,features={},
+                     phase_reference=None,feature_error=[offset,0.],filtered_feature_error=[offset,0.],
+                     filtered_error_joints=offset,estimated_bending_center_joint=sum(desired)/2)
+            aligned=None
+            if self.runtime_down is not None:
+                r['down_head']=self.runtime_down.tolist()
+                if section is not None:
+                    arc=section['points'][1:-1]
+                    opening=(arc[0]+arc[-1])/2-arc.mean(axis=0)
+                    aligned=float(opening@self.runtime_down/max(np.linalg.norm(opening),1e-12))
+                    r['current_opening_alignment']=aligned
+            disjoint=desired[0]>window[1] or desired[1]<window[0]
+            if desired!=window and (disjoint or not good or abs(offset)>2. or (aligned is not None and aligned<0.)):
+                r.update(state='relocalize',relocalize_window=list(desired))
                 return r
-            down, quality = self.passive_down(forward(np.radians(angles), self.lengths), window, section)
-            r['end_quality'] = quality
-            primary, corroborated = float(self.filtered[0]), False
-            if down is not None:
-                crest = self.geometry_observer.crest(forward(np.radians(angles), self.lengths), window, section, down)
-                crest_error = crest['joint_coordinate']-center-self.reference.at(phase_rad, window[0])[0]
-                if self.filtered_crest is None:
-                    self.filtered_crest = crest_error
-                else:
-                    self.filtered_crest += (1-math.exp(-dt/self.options.filter_s))*(crest_error-self.filtered_crest)
-                primary = float(self.filtered_crest)
-                r.update(down_head=down.tolist(), crest=crest, localisation='conditional_crest_with_bending',
-                         gravity_proxy_assumption='qualified passive end hangs down', filtered_error_joints=primary,
-                         observes_absolute_down=False)
-                sign = 1 if primary > 0 else -1
-                corroborated = (sign*self.filtered[0] >= self.options.bending_threshold_joints or
-                                sign*self.filtered[1] >= self.options.boundary_threshold_deg)
-            else:
-                self.filtered_crest = None
-                sign = 1 if primary > 0 else -1
-                corroborated = sign*self.filtered[1] >= self.options.boundary_threshold_deg
-            direction = 1 if primary > 0 else -1
-            if abs(primary) < self.options.crest_threshold_joints or not corroborated:
-                self.pending_since, self.pending_direction = None, 0
-                r['state'] = 'retain'
+            # Half-joint changes can reflect alternate hinge families during
+            # rolling. Position shifts require a full-joint centre difference;
+            # width changes are separately persisted by the count estimator.
+            direction=1 if offset>0 else -1
+            if abs(offset)<1.-1e-8:
+                self.pending_since,self.pending_direction=None,0
+                r['state']='retain'
                 return r
             candidate = (window[0]+direction, window[1]+direction)
             if candidate[0] < 2 or candidate[1] > len(angles)-1:
@@ -1649,8 +1733,8 @@ class RollingShapeObserver:
 
     def configuration(self):
         return dict(options=asdict(self.options), frozen_reference=self.reference.to_dict(),
-                    gravity_assumption='qualified long passive end; otherwise strong intrinsic bending only',
-                    position_definition='conditional gravity crest with same-winding corroboration',
+                    gravity_assumption='optional stable passive material segments',
+                    position_definition='whole-body measured open-arc feature; phase reference is legacy metadata',
                     inputs=['angles_deg', 'phase_rad', 'enabled', 'feedback_time_s'])
 
 
@@ -1849,6 +1933,9 @@ class PostureWindow(MotorFeedbackSliding):
         self.trial = None
         self.resize_fault = None
         self.adaptive_enabled = True
+        self.relocalization = None
+        self.relocation_intent = None
+        self.relocation_since = None
         self._new_observer()
 
     @property
@@ -1886,6 +1973,8 @@ class PostureWindow(MotorFeedbackSliding):
         o = self.observation
         if not o or not o.get('valid') or not o.get('position_valid', False):
             return None
+        if o.get('global_arc',{}).get('chosen'):
+            return 'whole_body_measured_arc_feature'
         if 'down_head' in o:
             return 'passive_down_and_bending'
         suggested = o.get('suggested_window')
@@ -1905,7 +1994,7 @@ class PostureWindow(MotorFeedbackSliding):
             resizing = window[1]-window[0] != self.window[1]-self.window[0]
             reason = ('candidate_shape_unreliable' if not good else
                       'candidate_circle_fit_unreliable' if resizing and measured['circle_rms_m'] > self.posture_options.circle_rms_max_m else
-                      'candidate_has_no_position_reference' if down is None and not intrinsic else None)
+                      'candidate_has_no_position_reference' if down is None and not intrinsic and self._position_evidence(window)!='whole_body_measured_arc_feature' else None)
             return dict(window=list(window), eligible=reason is None,
                         geometry=geometry, actual_body_circle=measured,
                         circle_fit_required=resizing,
@@ -1942,6 +2031,32 @@ class PostureWindow(MotorFeedbackSliding):
 
     def _select(self, angles, time_s):
         o, count = self.observation, self.count_observation
+        if o and o.get('state')=='relocalize':
+            destination=tuple(o['relocalize_window'])
+            if self.relocation_intent!=destination:
+                self.relocation_intent,self.relocation_since=destination,time_s
+            self.selection=dict(state='confirming_global_relocation',chosen=list(destination),
+                global_arc=o['global_arc'],length_reason='current_window_lost_upper_arc')
+            if time_s-self.relocation_since>=self.posture_options.persistence_s:
+                union=(min(self.window[0],destination[0]),max(self.window[1],destination[1]))
+                _,quality=self.observer.passive_down(forward(np.radians(angles),self.lengths),union,None)
+                if quality.get('source')=='candidate_would_enable_direction_reference':
+                    self.selection['state']='relocation_reference_conflict'
+                    return
+                mask=(np.arange(1,self.p.joints+1)>=union[0]) & (np.arange(1,self.p.joints+1)<=union[1])
+                goal=self.targets.copy();goal[~self.enabled]=np.radians(angles)[~self.enabled]
+                keep=(np.arange(1,self.p.joints+1)>=destination[0]) & (np.arange(1,self.p.joints+1)<=destination[1])
+                goal[mask & ~keep]=0.
+                self.targets[mask & ~self.enabled]=np.radians(angles)[mask & ~self.enabled]
+                self.relocalization=dict(old=list(self.window),to=list(destination),goal=goal,
+                    keep=keep,start_time=time_s,ready_since=None)
+                self.enabled,self.window=mask,union
+                self.phase_hold=True
+                self.pending,self.trial=None,None
+                self.events.append(dict(kind='relocalization_start',time_s=time_s,to=list(destination),
+                    old=self.relocalization['old'],phase_paused=True,observes_support=False))
+            return
+        self.relocation_intent=self.relocation_since=None
         evidence = self._position_evidence()
         if evidence is None:
             self.intent = self.intent_since = None
@@ -1972,6 +2087,8 @@ class PostureWindow(MotorFeedbackSliding):
         bending = o['filtered_feature_error']
         corroborated = sign*bending[0] >= self.observer.options.bending_threshold_joints or sign*bending[1] >= self.observer.options.boundary_threshold_deg
         migration = sign if abs(offset) >= self.observer.options.crest_threshold_joints and corroborated else 0
+        if evidence=='whole_body_measured_arc_feature':
+            migration=int(o['direction']) if o.get('state') in ('recommend_head','recommend_tail') else 0
         if evidence == 'persistent_intrinsic_bending_and_boundary':
             migration = int(o['direction'])
         first, last = self.window
@@ -2018,6 +2135,9 @@ class PostureWindow(MotorFeedbackSliding):
             self.selection['state'] = 'waiting_moving_handover'
 
     def _handover(self, angles, time_s):
+        if self.observation and self.observation.get('state')=='relocalize':
+            self.pending=None
+            return
         request, new = self.pending, tuple(self.pending['to'])
         if self.fresh_feedback:
             p = replace(self.p, first_joint=new[0], last_joint=new[1])
@@ -2107,23 +2227,82 @@ class PostureWindow(MotorFeedbackSliding):
             self.trial = None
 
     def advance(self, angles_deg, feedback_time_s, control_time_s, commanded_phase_rad=None, **kwargs):
+        if self.relocalization is not None:
+            return self._advance_relocalization(angles_deg,feedback_time_s,control_time_s,kwargs.get('freeze_targets',False))
         rolling_back = self.pending is not None and self.pending.get('rollback', False)
         if self.resize_fault or (self.fault and not rolling_back):
             kwargs['freeze_targets'] = True
-        result = super().advance(angles_deg, feedback_time_s, control_time_s, commanded_phase_rad, **kwargs)
-        if self.fresh_feedback:
+        try:
+            result = super().advance(angles_deg, feedback_time_s, control_time_s, commanded_phase_rad, **kwargs)
+        except (ValueError,np.linalg.LinAlgError):
+            if not self.observation or self.observation.get('state')!='relocalize':raise
+            # A straight/degenerate old section cannot veto a different valid
+            # full-body feature. Keep its last commands while acquiring that arc.
+            result=self.targets.copy(),self.enabled.copy()
+        relocating=self.observation is not None and self.observation.get('state')=='relocalize'
+        if self.fresh_feedback and not relocating:
             self._observe_count(np.asarray(angles_deg), control_time_s)
-        self._review_trial(np.asarray(angles_deg), control_time_s)
+        if not relocating:self._review_trial(np.asarray(angles_deg), control_time_s)
         if (self.automatic and self.fresh_feedback and self.pending is None and self.trial is None and
                 control_time_s >= self.cooldown_until and not self.fault and not self.resize_fault and
                 not kwargs.get('freeze_targets', False)):
             self._select(np.asarray(angles_deg), control_time_s)
-        if self.phase_hold:
+        if self.phase_hold and self.relocalization is None:
             raise RuntimeError('Normal posture-window exchanges must keep rolling')
-        return result
+        return self.targets.copy(),self.enabled.copy()
+
+    def _advance_relocalization(self, angles_deg, feedback_time, time_s, frozen):
+        """Acquire the measured upper arc, then straighten/release old motors.
+
+        This exceptional recovery holds phase; normal adjacent slides still
+        roll continuously. Every entering joint starts at its measured angle.
+        """
+        if not 0.<=time_s-feedback_time<=self.options.maximum_feedback_age_s:
+            raise TimeoutError('Relocation needs fresh motor feedback')
+        if self.last_control_time is not None and time_s<=self.last_control_time:
+            if time_s<self.last_control_time:raise ValueError('Control clock cannot run backwards')
+            return self.targets.copy(),self.enabled.copy()
+        fresh=self.last_time is None or feedback_time>self.last_time
+        if self.last_time is not None and feedback_time<self.last_time:raise ValueError('Feedback time cannot run backwards')
+        angles=np.asarray(angles_deg,float);q=np.radians(angles)
+        if not fresh and not np.array_equal(angles,self.previous_angles):raise ValueError('Changed angles with an unchanged feedback timestamp')
+        dt=min(.02,time_s-self.last_control_time)
+        self.last_control_time=time_s;self.fresh_feedback=fresh
+        if fresh:self.previous_angles,self.last_time=angles.copy(),feedback_time
+        r=self.relocalization
+        error=float(abs(np.degrees(self.targets[self.enabled])-angles[self.enabled]).max())
+        retiring=self.enabled & ~r['keep']
+        if not frozen and error<=5. and self.fault is None:
+            step=math.radians(self.section_options.target_rate_deg_s)*dt
+            self.targets[self.enabled]+=np.clip(r['goal'][self.enabled]-self.targets[self.enabled],-step,step)
+        self.targets[~self.enabled]=q[~self.enabled]
+        exit_error=float(abs(angles[retiring]).max()) if retiring.any() else 0.
+        target_error=float(abs(np.degrees(self.targets[retiring])).max()) if retiring.any() else 0.
+        self.selection=dict(state='relocalizing_upper_arc',chosen=r['to'],tracking_error_deg=error,
+            retiring_max_angle_deg=exit_error,phase_paused=True,length_reason='controlled_old_arc_release')
+        if fresh and not frozen and self.fault is None:
+            ready=exit_error<=self.options.switch_angle_deg and target_error<=self.options.switch_angle_deg and error<=5.
+            r['ready_since']=(feedback_time if r['ready_since'] is None else r['ready_since']) if ready else None
+            if r['ready_since'] is not None and feedback_time-r['ready_since']>=.2:
+                self.window=tuple(r['to']);self.enabled=r['keep'].copy()
+                p=replace(self.p,first_joint=self.window[0],last_joint=self.window[1])
+                self.core=FixedSectionCompliance(p,self.lengths,self.section_options)
+                self.core.targets=self.targets.copy()
+                self.targets[~self.enabled]=q[~self.enabled]
+                self.events.append(dict(kind='relocalization_complete',time_s=time_s,to=list(self.window),
+                    max_exit_angle_deg=exit_error,observes_unloading=False))
+                self.relocalization=None;self.phase_hold=False
+                self.relocation_intent=self.relocation_since=None
+                self.cooldown_until=time_s+self.posture_options.cooldown_s
+                self._new_observer()
+        if self.relocalization is not None and time_s-r['start_time']>10.:
+            self.fault='global relocation tracking did not settle; hold and reselect mode'
+        return self.targets.copy(),self.enabled.copy()
 
     def snapshot(self):
         result = super().snapshot()
+        result['relocalization']=None if self.relocalization is None else {
+            k:v for k,v in self.relocalization.items() if k not in ('goal','keep')}
         result.update(active_count=int(self.enabled.sum()), selection=copy.deepcopy(self.selection),
                       length_observation=copy.deepcopy(self.selection), trial=copy.deepcopy(self.trial),
                       resize_fault=self.resize_fault, posture_options=asdict(self.posture_options),
@@ -2359,6 +2538,7 @@ class WholeFeedingObserver:
         self._coordinate_offset_m = 0.
         self._last_valid_time = None
         self._current_candidates = {}
+        self._feature_cache = None
 
     def down_direction(self, points, window, angles_deg, feedback_time_s):
         """Search wholly passive spans; retain an eligible span to avoid chatter.
@@ -2569,9 +2749,14 @@ class WholeFeedingObserver:
             levels=np.array(locations)
             w=np.maximum(0.,levels-levels.max()+np.mean(self.lengths)/8)*weights
             crest=float(w@coordinates/w.sum())
-            # Cover the actual upper span plus neighbours. This is geometry,
-            # not the contact support span; it cannot prove unloading.
-            arc_window=(max(2,left-1),min(len(q)-1,right+1))
+            # Use the same measured feature as initial arming and rolling.
+            # The length cut must not also define an expanding torque buffer.
+            key=(tuple(angles),tuple(down))
+            if self._feature_cache is None or self._feature_cache[0]!=key:
+                self._feature_cache=(key,feature_arc_candidates(angles,self.lengths,down=down))
+            feature=self._feature_cache[1]
+            if feature['chosen'] is None:raise ValueError('no_open_arc_feature_for_feeding')
+            arc_window=tuple(feature['chosen'])
             section=local_section(q,self.lengths,*arc_window)
             # Commit the reference only after the whole measurement succeeds.
             # Failed section reconstruction is not a fresh valid datum.
@@ -2583,6 +2768,7 @@ class WholeFeedingObserver:
                 above_cut_length_m=float(self.distance[-1]-head-tail),
                 cut_height_head_frame_m=cut, cut_depth_m=self.cut_depth_m, crest_joint=crest,
                 actual_arc_window=list(arc_window), down_head=down.tolist(), end_quality=quality,
+                arc_feature=feature,
                 plane_rms_m=section['fit_rms'], observes_pipe_contact=False, observes_world_position=False)
         except (ValueError,np.linalg.LinAlgError) as exc:
             return dict(valid=False,reason=str(exc))
@@ -2633,18 +2819,33 @@ class ContinuousFeedingOptions:
 
 
 class ContinuousFeeding:
-    def __init__(self, lengths, options=ContinuousFeedingOptions()):
+    def __init__(self, lengths, options=ContinuousFeedingOptions(), seed_angles_deg=None):
         self.lengths = np.asarray(lengths, float)
         self.n = len(self.lengths)-1
         self.options = options
+        self.measured_seed = None
+        self.seed_turn_deg = None
+        if seed_angles_deg is not None:
+            seed=np.asarray(seed_angles_deg,float)
+            if seed.shape!=(self.n,) or not np.isfinite(seed).all():
+                raise ValueError('Feeding seed requires complete measured motor angles')
+            self.measured_seed=np.zeros(self.n)
+            first,last=options.first_joint,options.last_joint
+            self.measured_seed[first-1:last]=np.radians(seed[first-1:last])
+            section=local_section(np.radians(seed),self.lengths,first,last)
+            self.seed_turn_deg=math.degrees(section['total_turn'])
         self.reference_direction = 1 if options.requested_transfer_m > 0 else -1
         self.helper = FeedingArcGeometry(self.lengths)
         self.length_observer = WholeFeedingObserver(self.lengths, (options.first_joint, options.last_joint))
         self.origin = (options.first_joint, options.last_joint)
         # Each transition advances two alternating hinges. The last valid
         # pair gives a coarse profile range, not a guarantee of support.
-        self.minimum_bin = math.ceil((2-options.first_joint)/2)
-        self.maximum_bin = math.floor((self.n-1-options.last_joint-2)/2)
+        bearing_first,bearing_last=self.origin
+        if self.measured_seed is not None:
+            curved=np.flatnonzero(abs(self.measured_seed)>1e-8)+1
+            bearing_first,bearing_last=int(curved[0]),int(curved[-1])
+        self.minimum_bin = math.ceil((2-bearing_first)/2)
+        self.maximum_bin = math.floor((self.n-1-bearing_last-2)/2)
         self.position_bounds = (2*self.minimum_bin, 2*(self.maximum_bin+1))
         # A profile endpoint is reachable only if every nonzero bend can be
         # enabled while preserving the chosen passive reference. Never clip a
@@ -2668,7 +2869,7 @@ class ContinuousFeeding:
             1., abs(options.requested_transfer_m)/float(np.mean(self.lengths)))
         self.enabled = self.helper.mask(self.origin)
         self.window = self.origin
-        self.targets = self.helper.template(self.origin, 0., options.amplitude_deg)
+        self.targets = self.helper.template(self.origin, 0., options.amplitude_deg) if self.measured_seed is None else self.measured_seed.copy()
         self.stage = 'prepare'
         self.stage_since = self.ready_since = None
         self.last_time = self.last_feedback = self.last_length_time = None
@@ -2692,6 +2893,7 @@ class ContinuousFeeding:
         self.recovery = None
         self.observation_recovery = None
         self.reference_epoch = None
+        self.buffer_release_since = np.full(self.n, np.nan)
 
     def reference_mask(self):
         reserved = np.zeros(self.n, bool)
@@ -2885,13 +3087,32 @@ class ContinuousFeeding:
         return desired
 
     def profile(self, position, bias):
-        """Interpolate the travelling profile; totals of each axis stay fixed."""
+        """Interpolate the travelling profile; retain each captured axis budget."""
         cell = int(np.clip(math.floor(position/2), self.minimum_bin, self.maximum_bin))
         fraction = float(np.clip(position/2-cell, 0., 1.))
         old = tuple(j+2*cell for j in self.origin)
         new = tuple(j+2 for j in old)
-        left = self.helper.template(old, 0., self.options.amplitude_deg, bias)
-        right = self.helper.template(new, 0., self.options.amplitude_deg, bias)
+        if self.measured_seed is None:
+            left = self.helper.template(old, 0., self.options.amplitude_deg, bias)
+            right = self.helper.template(new, 0., self.options.amplitude_deg, bias)
+        else:
+            # Translate the captured bend in material coordinates. Preserve
+            # each alternating family's signed shape/amplitude; no phase-zero
+            # or 60-degree reconstruction on entering mode 4.
+            seed=self.measured_seed.copy()
+            source=np.arange(self.origin[0]-1,self.origin[1])
+            allocation=np.linspace(1.,-1.,len(source))
+            for parity in (0,1):
+                family=source[source%2==parity]
+                factor=1.+bias*allocation[source%2==parity]
+                total=float(abs(seed[family]).sum())
+                seed[family]*=factor
+                if total>1e-12:seed[family]*=total/abs(seed[family]).sum()
+            left,right=np.zeros(self.n),np.zeros(self.n)
+            for result,shift in ((left,2*cell),(right,2*(cell+1))):
+                inside=(source+shift>=0) & (source+shift<self.n)
+                if np.any(abs(seed[source[~inside]])>1e-8):raise ValueError('Measured bend outside robot')
+                result[source[inside]+shift]=seed[source[inside]]
         curved = np.flatnonzero(abs(left)+abs(right)>1e-10)+1
         focus = (int(curved[0]), int(curved[-1]))
         target = (1-fraction)*left+fraction*right
@@ -2902,7 +3123,7 @@ class ContinuousFeeding:
         allocation = offset*offset*(3.-2.*offset)
         boost = math.radians(self.options.fractional_middle_boost_deg)*allocation*math.sin(math.pi*fraction)**2
         family = curved-1
-        if len(family)==4:
+        if len(family)==4 and self.measured_seed is None:
             target[family[[0,-1]]] -= boost
             target[family[1:3]] += boost
         return target, focus, cell, fraction
@@ -2923,10 +3144,14 @@ class ContinuousFeeding:
         actual_arc = self.observation.get('actual_arc_window')
         if actual_arc is not None:
             required |= self.helper.mask(tuple(actual_arc))
-        active = np.flatnonzero(required)+1
+        # Neighbour capture is relative to the travelling feature, never to
+        # last frame's expanded mask or a length-measurement cut.
+        active = np.arange(focus[0],focus[1]+1)
         radius = self.options.adjacent_fold_distance_joints
         joints = np.arange(1,self.n+1)
         folds = joints[(abs(angles)>=self.options.adjacent_fold_angle_deg) &
+                       ~self.reference_mask() &
+                       (joints>=2) & (joints<=self.n-1) &
                        (joints>=active[0]-radius) & (joints<=active[-1]+radius)]
         self.fold_capture_position[folds-1] = position
         # A straightened fold often returns under gravity immediately
@@ -2935,6 +3160,7 @@ class ContinuousFeeding:
         # at a stationary length goal. This is material distance,
         # never pipe contact or a world unloading observation.
         retained = joints[np.isfinite(self.fold_capture_position) &
+            ~self.reference_mask() &
             (abs(position-self.fold_capture_position)<self.options.fold_retention_distance_joints)]
         folds = np.union1d(folds, retained)
         if len(folds):
@@ -2952,6 +3178,37 @@ class ContinuousFeeding:
             raise ValueError('Profile requires a reserved passive joint; recover inward first')
         required[reserved] = False
         return required
+
+    def retire_straight_buffers(self, angles, feedback_time, fresh):
+        """Retire settled zero-target buffers even if they exhausted the down reference.
+
+        Keep the travelling bend and its immediate/trailing neighbours. Remove
+        only contiguous outer zero-command joints, after fresh angle dwell.
+        This is a motor/shape handover, not a contact unloading measurement.
+        """
+        desired, focus, _, _ = self.profile(self.position, self.bias)
+        protected = self.required_with_buffer((max(2,focus[0]-1),min(self.n-1,focus[1]+1)))
+        eligible = (self.enabled & ~protected & (abs(desired)<1e-8) &
+                    (abs(np.degrees(self.targets))<=self.options.exit_angle_deg) &
+                    (abs(angles)<=self.options.exit_angle_deg))
+        if fresh:
+            self.buffer_release_since[~eligible] = np.nan
+            self.buffer_release_since[eligible & np.isnan(self.buffer_release_since)] = feedback_time
+        ready = eligible & (feedback_time-self.buffer_release_since>=self.options.release_persistence_s-1e-8)
+        active = np.flatnonzero(self.enabled)
+        release = np.zeros(self.n,bool)
+        for sequence in (active, active[::-1]):
+            for j in sequence:
+                if not ready[j]:break
+                release[j]=True
+        if release.any():
+            self.enabled[release]=False
+            self.fold_capture_position[release]=np.nan
+            self.buffer_release_since[release]=np.nan
+            active=np.flatnonzero(self.enabled)+1
+            self.window=(int(active[0]),int(active[-1]))
+            self.events.append(dict(kind='retire_straight_buffers',time_s=feedback_time,
+                released=(np.flatnonzero(release)+1).tolist(),observes_unloading=False))
 
     def release_ready(self, angles, required, feedback_time, fresh):
         """Encoder geometry below the bearing arc; not a contact-force gate."""
@@ -2994,6 +3251,8 @@ class ContinuousFeeding:
         dt = .02 if self.last_time is None else control_time_s-self.last_time
         self.last_time = control_time_s
         opt = self.options
+        if self.stage in ('acquire','feed_out','feed_return','review_out','review_return'):
+            self.retire_straight_buffers(angles,feedback_time_s,fresh)
         if fresh:
             previously_valid = self.observation is not None and self.observation['valid']
             self.last_feedback = feedback_time_s
@@ -3056,7 +3315,7 @@ class ContinuousFeeding:
 
         desired = self.targets.copy()
         if self.stage == 'prepare':
-            desired = self.helper.template(self.origin, 0., opt.amplitude_deg)
+            desired = self.helper.template(self.origin, 0., opt.amplitude_deg) if self.measured_seed is None else self.measured_seed.copy()
             if control_time_s >= opt.preparation_s-1e-8 and fresh:
                 if not self.observation['valid']:
                     # A fresh sample at the nominal preparation boundary may
@@ -3089,9 +3348,15 @@ class ContinuousFeeding:
                 proposed_position = float(np.clip(self.position+rate*dt, *self.position_bounds))
                 current, _, _, _ = self.profile(self.position, self.bias)
                 self.tracking_error_deg = float(np.max(abs(np.degrees(current[self.enabled])-angles[self.enabled])))
-                self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
+                # Alternating motor angles add to more than planar curvature
+                # when the captured rolling phase uses both hinge families.
+                if self.measured_seed is None:
+                    self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
+                else:
+                    self.actual_enabled_turn_deg = self.observation['arc_feature']['best']['turn_deg']
+                turn_limit=opt.tracked_turn_soft_limit_deg if self.seed_turn_deg is None else max(opt.tracked_turn_soft_limit_deg,self.seed_turn_deg+12.)
                 blocked = (self.tracking_error_deg>opt.tracking_tolerance_deg or
-                           self.actual_enabled_turn_deg>opt.tracked_turn_soft_limit_deg)
+                           self.actual_enabled_turn_deg>turn_limit)
                 if blocked:
                     proposed_position = self.position
                     if self.tracking_blocked_since is None:
@@ -3154,6 +3419,9 @@ class ContinuousFeeding:
 
     def snapshot(self):
         return dict(stage=self.stage, route='continuous_feeding', window=list(self.window),
+            seed_source='configured_template' if self.measured_seed is None else 'measured_feature_arc',
+            measured_seed_deg=None if self.measured_seed is None else np.degrees(self.measured_seed).tolist(),
+            seed_turn_deg=self.seed_turn_deg,
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
             acquisition_metrics=self.acquisition_metrics,
@@ -3180,102 +3448,37 @@ class ContinuousFeeding:
             inputs=['angles_deg', 'feedback_time_s', 'control_time_s'])
 
 
-def choose_posture_window(angles_deg, lengths, enabled_mask=None, diagnostics=None):
-    """Conditional selection from an already draped body, not pipe detection.
+def choose_feeding_arc(angles_deg, lengths, enabled_mask, focus=None):
+    """Acquire the established measured bend before releasing straight buffers."""
+    mask=np.asarray(enabled_mask,bool)
+    active=np.flatnonzero(mask)+1
+    if not len(active):raise ValueError('模式4没有使能圆弧')
+    if focus is None:focus=(int(active[0]),int(active[-1]))
+    selection=feature_arc_candidates(angles_deg,lengths,focus=focus)
+    if selection['chosen'] is None:raise ValueError('模式4实测形状中没有可重建的开放圆弧')
+    selection['best']['end_source']='feeding_measured_arc_before_passive_release'
+    selection['requires_down_before_switch']=False
+    return selection
 
-    Evaluate contiguous arcs of any mechanically feasible width. Straight
-    bodies have no identifiable draped arc and are rejected without enabling.
-    """
-    angles = np.asarray(angles_deg, float)
-    lengths = np.asarray(lengths, float)
-    n=len(lengths)-1
-    if angles.shape!=(n,) or not np.isfinite(angles).all():
-        raise ValueError('自动接管需要全关节有效角反馈')
-    points=forward(np.radians(angles),lengths)
-    passive_window=None
+
+def choose_posture_window(angles_deg,lengths,enabled_mask=None,diagnostics=None):
+    """Find measured arcs first; optional passive direction only ranks them."""
+    selection=feature_arc_candidates(angles_deg,lengths)
+    if diagnostics is not None:diagnostics.update(selection['diagnostics'])
+    if selection['chosen'] is None:
+        raise ValueError('没有可重建的开放圆弧；'+str(selection['diagnostics']))
+    window=tuple(selection['chosen'])
     if enabled_mask is not None:
-        mask=np.asarray(enabled_mask,bool)
-        if mask.shape!=(n,):
-            raise ValueError('自动接管需要完整使能掩码')
-        indices=np.flatnonzero(mask)+1
-        if len(indices):
-            passive_window=(int(indices[0]),int(indices[-1]))
-    helper=RollingShapeObserver(lengths,None)
-    total=float(abs(angles).sum())
-    candidates=[]
-    rejected={}
-    nearest=None
-    def reject(reason, stage, detail):
-        nonlocal nearest
-        rejected[reason]=rejected.get(reason,0)+1
-        if nearest is None or stage>nearest['stage']:
-            nearest=dict(detail,reason=reason,stage=stage)
-    for first in range(2,n):
-        for last in range(first+2,n):
-            window=(first,last)
-            if not mechanically_feasible(lengths,window):
-                continue
-            # Distal passive bends must not inflate a whole-body angle quota.
-            # Locate the upper arc with a qualified down reference below.
-            captured=float(abs(angles[first-1:last]).sum())
-            detail=dict(window=list(window),captured_bending_deg=captured)
-            if captured<90.:
-                reject('局部弯曲不足90°',0,detail)
-                continue
-            try:
-                section=local_section(np.radians(angles),lengths,*window)
-                body=section['points'][1:-1]
-                arc_length=float(np.linalg.norm(np.diff(body,axis=0),axis=1).sum())
-                gap=float(np.linalg.norm(body[-1]-body[0])/max(arc_length,1e-12))
-                turn=math.degrees(section['total_turn'])
-                detail.update(turn_deg=turn,gap_fraction=gap,plane_rms_m=section['fit_rms'])
-                if not 90.<=turn<=210. or gap<.35 or section['fit_rms']>.025:
-                    reject('截面转角/开口/平面拟合不合格',1,detail)
-                    continue
-                circle=measured_half_circle(section)
-                detail.update(coverage_deg=circle['coverage_deg'],circle_rms_m=circle['circle_rms_m'])
-                if not 90.<=circle['coverage_deg']<=240. or circle['circle_rms_m']>.025:
-                    reject('圆弧覆盖/圆拟合不合格',2,detail)
-                    continue
-                # During mode4 -> mode3, straightened feeding buffers are
-                # still powered. They must not masquerade as passive gravity
-                # references simply because the candidate window is narrower.
-                down,quality=helper.passive_down(points,passive_window or window,section)
-                detail['end_source']=quality['source']
-                if down is None:
-                    reject('缺少合格失能方向参考',3,detail)
-                    continue
-                heights=-points @ down
-                # The candidate must straddle the highest reconstructed
-                # backbone point (ties use the middle of the top plateau).
-                # This is conditional on passive-end direction, not world Z.
-                top=np.flatnonzero(heights>=heights.max()-1e-9)
-                crest=float(np.mean(top))
-                detail['conditional_crest_joint']=crest
-                if not first<crest<last+1:
-                    reject('候选未跨过重建顶部',4,detail)
-                    continue
-                score=(abs(circle['coverage_deg']-180.)/40.+abs(turn-180.)/60.+
-                       circle['circle_rms_m']/.01+.03*(last-first+1))
-                candidates.append(dict(window=list(window),score=score,
-                    turn_deg=turn,coverage_deg=circle['coverage_deg'],gap_fraction=gap,
-                    circle_rms_m=circle['circle_rms_m'],end_source=quality['source'],
-                    conditional_crest_joint=crest,
-                    captured_bending_fraction=captured/max(total,1e-12)))
-            except (ValueError,np.linalg.LinAlgError) as exc:
-                reject('截面重建失败：'+str(exc),0,detail)
-                continue
-    audit=dict(rejection_counts=rejected,nearest_rejected=nearest,eligible_count=len(candidates))
-    if diagnostics is not None:
-        diagnostics.update(audit)
-    if not candidates:
-        context='' if nearest is None else f"；最近候选J{nearest['window'][0]}–J{nearest['window'][1]}：{nearest['reason']}，数值={nearest}"
-        raise ValueError('自动选窗未执行，原使能状态未改变'+context+'；拒绝统计='+str(rejected))
-    candidates.sort(key=lambda x:(x['score'],x['window']))
-    return dict(chosen=candidates[0]['window'],best=candidates[0],
-        alternatives=candidates[1:3],input='all_measured_joint_angles',
-        diagnostics=audit,
-        observes_contact=False,observes_world_gravity=False)
+        active=np.flatnonzero(enabled_mask)+1
+        if len(active):window=(int(active[0]),int(active[-1]))
+    helper=WholeFeedingObserver(lengths,window,replace(FeedingDirectionOptions(),minimum_samples=1,stability_s=0.))
+    down,quality=helper.down_direction(forward(np.radians(angles_deg),lengths),window,angles_deg,0.)
+    if down is not None:
+        selection=feature_arc_candidates(angles_deg,lengths,down=down)
+    selection['best']['end_source']=quality['source']
+    selection['requires_down_before_switch']=False
+    if diagnostics is not None:diagnostics.update(selection['diagnostics'])
+    return selection
 # END ACTIVE_FEEDING_CORE
 
 # ==================== 4. 飞特串口协议（只有主循环操作串口） ====================
@@ -3466,15 +3669,17 @@ class RollingArcController:
             if not running or core.completed:
                 self.pause_feeding()
             return
+        measured = np.asarray(self.measured_angles())
+        selection=choose_posture_window(measured,LINK_LENGTHS_M,enabled_mask=self.enabled)
+        self.feeding_origin=tuple(selection['chosen'])
         options = ContinuousFeedingOptions(first_joint=self.feeding_origin[0], last_joint=self.feeding_origin[1],
-            amplitude_deg=FEED_AMPLITUDE_DEG, requested_transfer_m=self.feed_direction*self.feed_distance_m,
-            preparation_s=FEED_PREPARATION_S,
+            amplitude_deg=self.amplitude, requested_transfer_m=self.feed_direction*self.feed_distance_m,
+            preparation_s=0.,
             maximum_feed_s=60. if self.feed_distance_m<=float(np.mean(LINK_LENGTHS_M))+1e-9 else 100.)
         options = replace(options, **FEED_OPTIONS_OVERRIDE)
         options = replace(options, automatic_return=FEED_AUTOMATIC_RETURN)
-        core = ContinuousFeeding(LINK_LENGTHS_M, options)
+        core = ContinuousFeeding(LINK_LENGTHS_M, options, seed_angles_deg=measured)
         core.length_observer.options = replace(core.length_observer.options, **FEED_DIRECTION_OVERRIDE)
-        measured = np.asarray(self.measured_angles())
         mask = core.enabled | np.asarray(self.enabled)
         entering = mask & ~np.asarray(self.enabled)
         self.touched_hardware = True
@@ -3485,7 +3690,8 @@ class RollingArcController:
         core.enabled = mask
         active = np.flatnonzero(mask)+1
         core.window = (int(active[0]), int(active[-1]))
-        core.targets = np.radians(self.targets)
+        core.targets = np.radians(measured)
+        self.targets = measured.tolist()
         self.enabled = mask.tolist()
         self.first, self.last = core.window
         self.feeding, self.feeding_selected = core, True
@@ -3692,7 +3898,10 @@ class RollingArcController:
             measured=self.measured_angles()
             audit={}
             try:
-                selection=choose_posture_window(measured,LINK_LENGTHS_M,enabled_mask=self.enabled,diagnostics=audit)
+                focus=None
+                if self.feeding is not None and hasattr(self.feeding,'profile'):
+                    _,focus,_,_=self.feeding.profile(self.feeding.position,self.feeding.bias)
+                selection=choose_feeding_arc(measured,LINK_LENGTHS_M,self.enabled,focus)
             except ValueError as exc:
                 self.initial_window_selection=dict(accepted=False,diagnostics=audit,angles_deg=measured,from_mode='active_feeding')
                 raise ValueError('模式4→3重选未完成，保留原使能并保持：'+str(exc)) from exc
@@ -3829,7 +4038,7 @@ class RollingArcController:
         try:
             if slider.last_time is None or feedback_time > slider.last_time:
                 valid, self.actual_section = self.check_actual_section(measured)
-                if not valid:
+                if not valid and not DIY_PARAMETERS:
                     raise ValueError('新实测形态超出开放圆弧/平面范围 '+str(self.actual_section))
             target, enabled = slider.advance(measured, feedback_time, control_time,
                 commanded_phase_rad=self.phase, phase_at_feedback=self.feedback_phase_rad,
@@ -4247,7 +4456,7 @@ class RollingArcController:
             label += f'，静置余{self.settle_remaining:.1f}s'
         gait = ('主动送链' if self.feeding_selected else '角度反馈滑窗顺应' if self.sliding is not None else
                 '基础圆弧' if self.compliance is None else '固定截面顺应')
-        amplitude = (FEED_AMPLITUDE_DEG if self.feeding is None else self.feeding.options.amplitude_deg) if self.feeding_selected else self.amplitude
+        amplitude = (self.amplitude if self.feeding is None else self.feeding.options.amplitude_deg) if self.feeding_selected else self.amplitude
         print(f'{gait} | {label} | J{self.first}–J{self.last} | A={amplitude:g}° '
               f'omega={self.omega:g}rad/s | phase={self.phase:.4f}rad | delta={self.phase_step:g}rad', flush=True)
         if self.feeding_selected:
