@@ -3323,6 +3323,12 @@ class ContinuousFeeding:
                 release = self.release_ready(angles, required, feedback_time_s, fresh)
                 next_mask = required | (leaving & ~release)
                 entering = next_mask & ~self.enabled
+                # A completed release ends this temporary fold capture. Keep
+                # no dormant record that can re-enable it when position moves
+                # back across the retention boundary. Fresh nearby bends and
+                # the current arc can still request a new takeover normally.
+                self.fold_capture_position[release] = np.nan
+                self.release_since[release] = np.nan
                 if np.any(entering) or np.any(release):
                     self.targets[entering] = np.radians(angles)[entering]
                     self.events.append(dict(kind='mask_handover', time_s=control_time_s,

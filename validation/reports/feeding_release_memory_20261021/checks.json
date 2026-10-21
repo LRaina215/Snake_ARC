@@ -1,0 +1,13 @@
+{
+  "baseline_revision": "93b423b",
+  "old_recaptures_J16_J17_without_new_local_bend": true,
+  "regression_tests_passed": 2,
+  "hardware_run": false,
+  "new_physics": false,
+  "observer_outputs_frozen_for_lifecycle_test": true,
+  "additional_existing_checks_passed": [
+    "ManualFeedingTests.test_relative_actions_keep_profile_and_hold_without_return",
+    "FeedingPortTests.test_debug_entry_shares_action_without_advancing_physics"
+  ],
+  "total_checks_passed": 4
+}
