@@ -207,11 +207,13 @@ class PostureWindow(MotorFeedbackSliding):
             down, quality = self.observer.passive_down(forward(np.radians(angles), self.lengths), window, section)
             measured = measured_half_circle(section)
             intrinsic = self._position_evidence(window) == 'persistent_intrinsic_bending_and_boundary'
+            resizing = window[1]-window[0] != self.window[1]-self.window[0]
             reason = ('candidate_shape_unreliable' if not good else
-                      'candidate_circle_fit_unreliable' if measured['circle_rms_m'] > self.posture_options.circle_rms_max_m else
+                      'candidate_circle_fit_unreliable' if resizing and measured['circle_rms_m'] > self.posture_options.circle_rms_max_m else
                       'candidate_has_no_position_reference' if down is None and not intrinsic else None)
             return dict(window=list(window), eligible=reason is None,
                         geometry=geometry, actual_body_circle=measured,
+                        circle_fit_required=resizing,
                         end_source=quality['source'], position_evidence=self._position_evidence(window), reason=reason)
         except (ValueError, np.linalg.LinAlgError) as exc:
             return dict(window=list(window), eligible=False, reason=str(exc))

@@ -1,0 +1,15 @@
+{
+  "baseline": "84b28cb",
+  "tests": 2,
+  "failures": [
+    [
+      "test_full_v3_records_through_real_and_manual_adapters (validation.test_posture_port.PosturePortTests)",
+      "Traceback (most recent call last):\n  File \"D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\test_posture_port.py\", line 74, in test_full_v3_records_through_real_and_manual_adapters\n    self.assertFalse(c.sliding_fault, (path.name, t, c.section_block_reason))\nAssertionError: True is not false : ('return_repair_20261013_145949_538155', 8.020000000000994, '\u6ed1\u7a97\u4f7f\u80fd\u6216\u5f00\u653e\u76ee\u6807\u5f02\u5e38\uff1ameasured-section target outside opening\uff0c\u91cd\u65b0\u9009\u62e9\u6a21\u5f0f\u540e\u7ee7\u7eed')\n"
+    ],
+    [
+      "test_seven_joint_mode_switches_and_hold (validation.test_posture_port.PosturePortTests)",
+      "Traceback (most recent call last):\n  File \"D:\\Desktop\\SNAKE\\Paper Code\\Mujoco\\Snake_ARC\\validation\\test_posture_port.py\", line 138, in test_seven_joint_mode_switches_and_hold\n    with self.assertRaises(ValueError): c.command(command)\nAssertionError: ValueError not raised\n"
+    ]
+  ],
+  "errors": []
+}

@@ -37,6 +37,7 @@ def main():
         raise ValueError('Research helper changed; inspect this explicit sync before updating')
     controller = controller.replace(old, 'self.helper = FeedingArcGeometry(self.lengths)')
     body = geometry+'\n\n\n'+declaration(ROOT/'snake_control/whole_feeding_observer.py')+'\n\n\n'+controller
+    body += '\n\n\n'+declaration(ROOT/'snake_control/posture_initialization.py')
     target = ROOT/'codes/Rolling_Arc_Real.py'
     source = target.read_text(encoding='utf8')
     if BEGIN in source:

@@ -5,6 +5,7 @@ DRY_RUN=True时使用内存串口，不连接机器人；日志自动保存在�
 默认启动只读预览；正视由关节重建的局部截面，显示全身实测角、使能和算法候选。
 Ctrl+U 形成圆弧，Ctrl+J/H 正/反单步，Ctrl+G 连续/暂停，Ctrl+X 全部失能。
 Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动移窗与数量自适应。
+失能时Ctrl+3按全身实测姿态选窗接管并进入顺应；Ctrl+U始终按配置窗口形成。
 Ctrl+4 主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，到位保持，Ctrl+Y 提前返回，Ctrl+L单帧。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
 """
@@ -124,6 +125,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   Ctrl+T 反转连续滚动方向；Ctrl+K 读取所有关节位置
   Ctrl+E 固定窗口截面顺应开/关：先形成圆弧；保留相位与连续/暂停状态
   Ctrl+1 / 2 / 3 基础圆弧 / 固定截面顺应 / 角度反馈自动滑窗
+  失能时Ctrl+3：按实测姿态选初始窗口并形成；Ctrl+U：按配置窗口形成
   Ctrl+4 主动送链：J/H各执行一段头侧增长/缩短，到位保持，-/=目标量减半/加倍
   送链中Ctrl+G暂停/继续；Ctrl+L只推进一帧；Ctrl+Y提前返回起态
   Ctrl+W 自动移窗与扩缩开/关（仅滑动模式）；外侧扭矩关闭
@@ -1898,11 +1900,13 @@ class PostureWindow(MotorFeedbackSliding):
             down, quality = self.observer.passive_down(forward(np.radians(angles), self.lengths), window, section)
             measured = measured_half_circle(section)
             intrinsic = self._position_evidence(window) == 'persistent_intrinsic_bending_and_boundary'
+            resizing = window[1]-window[0] != self.window[1]-self.window[0]
             reason = ('candidate_shape_unreliable' if not good else
-                      'candidate_circle_fit_unreliable' if measured['circle_rms_m'] > self.posture_options.circle_rms_max_m else
+                      'candidate_circle_fit_unreliable' if resizing and measured['circle_rms_m'] > self.posture_options.circle_rms_max_m else
                       'candidate_has_no_position_reference' if down is None and not intrinsic else None)
             return dict(window=list(window), eligible=reason is None,
                         geometry=geometry, actual_body_circle=measured,
+                        circle_fit_required=resizing,
                         end_source=quality['source'], position_evidence=self._position_evidence(window), reason=reason)
         except (ValueError, np.linalg.LinAlgError) as exc:
             return dict(window=list(window), eligible=False, reason=str(exc))
@@ -2567,6 +2571,21 @@ class ContinuousFeeding:
         self.minimum_bin = math.ceil((2-options.first_joint)/2)
         self.maximum_bin = math.floor((self.n-1-options.last_joint-2)/2)
         self.position_bounds = (2*self.minimum_bin, 2*(self.maximum_bin+1))
+        # A profile endpoint is reachable only if every nonzero bend can be
+        # enabled while preserving the chosen passive reference. Never clip a
+        # required bending joint out of the mask after accepting its position.
+        geometric_bounds = self.position_bounds
+        seed, _, _, _ = self.profile(0.,0.)
+        if np.any(abs(seed[self.reference_mask()])>1e-10):
+            self.reference_direction *= -1
+        feasible = []
+        for position in range(geometric_bounds[0], geometric_bounds[1]+1, 2):
+            target, _, _, _ = self.profile(position, 0.)
+            if not np.any(abs(target[self.reference_mask()])>1e-10):
+                feasible.append(position)
+        if not feasible or min(feasible)>0 or max(feasible)<0:
+            raise ValueError('Initial arc conflicts with passive reference reserve')
+        self.position_bounds = (min(feasible), max(feasible))
         self.position = self.bias = self.phase = 0.
         # Equal relative settling speed for one-link and larger actions.
         # This is a motor-proxy gate, not a claim of true length stability.
@@ -2594,8 +2613,27 @@ class ContinuousFeeding:
         self.acquisition_samples = []
         self.acquisition_reason = None
         self.acquisition_metrics = {}
+        self.completion_reason = None
+        self.recovery = None
 
-    def request_step(self, distance_m, control_time_s):
+    def reference_mask(self):
+        reserved = np.zeros(self.n, bool)
+        count = self.options.minimum_passive_reference_links
+        if count:
+            if self.reference_direction > 0:
+                reserved[:count] = True
+            else:
+                reserved[-count:] = True
+        return reserved
+
+    def finish_at_boundary(self, time_s):
+        self.stage, self.completed = 'boundary', True
+        self.completion_reason = 'reachable_profile_boundary_not_length_goal'
+        self.events.append(dict(kind='reachable_boundary', time_s=time_s,
+            position_joints=self.position, bounds=list(self.position_bounds),
+            requested_transfer_m=self.options.requested_transfer_m))
+
+    def request_step(self, distance_m, control_time_s, angles_deg=None):
         """Start one relative action without resetting the travelling profile.
 
         The start datum is measured after taking over/straightening neighbours.
@@ -2603,11 +2641,15 @@ class ContinuousFeeding:
         """
         if not math.isfinite(distance_m) or distance_m == 0:
             raise ValueError('A finite nonzero feeding distance is required')
+        previous_direction = 1 if self.options.requested_transfer_m>0 else -1
+        recovering = self.stage=='reverse_recover'
         self.options = replace(self.options, requested_transfer_m=distance_m)
+        direction = 1 if distance_m>0 else -1
         self.goal_speed_tolerance_m_s = self.options.speed_tolerance_m_s*max(
             1., abs(distance_m)/float(np.mean(self.lengths)))
         self.stage, self.stage_since = 'acquire', control_time_s
         self.completed, self.fault = False, None
+        self.completion_reason, self.recovery = None, None
         self.baseline = self.goal_m = None
         self.ready_since = self.untrusted_since = self.tracking_blocked_since = None
         self.acquisition_samples = []
@@ -2617,6 +2659,65 @@ class ContinuousFeeding:
         self.last_length_time = None
         self.events.append(dict(kind='manual_relative_step', time_s=control_time_s,
             requested_transfer_m=distance_m, position_joints=self.position))
+        lo, hi = self.position_bounds
+        outward = direction>0 and self.position>=hi-1e-8 or direction<0 and self.position<=lo+1e-8
+        if outward:
+            self.finish_at_boundary(control_time_s)
+            return
+        if angles_deg is not None:
+            angles = np.radians(np.asarray(angles_deg, float))
+            current, _, _, _ = self.profile(self.position, self.bias)
+            error = float(np.degrees(abs(current[self.enabled]-angles[self.enabled])).max())
+            outside = self.position<lo-1e-8 or self.position>hi+1e-8
+            if outside or recovering or (direction!=previous_direction and error>self.options.tracking_tolerance_deg):
+                # A reversal must not wait for the unreachable OLD endpoint.
+                # Bridge from the measured pose to an inward feasible profile,
+                # tracking each intermediate command with the unchanged 5 deg
+                # tolerance. This is explicit recovery, not claimed mm travel.
+                destination = float(np.clip(self.position+direction*min(1.,abs(distance_m)/np.mean(self.lengths)),lo,hi))
+                bias = -self.options.travelling_bias_amplitude*math.sin(math.pi*destination)
+                goal, focus, _, _ = self.profile(destination,bias)
+                self.recovery = dict(start=angles.copy(), goal=goal, focus=focus,
+                    start_position=self.position, destination=destination, bias=bias,
+                    fraction=0., initial_error_deg=error,
+                    duration_s=max(abs(destination-self.position)/self.options.maximum_position_rate_joints_s,
+                        float(np.degrees(abs(goal-angles)).max())/self.options.target_rate_deg_s,.2))
+                self.stage = 'reverse_recover'
+                self.acquisition_reason = 'tracking_inward_bridge_from_measured_pose'
+                self.events.append(dict(kind='reverse_recovery', time_s=control_time_s,
+                    from_position=self.position, to_position=destination, initial_error_deg=error))
+
+    def recover_reverse(self, angles, feedback_time, control_time, dt, fresh):
+        r, opt = self.recovery, self.options
+        required = self.required_mask(r['focus'], angles, r['destination'])
+        entering = required & ~self.enabled
+        self.targets[entering] = np.radians(angles)[entering]
+        self.enabled |= required
+        indices = np.flatnonzero(self.enabled)+1
+        self.window = (int(indices[0]),int(indices[-1]))
+        # A zero-fraction bridge first relaxes the old tracking error towards
+        # the measured start; target slew limiting still applies below.
+        self.tracking_error_deg = float(abs(np.degrees(self.targets[self.enabled])-angles[self.enabled]).max())
+        if self.tracking_error_deg <= opt.tracking_tolerance_deg:
+            r['fraction'] = min(1.,r['fraction']+min(dt,.02)/r['duration_s'])
+            self.tracking_blocked_since = None
+        elif self.tracking_blocked_since is None:
+            self.tracking_blocked_since = control_time
+        desired = (1-r['fraction'])*r['start']+r['fraction']*r['goal']
+        if r['fraction']>=1. and fresh:
+            error = float(abs(np.degrees(r['goal'][self.enabled])-angles[self.enabled]).max())
+            self.ready_since = (feedback_time if self.ready_since is None else self.ready_since) if error<=opt.tracking_tolerance_deg else None
+            if self.ready_since is not None and feedback_time-self.ready_since>=opt.persistence_s:
+                self.position, self.bias = r['destination'], r['bias']
+                self.stage, self.completed = 'recovered', True
+                self.completion_reason = 'inward_pose_recovered_not_length_goal'
+                self.acquisition_reason = None
+                self.events.append(dict(kind='reverse_recovered',time_s=control_time,position_joints=self.position))
+        if self.tracking_blocked_since is not None and control_time-self.tracking_blocked_since>opt.maximum_tracking_wait_s:
+            self.fault = 'reverse intermediate target tracking did not recover'
+        if control_time-self.stage_since>r['duration_s']+opt.maximum_tracking_wait_s:
+            self.fault = 'reverse recovery timeout'
+        return desired
 
     def acquire_start(self, angles, feedback_time, control_time, fresh):
         """Settle the actual takeover before defining zero transfer.
@@ -2748,11 +2849,11 @@ class ContinuousFeeding:
         # use the same end through return to avoid switching the
         # observation geometry. Reserved folds remain passive and are
         # still fully included in external whole-body shape audits.
-        reserve = self.options.minimum_passive_reference_links
-        if self.reference_direction > 0:
-            required[:reserve] = False
-        else:
-            required[self.n-reserve:] = False
+        reserved = self.reference_mask()
+        bend, _, _, _ = self.profile(position, -self.options.travelling_bias_amplitude*math.sin(math.pi*position))
+        if np.any(abs(bend[reserved])>1e-8):
+            raise ValueError('Profile requires a reserved passive joint; recover inward first')
+        required[reserved] = False
         return required
 
     def release_ready(self, angles, required, feedback_time, fresh):
@@ -2839,6 +2940,8 @@ class ContinuousFeeding:
                     desired = self.acquire_start(angles, feedback_time_s, control_time_s, fresh)
         elif self.stage == 'acquire':
             desired = self.acquire_start(angles, feedback_time_s, control_time_s, fresh)
+        elif self.stage == 'reverse_recover':
+            desired = self.recover_reverse(angles, feedback_time_s, control_time_s, dt, fresh)
         elif self.stage in ('feed_out', 'review_out', 'feed_return', 'review_return'):
             # Pausing the material coordinate must not freeze a newly enabled
             # joint at its preload angle. Finish the already commanded shape
@@ -2880,6 +2983,10 @@ class ContinuousFeeding:
                 active = np.flatnonzero(self.enabled)+1
                 self.window = (int(active[0]), int(active[-1]))
                 desired = proposal
+                boundary = ((self.position<=self.position_bounds[0]+1e-8 and rate<0) or
+                            (self.position>=self.position_bounds[1]-1e-8 and rate>0))
+                if fresh and boundary and not blocked and abs(error)>opt.length_tolerance_m:
+                    self.finish_at_boundary(control_time_s)
                 if fresh and self.stage in ('feed_out', 'feed_return'):
                     reached = abs(error)<=opt.length_tolerance_m and abs(self.velocity_m_s)<=self.goal_speed_tolerance_m_s
                     self.ready_since = (feedback_time_s if self.ready_since is None else self.ready_since) if reached else None
@@ -2915,6 +3022,9 @@ class ContinuousFeeding:
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
             acquisition_metrics=self.acquisition_metrics,
+            completion_reason=self.completion_reason,
+            recovery=None if self.recovery is None else {k:v for k,v in self.recovery.items()
+                if k not in ('start','goal')},
             phase_rad=0., position_joints=self.position, bearing_bias=self.bias,
             bearing_error_m=self.bearing_error_m, goal_m=self.goal_m, baseline_m=self.baseline,
             goal_delta_m=None if self.goal_m is None else self.goal_m-self.baseline,
@@ -2931,6 +3041,60 @@ class ContinuousFeeding:
             passive_reference_end='head' if self.reference_direction>0 else 'tail',
             completion_means='encoder_length_and_speed_goal_not_world_truth_acceptance',
             inputs=['angles_deg', 'feedback_time_s', 'control_time_s'])
+
+
+def choose_posture_window(angles_deg, lengths):
+    """Conditional selection from an already draped body, not pipe detection.
+
+    Evaluate contiguous arcs of any mechanically feasible width. Straight
+    bodies have no identifiable draped arc and are rejected without enabling.
+    """
+    angles = np.asarray(angles_deg, float)
+    lengths = np.asarray(lengths, float)
+    n=len(lengths)-1
+    if angles.shape!=(n,) or not np.isfinite(angles).all():
+        raise ValueError('自动接管需要全关节有效角反馈')
+    points=forward(np.radians(angles),lengths)
+    helper=RollingShapeObserver(lengths,None)
+    total=float(abs(angles).sum())
+    candidates=[]
+    for first in range(2,n):
+        for last in range(first+2,n):
+            window=(first,last)
+            if not mechanically_feasible(lengths,window):
+                continue
+            # Do not latch onto a small folded distal tip instead of the arc.
+            captured=float(abs(angles[first-1:last]).sum())
+            if captured<90. or captured<.65*total:
+                continue
+            try:
+                section=local_section(np.radians(angles),lengths,*window)
+                body=section['points'][1:-1]
+                arc_length=float(np.linalg.norm(np.diff(body,axis=0),axis=1).sum())
+                gap=float(np.linalg.norm(body[-1]-body[0])/max(arc_length,1e-12))
+                turn=math.degrees(section['total_turn'])
+                if not 90.<=turn<=210. or gap<.35 or section['fit_rms']>.025:
+                    continue
+                circle=measured_half_circle(section)
+                if not 90.<=circle['coverage_deg']<=240. or circle['circle_rms_m']>.025:
+                    continue
+                down,quality=helper.passive_down(points,window,section)
+                if down is None:
+                    continue
+                score=(abs(circle['coverage_deg']-180.)/40.+abs(turn-180.)/60.+
+                       circle['circle_rms_m']/.01+.03*(last-first+1))
+                candidates.append(dict(window=list(window),score=score,
+                    turn_deg=turn,coverage_deg=circle['coverage_deg'],gap_fraction=gap,
+                    circle_rms_m=circle['circle_rms_m'],end_source=quality['source'],
+                    captured_bending_fraction=captured/max(total,1e-12)))
+            except (ValueError,np.linalg.LinAlgError):
+                continue
+    if not candidates:
+        raise ValueError('当前角反馈中没有可确认的开放圆弧和下垂参考；未使能。摆好搭管姿态后再按Ctrl+3，或Ctrl+U按配置形成。')
+    candidates.sort(key=lambda x:(x['score'],x['window']))
+    return dict(chosen=candidates[0]['window'],best=candidates[0],
+        alternatives=candidates[1:3],input='all_measured_joint_angles',
+        observes_contact=False,observes_world_gravity=False)
 # END ACTIVE_FEEDING_CORE
 
 # ==================== 4. 飞特串口协议（只有主循环操作串口） ====================
@@ -3052,6 +3216,8 @@ class RollingArcController:
         self.bus = bus
         self.amplitude, self.omega = AMPLITUDE_DEG, OMEGA_RAD_S
         self.first, self.last = FIRST_JOINT, LAST_JOINT
+        self.configured_window = (self.first, self.last)
+        self.initial_window_selection = None
         self.length_normalized = self.last-self.first+1 != 6
         self.phase = self.command_phase = INITIAL_PHASE_RAD
         self.direction, self.mode = 1, 'released'
@@ -3109,13 +3275,14 @@ class RollingArcController:
             core.completed = False
             self.resume_feeding()
             now, _ = self.motor_sample_clock()
-            core.request_step(self.feed_direction*self.feed_distance_m, now-self.feeding_clock_origin)
+            core.request_step(self.feed_direction*self.feed_distance_m, now-self.feeding_clock_origin,
+                              self.measured_angles())
             core.options = replace(core.options, automatic_return=FEED_AUTOMATIC_RETURN,
                 maximum_feed_s=60. if self.feed_distance_m<=float(np.mean(LINK_LENGTHS_M))+1e-9 else 100.)
             self.feeding_action_id += 1
             self.feeding_inputs = None
             self.feeding_last_stage = None
-            if not running:
+            if not running or core.completed:
                 self.pause_feeding()
             return
         options = ContinuousFeedingOptions(first_joint=self.feeding_origin[0], last_joint=self.feeding_origin[1],
@@ -3165,7 +3332,7 @@ class RollingArcController:
             self.start_feeding()
             return
         if self.feeding.completed:
-            print('本步已完成并保持；Ctrl+J/H执行下一段，Ctrl+Y手动返回本步起态。', flush=True)
+            print('当前段已停止并保持；Ctrl+J/H发起下一段，边界处请按反向键。', flush=True)
             return
         self.refresh_compliance_feedback()
         now, _ = self.motor_sample_clock()
@@ -3314,6 +3481,17 @@ class RollingArcController:
 
     def select_gait(self, kind):
         """保留当前窗口、相位和已发目标；切模式不会重新搭管或重置机器人。"""
+        if kind=='sliding' and self.mode=='released':
+            self.refresh_compliance_feedback()
+            selection=choose_posture_window(self.measured_angles(),LINK_LENGTHS_M)
+            self.initial_window_selection=selection
+            self.arm(window_override=tuple(selection['chosen']))
+            self.pending_gait='sliding'
+            best=selection['best']
+            print(f'按实测姿态接管J{self.first}–J{self.last}（{sum(self.enabled)}关节）；'
+                  f'截面转角={best["turn_deg"]:.1f}°，覆盖角={best["coverage_deg"]:.1f}°，'
+                  f'下垂依据={best["end_source"]}。形成完成后进入自动滑窗顺应。',flush=True)
+            return
         if kind=='feeding':
             self.select_feeding()
             return
@@ -3578,12 +3756,14 @@ class RollingArcController:
         if step_finished:
             self.mode = 'hold'
 
-    def arm(self):
+    def arm(self, window_override=None):
         if self.mode != 'released':
             return              # 重复 apply 不重新初始化，不把机器人拉回相位 0
-        if self.feeding_selected:
-            self.first, self.last = self.feeding_origin
-            self.length_normalized = self.last-self.first+1!=6
+        self.first, self.last = self.configured_window if window_override is None else window_override
+        self.feeding_origin = (self.first,self.last)
+        if window_override is None:
+            self.initial_window_selection=None
+        self.length_normalized = self.last-self.first+1!=6
         validate_arc_reference(self.amplitude, self.omega, self.first, self.last, self.length_normalized)
         enabled = [self.first <= j <= self.last for j in range(1, NUM_JOINTS + 1)]
         measured = self.bus.read_angles(range(self.first - 1, self.last))
@@ -3599,8 +3779,6 @@ class RollingArcController:
         self.pending_phase, self.mode = 0.0, 'hold'
 
     def release(self, verify=True):
-        if self.feeding_selected:
-            self.first, self.last = self.feeding_origin
         self.feeding_selected, self.feeding = False, None
         self.feeding_inputs = None
         self.sliding, self.pending_gait = None, None
@@ -3610,6 +3788,10 @@ class RollingArcController:
         self.enabled = [False] * NUM_JOINTS
         self.touched_hardware = True
         self.bus.set_enabled(self.enabled, verify=verify)
+        self.first, self.last = self.configured_window
+        self.feeding_origin = self.configured_window
+        self.length_normalized = self.last-self.first+1!=6
+        self.freeze_targets = False
 
     def change_parameters(self, amplitude=None, omega=None):
         values = []
@@ -3667,6 +3849,7 @@ class RollingArcController:
         if self.mode == 'released':
             self.length_normalized = last-first+1 != 6
             self.feeding_origin = (first, last)
+            self.configured_window = (first, last)
         if self.compliance is not None:
             self.compliance.p = reference
             self.compliance.options = options
@@ -3821,6 +4004,7 @@ class RollingArcController:
                     feeding=None if self.feeding is None else copy.deepcopy(self.feeding.snapshot()),
                     feeding_motor_input=copy.deepcopy(self.feeding_inputs),
                     feeding_action_id=self.feeding_action_id, feed_requested_m=self.feed_direction*self.feed_distance_m,
+                    configured_window=list(self.configured_window), initial_window_selection=copy.deepcopy(self.initial_window_selection),
                     feeding_paused=self.feeding_paused,
                     sliding=None if self.sliding is None else copy.deepcopy(self.sliding.snapshot()),
                     sliding_events=[] if self.sliding is None else copy.deepcopy(self.sliding.events),
@@ -3856,6 +4040,10 @@ class RollingArcController:
                       f'角度波动={m.get("angle_span_deg")}° | 长度代理波动={m.get("length_span_mm")}mm', flush=True)
             for line in feeding_direction_lines(o):
                 print(line, flush=True)
+            if core is not None and core.completion_reason:
+                message = {'reachable_profile_boundary_not_length_goal': '已达可达边界；继续同向不会推进，按反向J/H可退出。未宣称毫米目标到位。',
+                    'inward_pose_recovered_not_length_goal': '已向内恢复可执行姿态并保持；按J/H继续调长。恢复段不按毫米到位计量。'}
+                print(message.get(core.completion_reason,core.completion_reason),flush=True)
         if self.compliance is not None:
             window_state = '窗口固定' if self.sliding is None else f'自动选窗={self.sliding.automatic} 待交接={self.sliding.pending is not None}'
             print(f'实测截面直接顺应 K={self.options.gain:g} | '

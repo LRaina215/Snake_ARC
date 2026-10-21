@@ -79,6 +79,7 @@ class DebugArcController(real.RollingArcController):
         self.length_normalized = self.last-self.first+1 != 6
         self.amplitude, self.omega = session.sim.p.amplitude_deg, session.sim.p.omega_rad_s
         self.feeding_origin = (self.first, self.last)
+        self.configured_window = (self.first, self.last)
         self.sliding = None
         self.pending_gait = None
         self.sliding_fault = False
