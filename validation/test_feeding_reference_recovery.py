@@ -18,6 +18,32 @@ def recorded_switch():
 
 
 class ModeSwitchTests(unittest.TestCase):
+    def test_recorded_released_pose_with_bent_tips_can_initialize_from_crest(self):
+        data=json.loads((ROOT/'validation/reports/feeding_reference_recovery_20261021/initial_selection_followup.json').read_text(encoding='utf8'))
+        row=data['representative_original_row'];c=ClockController()
+        q=np.array([row['measured_controller_deg'][f'J{i}'] for i in range(1,21)])
+        for i,sid in enumerate(real.SERVO_IDS):
+            raw=real.angle_to_raw(i,q[i])
+            c.port.registers[sid][0x38:0x3A]=raw.to_bytes(2,'little')
+        with contextlib.redirect_stdout(io.StringIO()):c.command('gait_sliding')
+        self.assertEqual([c.first,c.last],data['new_selection']['chosen'])
+        self.assertTrue(all(c.enabled[j-1] for j in (11,13,15)))
+        self.assertTrue(c.forming);self.assertEqual(c.pending_gait,'sliding')
+        best=c.initial_window_selection['best']
+        self.assertLess(best['captured_bending_fraction'],.65)
+        self.assertLess(c.first,best['conditional_crest_joint'])
+        self.assertGreater(c.last+1,best['conditional_crest_joint'])
+        from snake_control.posture_initialization import choose_posture_window
+        self.assertEqual(choose_posture_window(q,real.LINK_LENGTHS_M)['chosen'],[c.first,c.last])
+
+    def test_initial_rejection_records_specific_reason_without_enabling(self):
+        c=ClockController()
+        with self.assertRaisesRegex(ValueError,'局部弯曲不足90'):
+            c.command('gait_sliding')
+        self.assertFalse(c.initial_window_selection['accepted'])
+        self.assertGreater(c.initial_window_selection['diagnostics']['rejection_counts']['局部弯曲不足90°'],0)
+        self.assertFalse(any(c.enabled));self.assertFalse(c.touched_hardware)
+
     def test_reselection_writes_exact_torque_mask_and_only_sends_selected_ids(self):
         row=recorded_switch();c=ClockController()
         q=np.array([row['measured_controller_deg'][f'J{i}'] for i in range(1,21)])

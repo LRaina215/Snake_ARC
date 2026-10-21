@@ -1,0 +1,376 @@
+{
+  "source": "rolling_arc_20261021_143621_821744.jsonl",
+  "total_rows": 1621,
+  "modes": {
+    "released": 1621
+  },
+  "unique_angle_sets": 2,
+  "representative_original_row": {
+    "time_s": 0.0,
+    "execution": "serial",
+    "mode": "released",
+    "gait": "basic_arc",
+    "targets_frozen": false,
+    "forming": false,
+    "phase_rad": 0.0,
+    "command_phase_rad": 0.0,
+    "amplitude_deg": 60.0,
+    "omega_rad_s": 0.6,
+    "direction": 1,
+    "phase_step_rad": 0.1,
+    "pending_phase_rad": 0.0,
+    "settle_remaining_s": 0.0,
+    "window": [
+      8,
+      13
+    ],
+    "enabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "target_controller_deg": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "active_count": 0,
+    "length_normalized": false,
+    "enable_state_known": false,
+    "feedback_time_s": 0.0,
+    "feedback_age_s": 0.10899999999674037,
+    "feedback_sequence": 1,
+    "compliance": null,
+    "pending_gait": null,
+    "feeding": null,
+    "feeding_motor_input": null,
+    "feeding_action_id": 0,
+    "feed_requested_m": 0.0645,
+    "configured_window": [
+      8,
+      13
+    ],
+    "initial_window_selection": null,
+    "feeding_paused": true,
+    "sliding": null,
+    "sliding_events": [],
+    "servo_feedback_raw": {
+      "0": {
+        "angle_deg": 25.48828125,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 40,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "1": {
+        "angle_deg": -8.525390625,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 41,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "2": {
+        "angle_deg": -17.138671875,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 41,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "3": {
+        "angle_deg": -5.185546875,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.2,
+        "temperature_c": 40,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "4": {
+        "angle_deg": 6.240234375,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 41,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "5": {
+        "angle_deg": -4.921875,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.4,
+        "temperature_c": 42,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "6": {
+        "angle_deg": 0.52734375,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 42,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "7": {
+        "angle_deg": 2.197265625,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.2,
+        "temperature_c": 43,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "8": {
+        "angle_deg": 4.74609375,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 41,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "9": {
+        "angle_deg": -0.17578125,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 45,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "10": {
+        "angle_deg": 66.97265625,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 46,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "11": {
+        "angle_deg": -0.3515625,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 47,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "12": {
+        "angle_deg": 78.92578125,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.2,
+        "temperature_c": 47,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "13": {
+        "angle_deg": -0.263671875,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 46,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "14": {
+        "angle_deg": 23.90625,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 45,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "15": {
+        "angle_deg": -8.0859375,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 43,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "16": {
+        "angle_deg": -6.85546875,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 41,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "17": {
+        "angle_deg": 12.12890625,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 41,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "18": {
+        "angle_deg": -9.140625,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.3,
+        "temperature_c": 41,
+        "status_raw": 0,
+        "moving_raw": 0
+      },
+      "19": {
+        "angle_deg": -8.701171875,
+        "load_raw": 0,
+        "current_raw": 0,
+        "voltage_v": 12.2,
+        "temperature_c": 40,
+        "status_raw": 0,
+        "moving_raw": 0
+      }
+    },
+    "measured_controller_deg": {
+      "J1": 25.48828125,
+      "J2": -8.525390625,
+      "J3": -17.138671875,
+      "J4": -5.185546875,
+      "J5": 6.240234375,
+      "J6": -4.921875,
+      "J7": 0.52734375,
+      "J8": 2.197265625,
+      "J9": 4.74609375,
+      "J10": -0.17578125,
+      "J11": 66.97265625,
+      "J12": -0.3515625,
+      "J13": 78.92578125,
+      "J14": -0.263671875,
+      "J15": 23.90625,
+      "J16": -8.0859375,
+      "J17": -6.85546875,
+      "J18": 12.12890625,
+      "J19": -9.140625,
+      "J20": -8.701171875
+    }
+  },
+  "old_rejection": "captured < 0.65 * sum(abs(all_joint_angles))",
+  "new_selection": {
+    "chosen": [
+      10,
+      15
+    ],
+    "best": {
+      "window": [
+        10,
+        15
+      ],
+      "score": 2.220229722717686,
+      "turn_deg": 169.8062965736108,
+      "coverage_deg": 205.11636290420202,
+      "gap_fraction": 0.5423445780464161,
+      "circle_rms_m": 0.012424255930061487,
+      "end_source": "single_tail",
+      "conditional_crest_joint": 13.0,
+      "captured_bending_fraction": 0.5872919818456883
+    },
+    "alternatives": [
+      {
+        "window": [
+          11,
+          16
+        ],
+        "score": 2.326496649411894,
+        "turn_deg": 169.94970201086016,
+        "coverage_deg": 158.61549424964312,
+        "gap_fraction": 0.7269106970491181,
+        "circle_rms_m": 0.014443790391673083,
+        "end_source": "single_tail",
+        "conditional_crest_joint": 13.0,
+        "captured_bending_fraction": 0.6145234493192133
+      },
+      {
+        "window": [
+          8,
+          13
+        ],
+        "score": 2.420772537429121,
+        "turn_deg": 150.65366505171147,
+        "coverage_deg": 175.0414414286974,
+        "gap_fraction": 0.6254581485178475,
+        "circle_rms_m": 0.016277029906750805,
+        "end_source": "single_tail",
+        "conditional_crest_joint": 13.0,
+        "captured_bending_fraction": 0.5279878971255674
+      }
+    ],
+    "input": "all_measured_joint_angles",
+    "diagnostics": {
+      "rejection_counts": {
+        "局部弯曲不足90°": 16,
+        "圆弧覆盖/圆拟合不合格": 41,
+        "截面转角/开口/平面拟合不合格": 21,
+        "候选未跨过重建顶部": 3,
+        "缺少合格失能方向参考": 1
+      },
+      "nearest_rejected": {
+        "window": [
+          3,
+          12
+        ],
+        "captured_bending_deg": 108.45703125,
+        "turn_deg": 96.20715392531973,
+        "gap_fraction": 0.8783204632363005,
+        "plane_rms_m": 0.003138119979962467,
+        "coverage_deg": 91.24666543578999,
+        "circle_rms_m": 0.024379525158455415,
+        "end_source": "single_tail",
+        "conditional_crest_joint": 13.0,
+        "reason": "候选未跨过重建顶部",
+        "stage": 4
+      },
+      "eligible_count": 9
+    },
+    "observes_contact": false,
+    "observes_world_gravity": false
+  }
+}

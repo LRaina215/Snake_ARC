@@ -43,3 +43,15 @@
 - 原J13持续5.109°误差固定姿态输入仍被拒绝，准确指出跟踪关节；研究核心与嵌入实机核心在该序列和缺口恢复序列中逐步目标、掩码、基线一致。J到边界后H反向、X→U配置恢复等此前修复回归通过。
 
 本轮满足程序修复和接口验收，未完成新的真实运动验收。没有新世界姿态/接触真值，因此不宣称全程承重、开放形态、曲率、力矩饱和、限位与漂移已通过，也不把角度参考当作真重力或管径。下一项最小实测：在模式4调偏后按Ctrl+3，核对新J范围和实际扭矩状态，Ctrl+G滚动并观察选窗理由；另连续J/H跨越原缺样区，核对参考交接、恢复状态与材料标记。无需新增大范围仿真或参数扫描。
+
+## 后续实测：失能状态Ctrl+3被拒绝
+
+14:36启动的`rolling_arc_20261021_143621_821744.jsonl`全部561条保存态都是`released/basic_arc`，20关节均失能，保存角度只有1组不同值。本次不是模式4窗口继承，不能拿前述4→3检查解释它。`initial_selection_followup.json`保留代表原始行、记录统计与修复后的选择结果。
+
+已确认的程序问题：初始选择要求候选绝对弯曲量至少占全身绝对关节角之和65%。这把失能末端的局部折弯也计入分母，错误排除了主圆弧。本次全身绝对角之和290.479°，J10–J15占58.73%；但该区重建转角169.81°、圆覆盖205.12°、开口比例0.542、圆拟合RMS12.42 mm，且尾侧参考合格。原来统一报“没有开放圆弧和下垂参考”不能说明真实拒绝原因。
+
+修复改为局部弯曲至少90°，并要求候选跨过由合格失能参考确定的重建顶部，继续检查已有开放/平面/圆拟合条件；不再用全身绝对角比例排除主圆弧。此样本顶部材料坐标13，选择J10–J15（6关节）。方向仍是条件性角度估计，不宣称实测世界Z或识别真实支撑。失败时记录`initial_window_selection.accepted=false`、实际全角、候选拒绝统计与数值，并区分失能初始化和模式4保持原掩码。
+
+此续修只增加2项针对性检查，并复核7项相关已有检查，共9项通过：实测失败姿态接管、失败诊断保存、模式4→3实机/仿真一致性、自动交接、扭矩掩码、原偏置初始化、直线拒绝和仿真入口。使用既有`mujoco`环境，没有新实机或动力学实验。命令：`python -m unittest validation.test_feeding_reference_recovery.ModeSwitchTests validation.test_feeding_boundary.BoundaryTests.test_ctrl3_arms_measured_offset_arc_and_ctrl_u_keeps_configured_seed validation.test_feeding_boundary.BoundaryTests.test_ctrl3_rejects_unobservable_straight_pose_without_enabling validation.test_feeding_boundary.BoundaryTests.test_debug_ctrl3_uses_same_selector_and_configured_reset -v`。
+
+此前“4→3可重新选窗”的软件结论仍成立，但没有覆盖这种失能末端弯折姿态；这次补上其失败复现和修复。下一项最小验收为重启Python，在相同搭管姿态按Ctrl+3核对J10–J15附近的实际选择和接管，再由用户观察形成过程。样本只覆盖一个静态姿态，不扩大为任意姿态通过。
