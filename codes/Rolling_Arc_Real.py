@@ -79,12 +79,14 @@ POSTURE_CONTRACT_EXIT_ANGLE_DEG = 12.0
 POSTURE_EXPANSION_TURN_ERROR_DEG = -5.0
 POSTURE_CONTRACTION_TURN_ERROR_DEG = 5.0
 
-# 主动送链：只用角度/时间，暂停滚动并保留实测起态；不是管径顺应。
+# 主动送链：只用角度/时间，暂停滚动，首次按旧版模板建形；不是管径顺应。
 FEED_DISTANCE_M = .0645        # Ctrl+J/H一次任务的材料量；四连杆试验改为.258
 FEED_AMPLITUDE_DEG = 60.0      # 送链起态自己的幅值，不覆盖你的基础/顺应参数
 FEED_PREPARATION_S = 6.0       # 首次形成；之后另等接管展直稳定才标定本步基线
 FEED_AUTOMATIC_RETURN = False  # 手调默认单程，到位保持；不自动反向
-FEED_OPTIONS_OVERRIDE = {}     # 可覆盖第3C段ContinuousFeedingOptions字段，单位见定义
+FEED_OPTIONS_OVERRIDE = {
+    'tracking_tolerance_deg': 8.0,  # 手调接管/运动跟踪容差；原5°，不改目标或使能交接逻辑
+}                             # 其他ContinuousFeedingOptions字段也可在这里覆盖
 FEED_DIRECTION_OVERRIDE = {}   # 第3C段ManualFeedingDirectionOptions：选段/直线度/稳定时间
 FEED_DIAGNOSTIC_PERIOD_S = 2.0 # 自动显示两侧判断数值；Ctrl+K随时查看
 

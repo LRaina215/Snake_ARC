@@ -1,0 +1,38 @@
+{
+  "source": "codes/logs/rolling_arc_20261021_154602_181845.jsonl",
+  "action": 13,
+  "unique_feedback_samples": 48,
+  "results": [
+    {
+      "tolerance_deg": 5.0,
+      "accepted": null,
+      "stage": "acquire",
+      "fault": null,
+      "position_joints": 1.0035448657116681,
+      "tracking_error_deg": 5.0281266010216825,
+      "metrics": {},
+      "observation_valid": true
+    },
+    {
+      "tolerance_deg": 8.0,
+      "accepted": {
+        "line": 1791,
+        "elapsed_s": 1.3007253999999762
+      },
+      "stage": "feed_out",
+      "fault": null,
+      "position_joints": 1.0035448657116681,
+      "tracking_error_deg": 5.0281266010216825,
+      "metrics": {
+        "samples": 4,
+        "stable_span_s": 0.6488425000000007,
+        "angle_span_deg": 0.0,
+        "length_span_mm": 0.0,
+        "tracking_error_deg": 5.0281266010216825
+      },
+      "observation_valid": true
+    }
+  ],
+  "hardware_run": false,
+  "new_physics": false
+}
