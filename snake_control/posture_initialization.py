@@ -6,7 +6,7 @@ from .rolling_shape_observer import RollingShapeObserver
 from .posture_window import measured_half_circle, mechanically_feasible
 
 
-def choose_posture_window(angles_deg, lengths):
+def choose_posture_window(angles_deg, lengths, enabled_mask=None):
     """Conditional selection from an already draped body, not pipe detection.
 
     Evaluate contiguous arcs of any mechanically feasible width. Straight
@@ -18,6 +18,14 @@ def choose_posture_window(angles_deg, lengths):
     if angles.shape!=(n,) or not np.isfinite(angles).all():
         raise ValueError('自动接管需要全关节有效角反馈')
     points=forward(np.radians(angles),lengths)
+    passive_window=None
+    if enabled_mask is not None:
+        mask=np.asarray(enabled_mask,bool)
+        if mask.shape!=(n,):
+            raise ValueError('自动接管需要完整使能掩码')
+        indices=np.flatnonzero(mask)+1
+        if len(indices):
+            passive_window=(int(indices[0]),int(indices[-1]))
     helper=RollingShapeObserver(lengths,None)
     total=float(abs(angles).sum())
     candidates=[]
@@ -41,7 +49,10 @@ def choose_posture_window(angles_deg, lengths):
                 circle=measured_half_circle(section)
                 if not 90.<=circle['coverage_deg']<=240. or circle['circle_rms_m']>.025:
                     continue
-                down,quality=helper.passive_down(points,window,section)
+                # During mode4 -> mode3, straightened feeding buffers are
+                # still powered. They must not masquerade as passive gravity
+                # references simply because the candidate window is narrower.
+                down,quality=helper.passive_down(points,passive_window or window,section)
                 if down is None:
                     continue
                 score=(abs(circle['coverage_deg']-180.)/40.+abs(turn-180.)/60.+

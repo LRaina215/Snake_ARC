@@ -1,0 +1,26 @@
+{
+  "environment": "existing conda mujoco",
+  "hardware_connected": false,
+  "new_dynamics_runs": 0,
+  "unique_targeted_checks_passed": 29,
+  "runs": [
+    {
+      "command": "python -m unittest validation.test_feeding_reference_recovery validation.test_feeding_boundary validation.test_passive_segment_selection validation.test_manual_feeding -v",
+      "tests_at_time_of_run": 26,
+      "result": "OK"
+    },
+    {
+      "command": "python -m unittest validation.test_feeding_reference_recovery.ModeSwitchTests.test_reselection_writes_exact_torque_mask_and_only_sends_selected_ids validation.test_feeding_reference_recovery.ReferenceRecoveryTests.test_long_gap_requires_stable_redatum_and_never_credits_unknown_motion -v",
+      "tests_at_time_of_run": 2,
+      "result": "OK"
+    },
+    {
+      "command": "python -m unittest validation.test_feeding_reference_recovery -v",
+      "tests_at_time_of_run": 12,
+      "result": "OK",
+      "purpose": "Final focused checks after adding mode-switch torque-mask coverage and failed-reference handling"
+    }
+  ],
+  "replay": "replay.json",
+  "scope": "Existing recorded feedback and memory-serial/control-state checks; no claim of real movement success"
+}

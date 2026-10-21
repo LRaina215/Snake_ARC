@@ -117,6 +117,8 @@ class ContinuousFeeding:
         self.acquisition_metrics = {}
         self.completion_reason = None
         self.recovery = None
+        self.observation_recovery = None
+        self.reference_epoch = None
 
     def reference_mask(self):
         reserved = np.zeros(self.n, bool)
@@ -157,6 +159,7 @@ class ContinuousFeeding:
         self.acquisition_samples = []
         self.acquisition_metrics = {}
         self.acquisition_reason = 'waiting_for_takeover_and_stability'
+        self.observation_recovery = None
         self.velocity_m_s = 0.
         self.last_length_time = None
         self.events.append(dict(kind='manual_relative_step', time_s=control_time_s,
@@ -221,6 +224,30 @@ class ContinuousFeeding:
             self.fault = 'reverse recovery timeout'
         return desired
 
+    def collect_length_datum(self, samples, angles, coordinate, epoch, feedback_time):
+        """One coordinate frame and fresh samples; IDs alone do not reset it."""
+        opt = self.options
+        if samples and (feedback_time-samples[-1][0]>self.length_observer.options.maximum_sample_gap_s or epoch!=samples[-1][3]):
+            samples.clear()
+        if not samples or feedback_time>samples[-1][0]:
+            samples.append((feedback_time, angles.copy(), coordinate, epoch))
+        while len(samples)>3 and feedback_time-samples[1][0]>=opt.acquisition_stability_s:
+            samples.pop(0)
+        spans = np.ptp(np.array([s[1] for s in samples]),axis=0)
+        metrics = dict(samples=len(samples), stable_span_s=feedback_time-samples[0][0],
+            angle_span_deg=float(spans.max()), angle_span_joint=int(spans.argmax()+1),
+            length_span_mm=float(1000*np.ptp([s[2] for s in samples])),
+            reference_epoch=epoch)
+        if len(samples)<3 or metrics['stable_span_s']<opt.acquisition_stability_s-1e-8:
+            reason = 'collecting_acquisition_samples'
+        elif metrics['angle_span_deg']>opt.acquisition_angle_span_deg:
+            reason = 'waiting_for_stable_angles'
+        elif metrics['length_span_mm']>1000*opt.acquisition_length_span_m:
+            reason = 'waiting_for_stable_length'
+        else:
+            reason = None
+        return metrics,reason
+
     def acquire_start(self, angles, feedback_time, control_time, fresh):
         """Settle the actual takeover before defining zero transfer.
 
@@ -240,37 +267,32 @@ class ContinuousFeeding:
             self.events.append(dict(kind='acquisition_takeover', time_s=control_time,
                 entering=(np.flatnonzero(entering)+1).tolist(), position_joints=self.position))
         opt = self.options
-        self.tracking_error_deg = float(np.max(abs(np.degrees(desired[self.enabled])-angles[self.enabled])))
-        self.acquisition_reason = 'waiting_for_stable_shape_and_length'
+        errors = np.where(self.enabled, abs(np.degrees(desired)-angles), -1.)
+        worst = int(errors.argmax())
+        self.tracking_error_deg = float(errors[worst])
+        tracking = dict(tracking_error_deg=self.tracking_error_deg, tracking_joint=worst+1,
+            tracking_target_deg=float(np.degrees(desired[worst])), tracking_actual_deg=float(angles[worst]))
+        self.acquisition_metrics.update(tracking)
         if fresh:
             if entering.any() or not self.observation['valid'] or self.tracking_error_deg > opt.tracking_tolerance_deg:
-                self.acquisition_samples = []
-                self.acquisition_metrics = {}
-                self.acquisition_reason = ('waiting_for_takeover_tracking' if entering.any() or self.observation['valid']
+                # A short missing qualification sample is not physical motion.
+                # Retain history only while a geometrically good candidate is
+                # collecting samples; genuine bad geometry still invalidates it.
+                ends = self.observation.get('end_quality',{}).get('ends',{})
+                collecting = any(e.get('best') and e['best']['reasons']==['collecting_stability'] for e in ends.values())
+                brief = bool(self.acquisition_samples) and feedback_time-self.acquisition_samples[-1][0]<=self.length_observer.options.maximum_sample_gap_s
+                if entering.any() or self.tracking_error_deg>opt.tracking_tolerance_deg or not (collecting and brief):
+                    self.acquisition_samples = []
+                    self.acquisition_metrics = dict(tracking)
+                self.acquisition_reason = ('waiting_for_takeover_tracking' if entering.any() or self.tracking_error_deg>opt.tracking_tolerance_deg
                                            else self.observation.get('reason', 'untrusted_direction'))
             else:
                 coordinate = self.observation['transfer_coordinate_m']
                 quality = self.observation.get('end_quality', {})
-                # Changing the reference segments is a new measurement frame.
-                # Ignore time-varying quality metrics; compare material spans.
-                reference = (quality.get('source'), tuple(
-                    (k, str(v.get('selected', {}).get('links')) if isinstance(v.get('selected'), dict) else str(v.get('selected')))
-                    for k,v in quality.get('ends', {}).items()))
-                if self.acquisition_samples and (feedback_time-self.acquisition_samples[-1][0]>.6 or
-                                                  reference != self.acquisition_samples[-1][3]):
-                    self.acquisition_samples = []
-                self.acquisition_samples.append((feedback_time, angles.copy(), coordinate, reference))
-                while len(self.acquisition_samples)>2 and feedback_time-self.acquisition_samples[1][0]>=opt.acquisition_stability_s:
-                    self.acquisition_samples.pop(0)
-                samples = self.acquisition_samples
-                self.acquisition_metrics = dict(samples=len(samples),
-                    stable_span_s=feedback_time-samples[0][0],
-                    angle_span_deg=float(np.ptp(np.array([s[1] for s in samples]), axis=0).max()),
-                    length_span_mm=float(1000*np.ptp([s[2] for s in samples])),
-                    tracking_error_deg=self.tracking_error_deg)
-                if (len(samples)>=3 and feedback_time-samples[0][0]>=opt.acquisition_stability_s-1e-8 and
-                    np.ptp(np.array([s[1] for s in samples]), axis=0).max()<=opt.acquisition_angle_span_deg and
-                    np.ptp([s[2] for s in samples])<=opt.acquisition_length_span_m):
+                self.acquisition_metrics,self.acquisition_reason = self.collect_length_datum(
+                    self.acquisition_samples,angles,coordinate,quality.get('reference_epoch',0),feedback_time)
+                self.acquisition_metrics.update(tracking)
+                if self.acquisition_reason is None:
                     self.baseline = coordinate
                     self.goal_m = coordinate+opt.requested_transfer_m
                     self.velocity_m_s = 0.
@@ -286,7 +308,7 @@ class ContinuousFeeding:
                         position_joints=self.position, window=list(self.window),
                         datum='after_takeover_stable_encoder_geometry'))
         if self.stage=='acquire' and control_time-self.stage_since>opt.maximum_tracking_wait_s:
-            self.fault = 'takeover shape/length did not settle; no transfer baseline recorded'
+            self.fault = 'takeover shape/length did not settle: '+str(self.acquisition_reason)+'; no transfer baseline recorded'
         return desired
 
     def profile(self, position, bias):
@@ -400,25 +422,62 @@ class ContinuousFeeding:
         self.last_time = control_time_s
         opt = self.options
         if fresh:
+            previously_valid = self.observation is not None and self.observation['valid']
             self.last_feedback = feedback_time_s
             self.previous_angles = angles.copy()
             self.observation = self.length_observer.observe(angles, self.window, feedback_time_s)
             if 'crest_joint' not in self.observation:
                 self.observation['crest_joint'] = None
             if self.observation['valid']:
-                self.untrusted_since = None
                 coordinate = self.observation['transfer_coordinate_m']
-                if self.last_length_time is not None:
+                epoch = self.observation.get('end_quality',{}).get('reference_epoch',0)
+                feeding = self.stage in ('feed_out','review_out','feed_return','review_return')
+                if feeding and self.reference_epoch is not None and epoch!=self.reference_epoch and self.observation_recovery is None:
+                    self.observation_recovery = dict(anchor_m=self.previous_coordinate, samples=[], metrics={})
+                    if self.untrusted_since is None:
+                        self.untrusted_since=control_time_s
+                    self.ready_since=None
+                    self.events.append(dict(kind='length_reference_wait',time_s=control_time_s,
+                        reason=self.observation['end_quality']['reference_event']))
+                self.reference_epoch=epoch
+                if self.observation_recovery is not None:
+                    recovery=self.observation_recovery
+                    recovery['metrics'],reason=self.collect_length_datum(recovery['samples'],angles,coordinate,epoch,feedback_time_s)
+                    recovery['reason']=reason
+                    self.velocity_m_s=0.
+                    self.last_length_time=None
+                    if reason is None:
+                        # No overlapping reference: discard the unknown gap's
+                        # displacement, retain only progress observed before it.
+                        # This is a new datum, never a claimed distance success.
+                        shift=coordinate-recovery['anchor_m']
+                        self.baseline+=shift
+                        self.goal_m+=shift
+                        self.previous_coordinate=coordinate
+                        self.last_length_time=feedback_time_s
+                        self.observation_recovery=None
+                        self.untrusted_since=None
+                        self.events.append(dict(kind='length_reference_reacquired',time_s=control_time_s,
+                            datum_shift_m=shift,unknown_gap_motion_counted=False))
+                elif previously_valid and self.last_length_time is not None:
                     sample_dt = feedback_time_s-self.last_length_time
                     raw_velocity = (coordinate-self.previous_coordinate)/sample_dt
                     amount = 1-math.exp(-sample_dt/opt.velocity_filter_s)
                     self.velocity_m_s += amount*(raw_velocity-self.velocity_m_s)
-                self.previous_coordinate = coordinate
-                self.last_length_time = feedback_time_s
+                else:
+                    self.velocity_m_s=0.
+                if self.observation_recovery is None:
+                    self.untrusted_since=None
+                    self.previous_coordinate=coordinate
+                    self.last_length_time=feedback_time_s
                 # A periodic intrinsic allocation coordinates the middle
                 # hinges without an accumulated orientation bias at rest.
             elif self.stage != 'prepare':
                 self.ready_since = None
+                self.velocity_m_s=0.
+                self.last_length_time=None
+                if self.observation_recovery is not None:
+                    self.observation_recovery['samples'].clear()
                 if self.untrusted_since is None:
                     self.untrusted_since = control_time_s
 
@@ -449,7 +508,7 @@ class ContinuousFeeding:
             # joint at its preload angle. Finish the already commanded shape
             # while waiting for the length/gravity proxy to become usable.
             desired, _, _, _ = self.profile(self.position, self.bias)
-            if self.observation['valid']:
+            if self.observation['valid'] and self.observation_recovery is None:
                 error = self.goal_m-self.observation['transfer_coordinate_m']
                 speed = opt.length_gain_s*error-opt.speed_damping*self.velocity_m_s
                 rate = np.clip(speed/np.mean(self.lengths),
@@ -506,7 +565,8 @@ class ContinuousFeeding:
                 self.fault = 'length observation did not recover during bounded shape completion'
             elif self.stage in ('feed_out', 'feed_return') and control_time_s-self.stage_since > opt.maximum_feed_s:
                 self.fault = 'length goal not reached within bounded feeding'
-            elif self.stage in ('review_out', 'review_return') and control_time_s-self.stage_since >= opt.review_s:
+            elif (self.stage in ('review_out', 'review_return') and control_time_s-self.stage_since >= opt.review_s
+                  and self.observation['valid'] and self.observation_recovery is None):
                 if self.stage == 'review_out':
                     self.stage, self.stage_since, self.ready_since = 'feed_return', control_time_s, None
                     self.goal_m = self.baseline
@@ -524,6 +584,8 @@ class ContinuousFeeding:
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
             acquisition_metrics=self.acquisition_metrics,
+            observation_recovery=None if self.observation_recovery is None else {
+                k:v for k,v in self.observation_recovery.items() if k!='samples'},
             completion_reason=self.completion_reason,
             recovery=None if self.recovery is None else {k:v for k,v in self.recovery.items()
                 if k not in ('start','goal')},

@@ -89,12 +89,12 @@ class DebugArcController(real.RollingArcController):
         if kind=='feeding':
             self.session.stop_push()
             return super().select_gait(kind)
-        if self.feeding_selected:
-            super().select_gait('basic')
         if SLIDING_FEEDBACK == 'motor_angles':
             super().select_gait(kind)
             self.session.record_event('gait_change', to=kind)
             return
+        if self.feeding_selected:
+            super().select_gait('basic')
         if kind not in ('basic', 'fixed', 'sliding'):
             raise ValueError('未知模式')
         if kind == 'basic':
