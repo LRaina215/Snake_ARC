@@ -66,6 +66,9 @@ class PassiveSegmentTests(unittest.TestCase):
         c.advance(self.q,6.,6.)
         self.assertIsNone(c.fault);self.assertIsNone(c.baseline)
         c.advance(self.q,6.2,6.2)
+        self.assertIsNone(c.baseline);self.assertEqual(c.stage,'acquire')
+        for t in (6.4,6.6,6.8,7.,7.2,7.4):
+            c.advance(np.degrees(c.targets),t,t)
         self.assertIsNotNone(c.baseline);self.assertEqual(c.stage,'feed_out')
         bad=ContinuousFeeding(c.lengths)
         q=np.full(20,40.)

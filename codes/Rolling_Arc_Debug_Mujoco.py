@@ -668,7 +668,7 @@ class DebugViewer:
                           viewport, left, right, self.context)
         mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT,
                           viewport, 'Ctrl+1/2/3/4: modes | Ctrl+U: form | Ctrl+G: run/pause\nHold Ctrl+A/D: pull left/right | Ctrl+[ / ]: force\nCtrl+W: auto window | Ctrl+R: reset preview',
-                          'Ctrl+J/H: step / feed action | Ctrl+Y: return\nCtrl+L: feed frame | Ctrl+Space: pause\nCtrl+X: release | Ctrl+Q: quit', self.context)
+                          'Ctrl+J/H: step / one feed segment (hold at goal) | Ctrl+Y: return\nCtrl+L: feed frame | Ctrl+Space: pause\nCtrl+X: release | Ctrl+Q: quit', self.context)
         self.glfw.swap_buffers(self.window)
         self.glfw.poll_events()
 

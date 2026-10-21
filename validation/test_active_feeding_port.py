@@ -147,7 +147,7 @@ class FeedingPortTests(unittest.TestCase):
 
     def test_pause_resume_and_single_frame_do_not_consume_pause(self):
         c = ready();c.command('step')
-        for _ in range(315):c.cycle()
+        for _ in range(400):c.cycle()
         self.assertIsNotNone(c.feeding.baseline)
         c.command('pause');p=c.feeding.position;targets=c.targets.copy();stage=c.feeding.stage
         c.t += 10.;c.refresh_compliance_feedback();c.tick(.02)
@@ -160,11 +160,11 @@ class FeedingPortTests(unittest.TestCase):
 
     def test_return_repeated_task_and_emergency_release(self):
         c=ready();c.command('back')
-        for _ in range(315):c.cycle()
+        for _ in range(400):c.cycle()
         c.command('feed_return');self.assertEqual(c.feeding.stage,'feed_return')
         self.assertEqual(c.feeding.goal_m,c.feeding.baseline)
         c.cycle();old_id=c.feeding_action_id;c.command('step')
-        self.assertGreater(c.feeding_action_id,old_id);self.assertEqual(c.feeding.stage,'prepare')
+        self.assertGreater(c.feeding_action_id,old_id);self.assertEqual(c.feeding.stage,'acquire')
         self.assertEqual(c.feeding.targets.tolist(),np.radians(c.targets).tolist())
         c.command('release')
         self.assertTrue(all(c.port.registers[sid][0x28]==0 for sid in real.SERVO_IDS))
@@ -172,7 +172,7 @@ class FeedingPortTests(unittest.TestCase):
 
     def test_paused_feedback_keeps_segments_ready_for_human_paced_single_steps(self):
         c=ready();c.command('step')
-        for _ in range(315):c.cycle()
+        for _ in range(400):c.cycle()
         c.command('pause')
         before=(c.feeding.position,c.feeding.baseline,c.targets.copy(),c.enabled.copy())
         # Multiple real encoder samples arrive while targets remain frozen.
@@ -205,7 +205,7 @@ class FeedingPortTests(unittest.TestCase):
                     if c.feeding_paused:break
                 self.assertIsNone(c.feeding.fault)
                 if not automatic:
-                    self.assertEqual(c.feeding.stage,'review_out')
+                    self.assertEqual(c.feeding.stage,'complete')
                     self.assertAlmostEqual(c.feeding.goal_m-c.feeding.baseline,-real.FEED_DISTANCE_M)
                     c.command('feed_return')
                     for _ in range(2500):
@@ -227,7 +227,7 @@ class FeedingPortTests(unittest.TestCase):
         c.command('amplitude=70 omega=0.8')
         self.assertFalse(c.forming)
         self.assertEqual(c.feeding.options.amplitude_deg,real.FEED_AMPLITUDE_DEG)
-        c.command('back');self.assertEqual(c.feeding.stage,'prepare')
+        c.command('back');self.assertEqual(c.feeding.stage,'acquire')
 
     def test_preview_and_standalone_copy(self):
         c=ready();c.command('back');c.cycle()
