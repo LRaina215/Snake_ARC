@@ -2,16 +2,15 @@
 
 Position is a travelling curvature profile in material joint coordinates,
 not a world displacement. A new local transition follows each old one.
-Manual entries translate the captured measured bend; historical experiments
-may still construct a pi-turn template by omitting seed_angles_deg.
+The left/right curvature allocation can change while its total stays pi.
 All contact/world support and true length checks belong to the experiment.
 """
 from dataclasses import dataclass, asdict, replace
 import math
 import numpy as np
 from .active_arc_transfer import ActiveArcTransfer, TransferOptions
-from .whole_feeding_observer import WholeFeedingObserver
-from .section_geometry import forward,local_section
+from .manual_feeding_observer import ManualFeedingObserver
+from .section_geometry import forward
 
 
 @dataclass(frozen=True)
@@ -59,51 +58,21 @@ class ContinuousFeedingOptions:
 
 
 class ContinuousFeeding:
-    def __init__(self, lengths, options=ContinuousFeedingOptions(), seed_angles_deg=None):
+    def __init__(self, lengths, options=ContinuousFeedingOptions()):
         self.lengths = np.asarray(lengths, float)
         self.n = len(self.lengths)-1
         self.options = options
-        self.measured_seed = None
-        self.seed_turn_deg = None
-        if seed_angles_deg is not None:
-            seed=np.asarray(seed_angles_deg,float)
-            if seed.shape!=(self.n,) or not np.isfinite(seed).all():
-                raise ValueError('Feeding seed requires complete measured motor angles')
-            self.measured_seed=np.zeros(self.n)
-            first,last=options.first_joint,options.last_joint
-            self.measured_seed[first-1:last]=np.radians(seed[first-1:last])
-            section=local_section(np.radians(seed),self.lengths,first,last)
-            self.seed_turn_deg=math.degrees(section['total_turn'])
         self.reference_direction = 1 if options.requested_transfer_m > 0 else -1
         self.helper = ActiveArcTransfer(self.lengths, 'transfer', TransferOptions(
             first_joint=options.first_joint, last_joint=options.last_joint,
             amplitude_deg=options.amplitude_deg, hold_phase_rad=0.))
-        self.length_observer = WholeFeedingObserver(self.lengths, (options.first_joint, options.last_joint))
+        self.length_observer = ManualFeedingObserver(self.lengths, (options.first_joint, options.last_joint))
         self.origin = (options.first_joint, options.last_joint)
         # Each transition advances two alternating hinges. The last valid
         # pair gives a coarse profile range, not a guarantee of support.
-        bearing_first,bearing_last=self.origin
-        if self.measured_seed is not None:
-            curved=np.flatnonzero(abs(self.measured_seed)>1e-8)+1
-            bearing_first,bearing_last=int(curved[0]),int(curved[-1])
-        self.minimum_bin = math.ceil((2-bearing_first)/2)
-        self.maximum_bin = math.floor((self.n-1-bearing_last-2)/2)
+        self.minimum_bin = math.ceil((2-options.first_joint)/2)
+        self.maximum_bin = math.floor((self.n-1-options.last_joint-2)/2)
         self.position_bounds = (2*self.minimum_bin, 2*(self.maximum_bin+1))
-        # A profile endpoint is reachable only if every nonzero bend can be
-        # enabled while preserving the chosen passive reference. Never clip a
-        # required bending joint out of the mask after accepting its position.
-        geometric_bounds = self.position_bounds
-        seed, _, _, _ = self.profile(0.,0.)
-        if np.any(abs(seed[self.reference_mask()])>1e-10):
-            self.reference_direction *= -1
-        feasible = []
-        for position in range(geometric_bounds[0], geometric_bounds[1]+1, 2):
-            target, _, _, _ = self.profile(position, 0.)
-            if not np.any(abs(target[self.reference_mask()])>1e-10):
-                feasible.append(position)
-        if not feasible or min(feasible)>0 or max(feasible)<0:
-            raise ValueError('Initial arc conflicts with passive reference reserve')
-        self.position_bounds = (min(feasible), max(feasible))
         self.position = self.bias = self.phase = 0.
         # Equal relative settling speed for one-link and larger actions.
         # This is a motor-proxy gate, not a claim of true length stability.
@@ -111,7 +80,7 @@ class ContinuousFeeding:
             1., abs(options.requested_transfer_m)/float(np.mean(self.lengths)))
         self.enabled = self.helper.mask(self.origin)
         self.window = self.origin
-        self.targets = self.helper.template(self.origin, 0., options.amplitude_deg) if self.measured_seed is None else self.measured_seed.copy()
+        self.targets = self.helper.template(self.origin, 0., options.amplitude_deg)
         self.stage = 'prepare'
         self.stage_since = self.ready_since = None
         self.last_time = self.last_feedback = self.last_length_time = None
@@ -131,30 +100,8 @@ class ContinuousFeeding:
         self.acquisition_samples = []
         self.acquisition_reason = None
         self.acquisition_metrics = {}
-        self.completion_reason = None
-        self.recovery = None
-        self.observation_recovery = None
-        self.reference_epoch = None
-        self.buffer_release_since = np.full(self.n, np.nan)
 
-    def reference_mask(self):
-        reserved = np.zeros(self.n, bool)
-        count = self.options.minimum_passive_reference_links
-        if count:
-            if self.reference_direction > 0:
-                reserved[:count] = True
-            else:
-                reserved[-count:] = True
-        return reserved
-
-    def finish_at_boundary(self, time_s):
-        self.stage, self.completed = 'boundary', True
-        self.completion_reason = 'reachable_profile_boundary_not_length_goal'
-        self.events.append(dict(kind='reachable_boundary', time_s=time_s,
-            position_joints=self.position, bounds=list(self.position_bounds),
-            requested_transfer_m=self.options.requested_transfer_m))
-
-    def request_step(self, distance_m, control_time_s, angles_deg=None):
+    def request_step(self, distance_m, control_time_s):
         """Start one relative action without resetting the travelling profile.
 
         The start datum is measured after taking over/straightening neighbours.
@@ -162,108 +109,20 @@ class ContinuousFeeding:
         """
         if not math.isfinite(distance_m) or distance_m == 0:
             raise ValueError('A finite nonzero feeding distance is required')
-        previous_direction = 1 if self.options.requested_transfer_m>0 else -1
-        recovering = self.stage=='reverse_recover'
         self.options = replace(self.options, requested_transfer_m=distance_m)
-        direction = 1 if distance_m>0 else -1
         self.goal_speed_tolerance_m_s = self.options.speed_tolerance_m_s*max(
             1., abs(distance_m)/float(np.mean(self.lengths)))
         self.stage, self.stage_since = 'acquire', control_time_s
         self.completed, self.fault = False, None
-        self.completion_reason, self.recovery = None, None
         self.baseline = self.goal_m = None
         self.ready_since = self.untrusted_since = self.tracking_blocked_since = None
         self.acquisition_samples = []
         self.acquisition_metrics = {}
         self.acquisition_reason = 'waiting_for_takeover_and_stability'
-        self.observation_recovery = None
         self.velocity_m_s = 0.
         self.last_length_time = None
         self.events.append(dict(kind='manual_relative_step', time_s=control_time_s,
             requested_transfer_m=distance_m, position_joints=self.position))
-        lo, hi = self.position_bounds
-        outward = direction>0 and self.position>=hi-1e-8 or direction<0 and self.position<=lo+1e-8
-        if outward:
-            self.finish_at_boundary(control_time_s)
-            return
-        if angles_deg is not None:
-            angles = np.radians(np.asarray(angles_deg, float))
-            current, _, _, _ = self.profile(self.position, self.bias)
-            error = float(np.degrees(abs(current[self.enabled]-angles[self.enabled])).max())
-            outside = self.position<lo-1e-8 or self.position>hi+1e-8
-            if outside or recovering or (direction!=previous_direction and error>self.options.tracking_tolerance_deg):
-                # A reversal must not wait for the unreachable OLD endpoint.
-                # Bridge from the measured pose to an inward feasible profile,
-                # tracking each intermediate command with the unchanged 5 deg
-                # tolerance. This is explicit recovery, not claimed mm travel.
-                destination = float(np.clip(self.position+direction*min(1.,abs(distance_m)/np.mean(self.lengths)),lo,hi))
-                bias = -self.options.travelling_bias_amplitude*math.sin(math.pi*destination)
-                goal, focus, _, _ = self.profile(destination,bias)
-                self.recovery = dict(start=angles.copy(), goal=goal, focus=focus,
-                    start_position=self.position, destination=destination, bias=bias,
-                    fraction=0., initial_error_deg=error,
-                    duration_s=max(abs(destination-self.position)/self.options.maximum_position_rate_joints_s,
-                        float(np.degrees(abs(goal-angles)).max())/self.options.target_rate_deg_s,.2))
-                self.stage = 'reverse_recover'
-                self.acquisition_reason = 'tracking_inward_bridge_from_measured_pose'
-                self.events.append(dict(kind='reverse_recovery', time_s=control_time_s,
-                    from_position=self.position, to_position=destination, initial_error_deg=error))
-
-    def recover_reverse(self, angles, feedback_time, control_time, dt, fresh):
-        r, opt = self.recovery, self.options
-        required = self.required_mask(r['focus'], angles, r['destination'])
-        entering = required & ~self.enabled
-        self.targets[entering] = np.radians(angles)[entering]
-        self.enabled |= required
-        indices = np.flatnonzero(self.enabled)+1
-        self.window = (int(indices[0]),int(indices[-1]))
-        # A zero-fraction bridge first relaxes the old tracking error towards
-        # the measured start; target slew limiting still applies below.
-        self.tracking_error_deg = float(abs(np.degrees(self.targets[self.enabled])-angles[self.enabled]).max())
-        if self.tracking_error_deg <= opt.tracking_tolerance_deg:
-            r['fraction'] = min(1.,r['fraction']+min(dt,.02)/r['duration_s'])
-            self.tracking_blocked_since = None
-        elif self.tracking_blocked_since is None:
-            self.tracking_blocked_since = control_time
-        desired = (1-r['fraction'])*r['start']+r['fraction']*r['goal']
-        if r['fraction']>=1. and fresh:
-            error = float(abs(np.degrees(r['goal'][self.enabled])-angles[self.enabled]).max())
-            self.ready_since = (feedback_time if self.ready_since is None else self.ready_since) if error<=opt.tracking_tolerance_deg else None
-            if self.ready_since is not None and feedback_time-self.ready_since>=opt.persistence_s:
-                self.position, self.bias = r['destination'], r['bias']
-                self.stage, self.completed = 'recovered', True
-                self.completion_reason = 'inward_pose_recovered_not_length_goal'
-                self.acquisition_reason = None
-                self.events.append(dict(kind='reverse_recovered',time_s=control_time,position_joints=self.position))
-        if self.tracking_blocked_since is not None and control_time-self.tracking_blocked_since>opt.maximum_tracking_wait_s:
-            self.fault = 'reverse intermediate target tracking did not recover'
-        if control_time-self.stage_since>r['duration_s']+opt.maximum_tracking_wait_s:
-            self.fault = 'reverse recovery timeout'
-        return desired
-
-    def collect_length_datum(self, samples, angles, coordinate, epoch, feedback_time):
-        """One coordinate frame and fresh samples; IDs alone do not reset it."""
-        opt = self.options
-        if samples and (feedback_time-samples[-1][0]>self.length_observer.options.maximum_sample_gap_s or epoch!=samples[-1][3]):
-            samples.clear()
-        if not samples or feedback_time>samples[-1][0]:
-            samples.append((feedback_time, angles.copy(), coordinate, epoch))
-        while len(samples)>3 and feedback_time-samples[1][0]>=opt.acquisition_stability_s:
-            samples.pop(0)
-        spans = np.ptp(np.array([s[1] for s in samples]),axis=0)
-        metrics = dict(samples=len(samples), stable_span_s=feedback_time-samples[0][0],
-            angle_span_deg=float(spans.max()), angle_span_joint=int(spans.argmax()+1),
-            length_span_mm=float(1000*np.ptp([s[2] for s in samples])),
-            reference_epoch=epoch)
-        if len(samples)<3 or metrics['stable_span_s']<opt.acquisition_stability_s-1e-8:
-            reason = 'collecting_acquisition_samples'
-        elif metrics['angle_span_deg']>opt.acquisition_angle_span_deg:
-            reason = 'waiting_for_stable_angles'
-        elif metrics['length_span_mm']>1000*opt.acquisition_length_span_m:
-            reason = 'waiting_for_stable_length'
-        else:
-            reason = None
-        return metrics,reason
 
     def acquire_start(self, angles, feedback_time, control_time, fresh):
         """Settle the actual takeover before defining zero transfer.
@@ -284,32 +143,37 @@ class ContinuousFeeding:
             self.events.append(dict(kind='acquisition_takeover', time_s=control_time,
                 entering=(np.flatnonzero(entering)+1).tolist(), position_joints=self.position))
         opt = self.options
-        errors = np.where(self.enabled, abs(np.degrees(desired)-angles), -1.)
-        worst = int(errors.argmax())
-        self.tracking_error_deg = float(errors[worst])
-        tracking = dict(tracking_error_deg=self.tracking_error_deg, tracking_joint=worst+1,
-            tracking_target_deg=float(np.degrees(desired[worst])), tracking_actual_deg=float(angles[worst]))
-        self.acquisition_metrics.update(tracking)
+        self.tracking_error_deg = float(np.max(abs(np.degrees(desired[self.enabled])-angles[self.enabled])))
+        self.acquisition_reason = 'waiting_for_stable_shape_and_length'
         if fresh:
             if entering.any() or not self.observation['valid'] or self.tracking_error_deg > opt.tracking_tolerance_deg:
-                # A short missing qualification sample is not physical motion.
-                # Retain history only while a geometrically good candidate is
-                # collecting samples; genuine bad geometry still invalidates it.
-                ends = self.observation.get('end_quality',{}).get('ends',{})
-                collecting = any(e.get('best') and e['best']['reasons']==['collecting_stability'] for e in ends.values())
-                brief = bool(self.acquisition_samples) and feedback_time-self.acquisition_samples[-1][0]<=self.length_observer.options.maximum_sample_gap_s
-                if entering.any() or self.tracking_error_deg>opt.tracking_tolerance_deg or not (collecting and brief):
-                    self.acquisition_samples = []
-                    self.acquisition_metrics = dict(tracking)
-                self.acquisition_reason = ('waiting_for_takeover_tracking' if entering.any() or self.tracking_error_deg>opt.tracking_tolerance_deg
+                self.acquisition_samples = []
+                self.acquisition_metrics = {}
+                self.acquisition_reason = ('waiting_for_takeover_tracking' if entering.any() or self.observation['valid']
                                            else self.observation.get('reason', 'untrusted_direction'))
             else:
                 coordinate = self.observation['transfer_coordinate_m']
                 quality = self.observation.get('end_quality', {})
-                self.acquisition_metrics,self.acquisition_reason = self.collect_length_datum(
-                    self.acquisition_samples,angles,coordinate,quality.get('reference_epoch',0),feedback_time)
-                self.acquisition_metrics.update(tracking)
-                if self.acquisition_reason is None:
+                # Changing the reference segments is a new measurement frame.
+                # Ignore time-varying quality metrics; compare material spans.
+                reference = (quality.get('source'), tuple(
+                    (k, str(v.get('selected', {}).get('links')) if isinstance(v.get('selected'), dict) else str(v.get('selected')))
+                    for k,v in quality.get('ends', {}).items()))
+                if self.acquisition_samples and (feedback_time-self.acquisition_samples[-1][0]>.6 or
+                                                  reference != self.acquisition_samples[-1][3]):
+                    self.acquisition_samples = []
+                self.acquisition_samples.append((feedback_time, angles.copy(), coordinate, reference))
+                while len(self.acquisition_samples)>2 and feedback_time-self.acquisition_samples[1][0]>=opt.acquisition_stability_s:
+                    self.acquisition_samples.pop(0)
+                samples = self.acquisition_samples
+                self.acquisition_metrics = dict(samples=len(samples),
+                    stable_span_s=feedback_time-samples[0][0],
+                    angle_span_deg=float(np.ptp(np.array([s[1] for s in samples]), axis=0).max()),
+                    length_span_mm=float(1000*np.ptp([s[2] for s in samples])),
+                    tracking_error_deg=self.tracking_error_deg)
+                if (len(samples)>=3 and feedback_time-samples[0][0]>=opt.acquisition_stability_s-1e-8 and
+                    np.ptp(np.array([s[1] for s in samples]), axis=0).max()<=opt.acquisition_angle_span_deg and
+                    np.ptp([s[2] for s in samples])<=opt.acquisition_length_span_m):
                     self.baseline = coordinate
                     self.goal_m = coordinate+opt.requested_transfer_m
                     self.velocity_m_s = 0.
@@ -325,36 +189,17 @@ class ContinuousFeeding:
                         position_joints=self.position, window=list(self.window),
                         datum='after_takeover_stable_encoder_geometry'))
         if self.stage=='acquire' and control_time-self.stage_since>opt.maximum_tracking_wait_s:
-            self.fault = 'takeover shape/length did not settle: '+str(self.acquisition_reason)+'; no transfer baseline recorded'
+            self.fault = 'takeover shape/length did not settle; no transfer baseline recorded'
         return desired
 
     def profile(self, position, bias):
-        """Interpolate the travelling profile; retain each captured axis budget."""
+        """Interpolate the travelling profile; totals of each axis stay fixed."""
         cell = int(np.clip(math.floor(position/2), self.minimum_bin, self.maximum_bin))
         fraction = float(np.clip(position/2-cell, 0., 1.))
         old = tuple(j+2*cell for j in self.origin)
         new = tuple(j+2 for j in old)
-        if self.measured_seed is None:
-            left = self.helper.template(old, 0., self.options.amplitude_deg, bias)
-            right = self.helper.template(new, 0., self.options.amplitude_deg, bias)
-        else:
-            # Translate the captured bend in material coordinates. Preserve
-            # each alternating family's signed shape/amplitude; no phase-zero
-            # or 60-degree reconstruction on entering mode 4.
-            seed=self.measured_seed.copy()
-            source=np.arange(self.origin[0]-1,self.origin[1])
-            allocation=np.linspace(1.,-1.,len(source))
-            for parity in (0,1):
-                family=source[source%2==parity]
-                factor=1.+bias*allocation[source%2==parity]
-                total=float(abs(seed[family]).sum())
-                seed[family]*=factor
-                if total>1e-12:seed[family]*=total/abs(seed[family]).sum()
-            left,right=np.zeros(self.n),np.zeros(self.n)
-            for result,shift in ((left,2*cell),(right,2*(cell+1))):
-                inside=(source+shift>=0) & (source+shift<self.n)
-                if np.any(abs(seed[source[~inside]])>1e-8):raise ValueError('Measured bend outside robot')
-                result[source[inside]+shift]=seed[source[inside]]
+        left = self.helper.template(old, 0., self.options.amplitude_deg, bias)
+        right = self.helper.template(new, 0., self.options.amplitude_deg, bias)
         curved = np.flatnonzero(abs(left)+abs(right)>1e-10)+1
         focus = (int(curved[0]), int(curved[-1]))
         target = (1-fraction)*left+fraction*right
@@ -365,7 +210,7 @@ class ContinuousFeeding:
         allocation = offset*offset*(3.-2.*offset)
         boost = math.radians(self.options.fractional_middle_boost_deg)*allocation*math.sin(math.pi*fraction)**2
         family = curved-1
-        if len(family)==4 and self.measured_seed is None:
+        if len(family)==4:
             target[family[[0,-1]]] -= boost
             target[family[1:3]] += boost
         return target, focus, cell, fraction
@@ -386,14 +231,10 @@ class ContinuousFeeding:
         actual_arc = self.observation.get('actual_arc_window')
         if actual_arc is not None:
             required |= self.helper.mask(tuple(actual_arc))
-        # Neighbour capture is relative to the travelling feature, never to
-        # last frame's expanded mask or a length-measurement cut.
-        active = np.arange(focus[0],focus[1]+1)
+        active = np.flatnonzero(required)+1
         radius = self.options.adjacent_fold_distance_joints
         joints = np.arange(1,self.n+1)
         folds = joints[(abs(angles)>=self.options.adjacent_fold_angle_deg) &
-                       ~self.reference_mask() &
-                       (joints>=2) & (joints<=self.n-1) &
                        (joints>=active[0]-radius) & (joints<=active[-1]+radius)]
         self.fold_capture_position[folds-1] = position
         # A straightened fold often returns under gravity immediately
@@ -402,7 +243,6 @@ class ContinuousFeeding:
         # at a stationary length goal. This is material distance,
         # never pipe contact or a world unloading observation.
         retained = joints[np.isfinite(self.fold_capture_position) &
-            ~self.reference_mask() &
             (abs(position-self.fold_capture_position)<self.options.fold_retention_distance_joints)]
         folds = np.union1d(folds, retained)
         if len(folds):
@@ -414,43 +254,12 @@ class ContinuousFeeding:
         # use the same end through return to avoid switching the
         # observation geometry. Reserved folds remain passive and are
         # still fully included in external whole-body shape audits.
-        reserved = self.reference_mask()
-        bend, _, _, _ = self.profile(position, -self.options.travelling_bias_amplitude*math.sin(math.pi*position))
-        if np.any(abs(bend[reserved])>1e-8):
-            raise ValueError('Profile requires a reserved passive joint; recover inward first')
-        required[reserved] = False
+        reserve = self.options.minimum_passive_reference_links
+        if self.reference_direction > 0:
+            required[:reserve] = False
+        else:
+            required[self.n-reserve:] = False
         return required
-
-    def retire_straight_buffers(self, angles, feedback_time, fresh):
-        """Retire settled zero-target buffers even if they exhausted the down reference.
-
-        Keep the travelling bend and its immediate/trailing neighbours. Remove
-        only contiguous outer zero-command joints, after fresh angle dwell.
-        This is a motor/shape handover, not a contact unloading measurement.
-        """
-        desired, focus, _, _ = self.profile(self.position, self.bias)
-        protected = self.required_with_buffer((max(2,focus[0]-1),min(self.n-1,focus[1]+1)))
-        eligible = (self.enabled & ~protected & (abs(desired)<1e-8) &
-                    (abs(np.degrees(self.targets))<=self.options.exit_angle_deg) &
-                    (abs(angles)<=self.options.exit_angle_deg))
-        if fresh:
-            self.buffer_release_since[~eligible] = np.nan
-            self.buffer_release_since[eligible & np.isnan(self.buffer_release_since)] = feedback_time
-        ready = eligible & (feedback_time-self.buffer_release_since>=self.options.release_persistence_s-1e-8)
-        active = np.flatnonzero(self.enabled)
-        release = np.zeros(self.n,bool)
-        for sequence in (active, active[::-1]):
-            for j in sequence:
-                if not ready[j]:break
-                release[j]=True
-        if release.any():
-            self.enabled[release]=False
-            self.fold_capture_position[release]=np.nan
-            self.buffer_release_since[release]=np.nan
-            active=np.flatnonzero(self.enabled)+1
-            self.window=(int(active[0]),int(active[-1]))
-            self.events.append(dict(kind='retire_straight_buffers',time_s=feedback_time,
-                released=(np.flatnonzero(release)+1).tolist(),observes_unloading=False))
 
     def release_ready(self, angles, required, feedback_time, fresh):
         """Encoder geometry below the bearing arc; not a contact-force gate."""
@@ -493,71 +302,32 @@ class ContinuousFeeding:
         dt = .02 if self.last_time is None else control_time_s-self.last_time
         self.last_time = control_time_s
         opt = self.options
-        if self.stage in ('acquire','feed_out','feed_return','review_out','review_return'):
-            self.retire_straight_buffers(angles,feedback_time_s,fresh)
         if fresh:
-            previously_valid = self.observation is not None and self.observation['valid']
             self.last_feedback = feedback_time_s
             self.previous_angles = angles.copy()
             self.observation = self.length_observer.observe(angles, self.window, feedback_time_s)
             if 'crest_joint' not in self.observation:
                 self.observation['crest_joint'] = None
             if self.observation['valid']:
+                self.untrusted_since = None
                 coordinate = self.observation['transfer_coordinate_m']
-                epoch = self.observation.get('end_quality',{}).get('reference_epoch',0)
-                feeding = self.stage in ('feed_out','review_out','feed_return','review_return')
-                if feeding and self.reference_epoch is not None and epoch!=self.reference_epoch and self.observation_recovery is None:
-                    self.observation_recovery = dict(anchor_m=self.previous_coordinate, samples=[], metrics={})
-                    if self.untrusted_since is None:
-                        self.untrusted_since=control_time_s
-                    self.ready_since=None
-                    self.events.append(dict(kind='length_reference_wait',time_s=control_time_s,
-                        reason=self.observation['end_quality']['reference_event']))
-                self.reference_epoch=epoch
-                if self.observation_recovery is not None:
-                    recovery=self.observation_recovery
-                    recovery['metrics'],reason=self.collect_length_datum(recovery['samples'],angles,coordinate,epoch,feedback_time_s)
-                    recovery['reason']=reason
-                    self.velocity_m_s=0.
-                    self.last_length_time=None
-                    if reason is None:
-                        # No overlapping reference: discard the unknown gap's
-                        # displacement, retain only progress observed before it.
-                        # This is a new datum, never a claimed distance success.
-                        shift=coordinate-recovery['anchor_m']
-                        self.baseline+=shift
-                        self.goal_m+=shift
-                        self.previous_coordinate=coordinate
-                        self.last_length_time=feedback_time_s
-                        self.observation_recovery=None
-                        self.untrusted_since=None
-                        self.events.append(dict(kind='length_reference_reacquired',time_s=control_time_s,
-                            datum_shift_m=shift,unknown_gap_motion_counted=False))
-                elif previously_valid and self.last_length_time is not None:
+                if self.last_length_time is not None:
                     sample_dt = feedback_time_s-self.last_length_time
                     raw_velocity = (coordinate-self.previous_coordinate)/sample_dt
                     amount = 1-math.exp(-sample_dt/opt.velocity_filter_s)
                     self.velocity_m_s += amount*(raw_velocity-self.velocity_m_s)
-                else:
-                    self.velocity_m_s=0.
-                if self.observation_recovery is None:
-                    self.untrusted_since=None
-                    self.previous_coordinate=coordinate
-                    self.last_length_time=feedback_time_s
+                self.previous_coordinate = coordinate
+                self.last_length_time = feedback_time_s
                 # A periodic intrinsic allocation coordinates the middle
                 # hinges without an accumulated orientation bias at rest.
             elif self.stage != 'prepare':
                 self.ready_since = None
-                self.velocity_m_s=0.
-                self.last_length_time=None
-                if self.observation_recovery is not None:
-                    self.observation_recovery['samples'].clear()
                 if self.untrusted_since is None:
                     self.untrusted_since = control_time_s
 
         desired = self.targets.copy()
         if self.stage == 'prepare':
-            desired = self.helper.template(self.origin, 0., opt.amplitude_deg) if self.measured_seed is None else self.measured_seed.copy()
+            desired = self.helper.template(self.origin, 0., opt.amplitude_deg)
             if control_time_s >= opt.preparation_s-1e-8 and fresh:
                 if not self.observation['valid']:
                     # A fresh sample at the nominal preparation boundary may
@@ -575,14 +345,12 @@ class ContinuousFeeding:
                     desired = self.acquire_start(angles, feedback_time_s, control_time_s, fresh)
         elif self.stage == 'acquire':
             desired = self.acquire_start(angles, feedback_time_s, control_time_s, fresh)
-        elif self.stage == 'reverse_recover':
-            desired = self.recover_reverse(angles, feedback_time_s, control_time_s, dt, fresh)
         elif self.stage in ('feed_out', 'review_out', 'feed_return', 'review_return'):
             # Pausing the material coordinate must not freeze a newly enabled
             # joint at its preload angle. Finish the already commanded shape
             # while waiting for the length/gravity proxy to become usable.
             desired, _, _, _ = self.profile(self.position, self.bias)
-            if self.observation['valid'] and self.observation_recovery is None:
+            if self.observation['valid']:
                 error = self.goal_m-self.observation['transfer_coordinate_m']
                 speed = opt.length_gain_s*error-opt.speed_damping*self.velocity_m_s
                 rate = np.clip(speed/np.mean(self.lengths),
@@ -590,15 +358,9 @@ class ContinuousFeeding:
                 proposed_position = float(np.clip(self.position+rate*dt, *self.position_bounds))
                 current, _, _, _ = self.profile(self.position, self.bias)
                 self.tracking_error_deg = float(np.max(abs(np.degrees(current[self.enabled])-angles[self.enabled])))
-                # Alternating motor angles add to more than planar curvature
-                # when the captured rolling phase uses both hinge families.
-                if self.measured_seed is None:
-                    self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
-                else:
-                    self.actual_enabled_turn_deg = self.observation['arc_feature']['best']['turn_deg']
-                turn_limit=opt.tracked_turn_soft_limit_deg if self.seed_turn_deg is None else max(opt.tracked_turn_soft_limit_deg,self.seed_turn_deg+12.)
+                self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
                 blocked = (self.tracking_error_deg>opt.tracking_tolerance_deg or
-                           self.actual_enabled_turn_deg>turn_limit)
+                           self.actual_enabled_turn_deg>opt.tracked_turn_soft_limit_deg)
                 if blocked:
                     proposed_position = self.position
                     if self.tracking_blocked_since is None:
@@ -624,10 +386,6 @@ class ContinuousFeeding:
                 active = np.flatnonzero(self.enabled)+1
                 self.window = (int(active[0]), int(active[-1]))
                 desired = proposal
-                boundary = ((self.position<=self.position_bounds[0]+1e-8 and rate<0) or
-                            (self.position>=self.position_bounds[1]-1e-8 and rate>0))
-                if fresh and boundary and not blocked and abs(error)>opt.length_tolerance_m:
-                    self.finish_at_boundary(control_time_s)
                 if fresh and self.stage in ('feed_out', 'feed_return'):
                     reached = abs(error)<=opt.length_tolerance_m and abs(self.velocity_m_s)<=self.goal_speed_tolerance_m_s
                     self.ready_since = (feedback_time_s if self.ready_since is None else self.ready_since) if reached else None
@@ -645,8 +403,7 @@ class ContinuousFeeding:
                 self.fault = 'length observation did not recover during bounded shape completion'
             elif self.stage in ('feed_out', 'feed_return') and control_time_s-self.stage_since > opt.maximum_feed_s:
                 self.fault = 'length goal not reached within bounded feeding'
-            elif (self.stage in ('review_out', 'review_return') and control_time_s-self.stage_since >= opt.review_s
-                  and self.observation['valid'] and self.observation_recovery is None):
+            elif self.stage in ('review_out', 'review_return') and control_time_s-self.stage_since >= opt.review_s:
                 if self.stage == 'review_out':
                     self.stage, self.stage_since, self.ready_since = 'feed_return', control_time_s, None
                     self.goal_m = self.baseline
@@ -661,17 +418,9 @@ class ContinuousFeeding:
 
     def snapshot(self):
         return dict(stage=self.stage, route='continuous_feeding', window=list(self.window),
-            seed_source='configured_template' if self.measured_seed is None else 'measured_feature_arc',
-            measured_seed_deg=None if self.measured_seed is None else np.degrees(self.measured_seed).tolist(),
-            seed_turn_deg=self.seed_turn_deg,
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
             acquisition_metrics=self.acquisition_metrics,
-            observation_recovery=None if self.observation_recovery is None else {
-                k:v for k,v in self.observation_recovery.items() if k!='samples'},
-            completion_reason=self.completion_reason,
-            recovery=None if self.recovery is None else {k:v for k,v in self.recovery.items()
-                if k not in ('start','goal')},
             phase_rad=0., position_joints=self.position, bearing_bias=self.bias,
             bearing_error_m=self.bearing_error_m, goal_m=self.goal_m, baseline_m=self.baseline,
             goal_delta_m=None if self.goal_m is None else self.goal_m-self.baseline,

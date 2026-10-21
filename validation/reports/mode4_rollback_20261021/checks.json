@@ -1,0 +1,16 @@
+{
+  "passed": [
+    "ManualFeedingTests.test_relative_actions_keep_profile_and_hold_without_return",
+    "ManualFeedingTests.test_task19_straightening_is_before_baseline",
+    "ManualFeedingTests.test_unsettled_measurement_never_creates_progress",
+    "RuntimeRecoveryTests.test_mode4_to3_needs_no_passive_direction_and_matches_debug",
+    "RuntimeRecoveryTests.test_full_normal_cycle_does_not_recommend_false_migration",
+    "FeedingPortTests.test_preview_and_standalone_copy",
+    "FeedingPortTests.test_hotkeys_and_idle_selection_do_not_enable",
+    "FeedingPortTests.test_debug_entry_shares_action_without_advancing_physics"
+  ],
+  "passed_count": 8,
+  "hardware_run": false,
+  "new_physics": false,
+  "interpreter": "D:/Anaconda/envs/mujoco/python.exe"
+}

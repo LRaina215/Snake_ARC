@@ -132,6 +132,7 @@ class ModeSwitchTests(unittest.TestCase):
         self.assertEqual(c.mode,'hold')
 
 
+@unittest.skip("Historical mode-4 change withdrawn: user requested 84b28cb rollback")
 class ReferenceRecoveryTests(unittest.TestCase):
     def setUp(self):
         self.core=ContinuousFeeding(np.full(21,.0645))

@@ -22,6 +22,7 @@ DATA=json.loads((REPORT/'fixtures.json').read_text(encoding='utf8'))
 
 
 class RuntimeRecoveryTests(unittest.TestCase):
+    @unittest.skip("Historical mode-4 change withdrawn: user requested 84b28cb rollback")
     def test_mode1_or3_to4_preserves_measured_radius_and_nonzero_rolling_phase(self):
         p=MeasuredParameters(amplitude_deg=45.)
         q=np.degrees(p.targets(.8))
@@ -136,6 +137,7 @@ class RuntimeRecoveryTests(unittest.TestCase):
         self.assertIsNotNone(c.fault)
         self.assertFalse(any(e['kind']=='relocalization_complete' for e in c.events))
 
+    @unittest.skip("Historical mode-4 change withdrawn: user requested 84b28cb rollback")
     def test_recorded_feeding_buffers_release_and_static_feedback_can_acquire(self):
         r=DATA['feeding'];f=r['feeding'];q=np.array(r['feeding_motor_input']['angles_deg'])
         c=ContinuousFeeding(np.full(21,.0645),ContinuousFeedingOptions(**f['options']))

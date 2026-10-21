@@ -10,6 +10,7 @@ from snake_control.continuous_feeding import ContinuousFeeding, ContinuousFeedin
 
 
 class BoundaryTests(unittest.TestCase):
+    @unittest.skip("Historical mode-4 change withdrawn: user requested 84b28cb rollback")
     def test_bounds_cover_every_required_bend_with_both_reference_sides(self):
         for sign,bounds in ((1,(-4,6)),(-1,(-6,4))):
             c=ContinuousFeeding(np.full(21,.0645),replace(ContinuousFeedingOptions(),requested_transfer_m=sign*.0645))
@@ -26,6 +27,7 @@ class BoundaryTests(unittest.TestCase):
                 self.assertLessEqual(c.position_bounds[0],0.)
                 self.assertGreaterEqual(c.position_bounds[1],0.)
 
+    @unittest.skip("Historical mode-4 change withdrawn: user requested 84b28cb rollback")
     def test_repeated_j_boundary_and_h_returns_without_reset(self):
         with contextlib.redirect_stdout(io.StringIO()):
             c=ready();c.command('back')  # Same reference side as the real failure.
@@ -51,6 +53,7 @@ class BoundaryTests(unittest.TestCase):
             self.assertLess(c.feeding.position,3.5)
             self.assertEqual(c.feeding.options.tracking_tolerance_deg,5.)
 
+    @unittest.skip("Historical mode-4 change withdrawn: user requested 84b28cb rollback")
     def test_recorded_j15_stall_has_an_inward_bridge_and_matches_embedded_core(self):
         evidence=json.loads((ROOT/'validation/reports/feeding_boundary_20261021/evidence.json').read_text(encoding='utf8'))
         row=evidence['selected_original_rows']['4812'];f=row['feeding']

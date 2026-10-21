@@ -1,0 +1,16 @@
+{
+  "restored_revision": "84b28cb",
+  "controller_classes_equal": true,
+  "observer_classes_equal_after_rename": true,
+  "adapter_methods_equal": [
+    "select_feeding",
+    "start_feeding",
+    "pause_feeding",
+    "resume_feeding",
+    "command_feeding",
+    "tick_feeding",
+    "show_status"
+  ],
+  "hardware_run": false,
+  "new_physics": false
+}
