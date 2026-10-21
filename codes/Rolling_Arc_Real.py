@@ -4385,7 +4385,7 @@ class DualEndGravityPreview:
         self.previous_frames = self.previous_candidates = None
         self.result = dict(state='waiting', reliable=False, down_head=None, basis=None)
 
-    def update(self, angles_deg, window, feedback_time_s):
+    def update(self, angles_deg, window, feedback_time_s, hint=None):
         q = np.radians(angles_deg)
         if q.shape != (len(self.lengths)-1,) or not np.isfinite(q).all() or not math.isfinite(feedback_time_s):
             raise ValueError('Finite full-body angles and sample time required')
@@ -4435,9 +4435,18 @@ class DualEndGravityPreview:
             prediction = gravity_unit(np.average(predictions, axis=0, weights=weights))
         raw = gravity_unit(sum(c['weight']*np.array(c['direction']) for c in usable)) if usable and consistent else None
         state = 'conflict_hold' if not consistent else 'unobservable_hold'
+        # A controller may already have qualified a straight passive subspan
+        # (the distal tip itself can be bent). Copy that angle-only observation;
+        # never ask the controller to run or change its state for the preview.
+        hint_used = False
+        if hint:
+            direction = np.asarray(hint['down_head'], float)
+            if direction.shape == (3,) and np.isfinite(direction).all() and np.linalg.norm(direction) > .5:
+                raw = gravity_unit(direction)
+                hint_used = True
         reliable = raw is not None
         if raw is not None:
-            state = 'dual' if len(usable) == 2 else 'single_degraded'
+            state = 'observer_'+hint['source'] if hint_used else 'dual' if len(usable) == 2 else 'single_degraded'
             if self.down is None:
                 self.down = raw
             else:
@@ -4465,6 +4474,7 @@ class DualEndGravityPreview:
             observes_world_pose=False, conditional_transport=True)
         return self.result
 # END GRAVITY_PREVIEW_CORE
+
 
 def preview_section_geometry(geometry):
     """只复制控制器已有的线/圆弧与截面坐标；采样留给显示进程。"""
@@ -4502,9 +4512,17 @@ def preview_payload(controller):
         source='control', window=[core.first, core.last], updates=core.updates,
         measured=preview_section_geometry(core.geometry),
         candidate=preview_section_geometry(core.target_geometry))
+    sample_time = controller.motor_sample_clock()[1]
+    observed_time = (getattr(feeding, 'last_feedback', None) if controller.feeding_selected else
+                     observation.get('feedback_time_s'))
+    hint = None
+    if (observation.get('valid') and observation.get('down_head') is not None and
+            observed_time is not None and observed_time == sample_time):
+        hint = dict(down_head=list(observation['down_head']),
+                    source=observation.get('end_quality', {}).get('source', 'passive_end'))
     return dict(angles_deg=angles, target_deg=target, enabled=enabled,
-        smooth_section=section,
-        gravity_time_s=controller.motor_sample_clock()[1],
+        smooth_section=section, gravity_hint=hint,
+        gravity_time_s=sample_time,
         enable_known=controller.touched_hardware, feedback_wall_s=controller.feedback_wall_s,
         window=[controller.first, controller.last], phase_rad=controller.phase,
         mode=controller.mode, gait='主动送链' if controller.feeding_selected else '自动位置/数量' if slider else '固定顺应' if controller.compliance else '基础圆弧',
@@ -4517,13 +4535,13 @@ def preview_payload(controller):
 
 
 class JointPreviewFigure:
-    """正视控制器由关节重建的截面平面；所有曲线共用实测截面坐标。"""
+    """全身投影到实测截面；仅在该平面内旋转，使估计重力朝屏幕下方。"""
     def __init__(self):
         import matplotlib.pyplot as plt
         plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'DejaVu Sans']
         plt.rcParams['axes.unicode_minus'] = False
         self.plt = plt
-        self.figure = plt.figure(figsize=(13, 7), facecolor='#f4f6fa')
+        self.figure = plt.figure(figsize=(14, 8), facecolor='#f4f6fa')
         self.figure.canvas.manager.set_window_title('Rolling Arc — 实测构型与使能预览')
         grid = self.figure.add_gridspec(3, 2, width_ratios=[1.3, 1], height_ratios=[1, 1, .45])
         self.body = self.figure.add_subplot(grid[:, 0])
@@ -4533,6 +4551,9 @@ class JointPreviewFigure:
         self.note = self.figure.text(.04, .04, '', fontsize=10, va='bottom')
         self.figure.subplots_adjust(left=.05, right=.97, top=.88, bottom=.24, wspace=.24, hspace=.65)
         self.section_origin = self.section_basis = None
+        self.gravity = None
+        self.gravity_status = '等待重力估计'
+        self.body_points = self.target_points = None
         self.smooth_display = {}
         self.latest_row = None
 
@@ -4584,19 +4605,63 @@ class JointPreviewFigure:
             self.angles.set_title('使能关节最大角差：'+(f'{error.max():.2f}°' if len(error) else '无使能关节'), fontsize=11)
         else:
             self.body.text(.05, .5, '等待全20关节实测角', transform=self.body.transAxes)
-        self.body.set(xlabel='截面坐标 u / m', ylabel='截面坐标 v / m',
-                      title='正视关节重建截面（局部使能段及边界连杆）')
+        self.body.set(xlabel='截面水平 / m', ylabel='截面向上 / m',
+                      title='全身关节重建截面（蓝：使能；紫：失能）')
         self.body.set_aspect('equal', adjustable='box')
         self.body.grid(alpha=.2)
         self.angles.set(ylabel='控制器坐标角度 / °', xticks=ids, ylim=(-100, 100))
         self.angles.grid(alpha=.2)
         self.figure.canvas.draw_idle()
 
+    def orient_section(self, row, measured_basis, points, stale):
+        """保留截面平面，消除拟合基底的任意转角与法向正负翻转。"""
+        if self.gravity is None:
+            self.gravity = DualEndGravityPreview(row['lengths'])
+        if not stale and row['enable_known'] and any(row['enabled']) and row['gravity_time_s'] is not None:
+            result = self.gravity.update(row['angles_deg'], row['window'], row['gravity_time_s'],
+                                         hint=row.get('gravity_hint'))
+        else:
+            result = self.gravity.result
+        normal = gravity_unit(np.cross(measured_basis[:, 0], measured_basis[:, 1]))
+        previous = self.section_basis
+        if previous is not None and normal @ np.cross(previous[:, 0], previous[:, 1]) < 0:
+            normal = -normal
+        down = result.get('down_head')
+        projected = None if down is None else np.asarray(down)-normal*(normal@down)
+        aligned = projected is not None and np.linalg.norm(projected) >= .15
+        if aligned:
+            up = -gravity_unit(projected)
+            source = result['state']
+            self.gravity_status = ('重力对齐：双侧融合' if source == 'dual' else
+                '重力对齐：单侧暂用' if source == 'single_degraded' else
+                '重力对齐：双侧被动段融合' if source.startswith('observer_') and 'two_consistent' in source else
+                '重力对齐：单侧被动段暂用' if source.startswith('observer_') else
+                '重力不可靠：保留上次方向')
+        else:
+            # 无可靠重力时不随SVD基底转动。第一次用开口定向只是显示约定。
+            if previous is not None:
+                up = previous[:, 1]-normal*(normal@previous[:, 1])
+            else:
+                first, last = row['window']
+                arc = points[first:last+2]
+                up = arc.mean(axis=0)-(arc[0]+arc[-1])*.5
+                up -= normal*(normal@up)
+            if np.linalg.norm(up) < 1e-8:
+                up = measured_basis[:, 1]
+            up = gravity_unit(up)
+            self.gravity_status = ('重力近垂直于截面：保持方向' if down is not None else
+                                   '重力未确定：保持显示方向（首次按圆弧开口定向）')
+        if stale:
+            self.gravity_status = '反馈陈旧：方向保持，等待新实测角'
+        horizontal = gravity_unit(np.cross(up, normal))
+        if previous is None and (points[-1]-points[0])@horizontal < 0:
+            horizontal = -horizontal  # 首次约定头端在左；不声称观测到世界水平朝向。
+        return np.column_stack((horizontal, up))
+
     def draw_section(self, row, colours, stale):
-        """直接使用控制的实测截面平面，不引入重力或另一张侧视平面。"""
+        """所有关节共用实测截面；局部控制平滑曲线保持原数据，仅变换显示坐标。"""
         window = row['window']
         self.smooth_display = {}
-        self.section_origin = self.section_basis = None
         section = row.get('smooth_section')
         try:
             if section is None:
@@ -4613,19 +4678,23 @@ class JointPreviewFigure:
                 return '平滑截面：等待控制器更新，不使用其他平面替代。'
             measured = section['measured']
             self.section_origin = origin = np.array(measured['origin'])
-            self.section_basis = basis = np.array(measured['basis'])
-            # 截面范围与local_section一致：使能段，加两端相邻边界连杆。
-            indices = range(window[0]-1, window[1]+3)
-            points = (forward(np.radians(row['angles_deg']), row['lengths'])-origin)@basis
-            targets = (forward(np.radians(row['target_deg']), row['lengths'])-origin)@basis
-            for i in list(indices)[:-1]:
+            full = forward(np.radians(row['angles_deg']), row['lengths'])
+            basis = self.orient_section(row, np.array(measured['basis']), full, stale)
+            self.section_basis = basis
+            self.body_points = points = (full-origin)@basis
+            self.target_points = targets = (forward(np.radians(row['target_deg']), row['lengths'])-origin)@basis
+            # 22个节点 = 头端点、J1..J20、尾端点；不再按使能窗口裁剪。
+            for i in range(len(points)-1):
                 self.body.plot(*points[i:i+2].T, color=colours[max(0, i-1)], lw=1.5, alpha=.35 if stale else .7)
-            self.body.plot([], [], color='#147bb5', lw=1.5, label='实测连杆（紫：失能）')
-            self.body.plot(*targets[list(indices)].T, '--', color='#e38b27', lw=1.5, label='已发目标连杆')
-            self.body.scatter(*points[list(indices)].T, c=[colours[max(0, min(NUM_JOINTS-1, i-1))] for i in indices], s=24)
-            for i in indices:
-                label = f'J{i}' if 1 <= i <= NUM_JOINTS else '端点'
-                self.body.annotate(label, points[i], xytext=(3, 4), textcoords='offset points', fontsize=8)
+            self.body.plot([], [], color='#147bb5', lw=2, label='使能实测')
+            self.body.plot([], [], color='#9259b5', lw=2, label='失能实测')
+            self.body.plot(*targets.T, '--', color='#e38b27', lw=1.3, alpha=.65, label='已发目标连杆')
+            self.body.scatter(*points[1:-1].T, c=colours, s=24, zorder=4)
+            for i in range(1, NUM_JOINTS+1):
+                self.body.annotate(f'J{i}', points[i], xytext=(4 if i % 2 else -22, 3),
+                                   textcoords='offset points', fontsize=8, color=colours[i-1])
+            for i, label in ((0, '头端'), (-1, '尾端')):
+                self.body.annotate(label, points[i], xytext=(4, -9), textcoords='offset points', fontsize=8)
             used = section['source'] == 'control'
             for key, color, style, label in (
                 ('measured', '#008d82', '-', '实测平滑（控制输入）' if used else '实测平滑（重建）'),
@@ -4635,13 +4704,20 @@ class JointPreviewFigure:
                     self.smooth_display[key] = curve
                     self.body.plot(*curve.T, style, color=color, lw=2.3, alpha=.4 if stale else 1., label=label)
             self.body.legend(loc='best', fontsize=8)
-            both = np.concatenate([points[list(indices)], targets[list(indices)]]+list(self.smooth_display.values()))
+            both = np.concatenate([points, targets]+list(self.smooth_display.values()))
             center = (both.min(axis=0)+both.max(axis=0))/2
             radius = max(.04, float(np.ptp(both, axis=0).max())*.65)
             self.body.set(xlim=(center[0]-radius, center[0]+radius), ylim=(center[1]-radius, center[1]+radius))
-            return (f"控制实测截面 #{section.get('updates', '?')}；洋红：滤波前候选，橙色：已发目标。"
+            if self.gravity.result.get('down_head') is not None:
+                self.body.annotate('', xy=(.94, .71), xytext=(.94, .88), xycoords='axes fraction',
+                                   arrowprops=dict(arrowstyle='->', color='#33485b', lw=1.8))
+                self.body.text(.92, .9, '估计重力', transform=self.body.transAxes, ha='right', fontsize=9)
+            plane_normal = np.cross(basis[:, 0], basis[:, 1])
+            off_plane = float(np.max(np.abs((full-origin)@plane_normal)))
+            return (self.gravity_status+f'；全身投影，离截面最大 {off_plane*1000:.1f}mm。\n'+
+                    (f"控制实测截面 #{section.get('updates', '?')}；洋红：滤波前候选，橙色：已发目标。"
                     if used else '送链预览：平滑曲线仅作显示；长度由连杆几何估计。'
-                    if row.get('feeding') is not None else '平滑截面：同法重建，当前未参与顺应控制。')
+                    if row.get('feeding') is not None else '平滑截面：同法重建，当前未参与顺应控制。'))
         except (ValueError, np.linalg.LinAlgError) as exc:
             self.body.text(.08, .5, '等待有效的关节重建截面', transform=self.body.transAxes)
             return '截面不可用：'+str(exc)

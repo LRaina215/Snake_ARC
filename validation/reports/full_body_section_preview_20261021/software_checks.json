@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "software_tests": 3,
+  "worktree_checks": true,
+  "desktop_checkout_checks": true,
+  "standalone_preview_rendered": true,
+  "child_closed": true,
+  "hardware_connections": 0,
+  "motor_enable_writes": 0,
+  "environment": "existing conda mujoco",
+  "new_dynamics": 0
+}

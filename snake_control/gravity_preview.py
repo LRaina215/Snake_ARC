@@ -48,7 +48,7 @@ class DualEndGravityPreview:
         self.previous_frames = self.previous_candidates = None
         self.result = dict(state='waiting', reliable=False, down_head=None, basis=None)
 
-    def update(self, angles_deg, window, feedback_time_s):
+    def update(self, angles_deg, window, feedback_time_s, hint=None):
         q = np.radians(angles_deg)
         if q.shape != (len(self.lengths)-1,) or not np.isfinite(q).all() or not math.isfinite(feedback_time_s):
             raise ValueError('Finite full-body angles and sample time required')
@@ -98,9 +98,18 @@ class DualEndGravityPreview:
             prediction = gravity_unit(np.average(predictions, axis=0, weights=weights))
         raw = gravity_unit(sum(c['weight']*np.array(c['direction']) for c in usable)) if usable and consistent else None
         state = 'conflict_hold' if not consistent else 'unobservable_hold'
+        # A controller may already have qualified a straight passive subspan
+        # (the distal tip itself can be bent). Copy that angle-only observation;
+        # never ask the controller to run or change its state for the preview.
+        hint_used = False
+        if hint:
+            direction = np.asarray(hint['down_head'], float)
+            if direction.shape == (3,) and np.isfinite(direction).all() and np.linalg.norm(direction) > .5:
+                raw = gravity_unit(direction)
+                hint_used = True
         reliable = raw is not None
         if raw is not None:
-            state = 'dual' if len(usable) == 2 else 'single_degraded'
+            state = 'observer_'+hint['source'] if hint_used else 'dual' if len(usable) == 2 else 'single_degraded'
             if self.down is None:
                 self.down = raw
             else:

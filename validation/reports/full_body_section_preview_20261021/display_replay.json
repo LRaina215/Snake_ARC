@@ -1,0 +1,24 @@
+{
+  "hardware_connections": 0,
+  "new_dynamics": 0,
+  "controller_steps": 0,
+  "passed": true,
+  "simulation_archive": {
+    "frames": 125,
+    "full_body_frames": 125,
+    "unformed_or_waiting": 0,
+    "gravity_states": {
+      "dual": 12,
+      "observer_two_consistent_ends": 110,
+      "observer_single_tail": 3
+    }
+  },
+  "real_task19_archive": {
+    "frames": 188,
+    "full_body_frames": 188,
+    "unformed_or_waiting": 0,
+    "gravity_states": {
+      "observer_global_single_tail": 188
+    }
+  }
+}
