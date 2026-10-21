@@ -1,0 +1,317 @@
+{
+  "source": "codes/logs/rolling_arc_20261021_160548_907144.jsonl",
+  "line": 3166,
+  "feeding": {
+    "stage": "acquire",
+    "route": "continuous_feeding",
+    "window": [
+      2,
+      15
+    ],
+    "acquisition_reason": "waiting_for_takeover_tracking",
+    "acquisition_samples": 0,
+    "acquisition_metrics": {},
+    "phase_rad": 0.0,
+    "position_joints": -5.412699751288065,
+    "bearing_bias": -0.11551504630894155,
+    "bearing_error_m": null,
+    "goal_m": null,
+    "baseline_m": null,
+    "goal_delta_m": null,
+    "observation": {
+      "valid": true,
+      "head_hanging_m": 0.2754926512860466,
+      "tail_hanging_m": 0.7870026020694322,
+      "transfer_coordinate_m": -0.2557549753916928,
+      "above_cut_length_m": 0.29200474664452136,
+      "cut_height_head_frame_m": 0.2463502675807297,
+      "cut_depth_m": 0.08762093420199568,
+      "crest_joint": 6.935511942949498,
+      "actual_arc_window": [
+        4,
+        9
+      ],
+      "down_head": [
+        0.9960778849352674,
+        -0.08488338470974607,
+        0.02497314844191193
+      ],
+      "end_quality": {
+        "source": "global_single_tail",
+        "candidates": [
+          {
+            "name": "tail",
+            "links": [
+              18,
+              21
+            ],
+            "internal_joints": [
+              18,
+              20
+            ],
+            "count": 4,
+            "available": 5,
+            "straightness": 0.9977399573191772,
+            "tip_below_global_top_m": 0.8440450984747101,
+            "segment_below_global_top_m": 0.5866281894863624,
+            "stable_span_s": 0.45479980000001774,
+            "samples": 3,
+            "shape_change_deg": 0.0,
+            "direction": [
+              0.9960778849352674,
+              -0.08488338470974607,
+              0.02497314844191193
+            ],
+            "reasons": []
+          }
+        ],
+        "ends": {
+          "head": {
+            "available": 1,
+            "tested_count": 0,
+            "stable_count": 0,
+            "selected": null,
+            "best": null,
+            "rejection_counts": {},
+            "reason": "insufficient_passive_links"
+          },
+          "tail": {
+            "available": 5,
+            "tested_count": 6,
+            "stable_count": 6,
+            "selected": {
+              "name": "tail",
+              "links": [
+                18,
+                21
+              ],
+              "internal_joints": [
+                18,
+                20
+              ],
+              "count": 4,
+              "available": 5,
+              "straightness": 0.9977399573191772,
+              "tip_below_global_top_m": 0.8440450984747101,
+              "segment_below_global_top_m": 0.5866281894863624,
+              "stable_span_s": 0.45479980000001774,
+              "samples": 3,
+              "shape_change_deg": 0.0,
+              "direction": [
+                0.9960778849352674,
+                -0.08488338470974607,
+                0.02497314844191193
+              ],
+              "reasons": []
+            },
+            "best": {
+              "name": "tail",
+              "links": [
+                18,
+                21
+              ],
+              "internal_joints": [
+                18,
+                20
+              ],
+              "count": 4,
+              "available": 5,
+              "straightness": 0.9977399573191772,
+              "tip_below_global_top_m": 0.8440450984747101,
+              "segment_below_global_top_m": 0.5866281894863624,
+              "stable_span_s": 0.45479980000001774,
+              "samples": 3,
+              "shape_change_deg": 0.0,
+              "direction": [
+                0.9960778849352674,
+                -0.08488338470974607,
+                0.02497314844191193
+              ],
+              "reasons": []
+            },
+            "rejection_counts": {},
+            "reason": "selected"
+          }
+        },
+        "thresholds": {
+          "minimum_links": 3,
+          "maximum_links": 5,
+          "minimum_straightness": 0.98,
+          "stability_s": 0.4,
+          "minimum_samples": 3,
+          "maximum_shape_change_deg": 3.0,
+          "maximum_sample_gap_s": 0.6,
+          "minimum_tip_depth_links": 2.5,
+          "minimum_segment_depth_links": 0.5,
+          "maximum_end_disagreement_deg": 25.0
+        },
+        "observes_world_gravity": false,
+        "stability_basis": "internal_joint_angles_in_material_segment",
+        "used_sides": [
+          "tail"
+        ]
+      },
+      "plane_rms_m": 2.0160122351766858e-05,
+      "observes_pipe_contact": false,
+      "observes_world_position": false
+    },
+    "velocity_m_s": 0.0,
+    "enabled": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "goal_speed_tolerance_m_s": 0.001,
+    "untrusted_since_s": null,
+    "release_below_peak_m": 0.3175667402250337,
+    "tracking_blocked_since_s": null,
+    "tracking_error_deg": 8.121958959381672,
+    "actual_enabled_turn_deg": 170.595703125,
+    "retained_fold_joints": [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      15
+    ],
+    "completed": false,
+    "fault": null,
+    "options": {
+      "first_joint": 11,
+      "last_joint": 15,
+      "amplitude_deg": 60.0,
+      "requested_transfer_m": 0.0645,
+      "preparation_s": 6.0,
+      "length_gain_s": 0.8,
+      "speed_damping": 0.7,
+      "maximum_position_rate_joints_s": 0.1,
+      "velocity_filter_s": 0.4,
+      "length_tolerance_m": 0.004,
+      "speed_tolerance_m_s": 0.001,
+      "persistence_s": 0.4,
+      "review_s": 2.0,
+      "maximum_feed_s": 60.0,
+      "target_rate_deg_s": 45.0,
+      "exit_angle_deg": 8.0,
+      "bearing_bias_limit": 0.18,
+      "bearing_bias_rate_s": 0.125,
+      "bearing_gain": 0.4,
+      "maximum_untrusted_s": 3.0,
+      "trailing_buffer_joints": 2,
+      "release_persistence_s": 0.4,
+      "tracking_tolerance_deg": 8.0,
+      "tracked_turn_soft_limit_deg": 192.0,
+      "maximum_tracking_wait_s": 10.0,
+      "travelling_bias_amplitude": 0.12,
+      "fractional_middle_boost_deg": 15.0,
+      "middle_boost_activation_joints": 1.5,
+      "middle_boost_ramp_joints": 1.0,
+      "adjacent_fold_angle_deg": 5.0,
+      "adjacent_fold_distance_joints": 4,
+      "fold_retention_distance_joints": 1.0,
+      "release_down_alignment": 0.97,
+      "minimum_passive_reference_links": 3,
+      "automatic_return": false,
+      "acquisition_stability_s": 0.6,
+      "acquisition_angle_span_deg": 3.0,
+      "acquisition_length_span_m": 0.002
+    },
+    "profile_position_bounds_joints": [
+      -8,
+      4
+    ],
+    "compliance": false,
+    "passive_reference_end": "tail",
+    "completion_means": "encoder_length_and_speed_goal_not_world_truth_acceptance",
+    "inputs": [
+      "angles_deg",
+      "feedback_time_s",
+      "control_time_s"
+    ]
+  },
+  "angles_deg": [
+    25.400390625,
+    -0.0,
+    0.087890625,
+    -0.0,
+    38.232421875,
+    -0.0,
+    70.48828125,
+    0.087890625,
+    56.513671875,
+    0.087890625,
+    4.130859375,
+    0.087890625,
+    -0.3515625,
+    0.087890625,
+    -0.439453125,
+    0.263671875,
+    -17.75390625,
+    0.17578125,
+    -2.373046875,
+    -8.525390625
+  ],
+  "target_deg": [
+    25.400390625,
+    0.0,
+    0.0,
+    0.0,
+    37.74536170426025,
+    0.0,
+    71.56653361291818,
+    0.0,
+    64.63563083438167,
+    0.0,
+    6.052473848439877,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.263671875,
+    -17.75390625,
+    0.17578125,
+    -2.373046875,
+    -8.525390625
+  ],
+  "enabled": [
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false
+  ]
+}

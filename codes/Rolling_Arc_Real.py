@@ -7,7 +7,7 @@ Ctrl+U 形成圆弧，Ctrl+J/H 正/反单步，Ctrl+G 连续/暂停，Ctrl+X 全
 Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动移窗与数量自适应。
 失能时Ctrl+3按全身实测姿态选窗接管并进入顺应；Ctrl+U始终按配置窗口形成。
 模式4转3会按实测重新选窗并撤去送链缓冲，成功后Ctrl+G开始滚动。
-Ctrl+4 主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，到位保持，Ctrl+Y 提前返回，Ctrl+L单帧。
+Ctrl+4 主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，Ctrl+Y 提前返回，Ctrl+L沿任务方向强制推进一步。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
 """
 import json
@@ -84,6 +84,7 @@ FEED_DISTANCE_M = .0645        # Ctrl+J/H一次任务的材料量；四连杆试
 FEED_AMPLITUDE_DEG = 60.0      # 送链起态自己的幅值，不覆盖你的基础/顺应参数
 FEED_PREPARATION_S = 6.0       # 首次形成；之后另等接管展直稳定才标定本步基线
 FEED_AUTOMATIC_RETURN = False  # 手调默认单程，到位保持；不自动反向
+FEED_FORCE_STEP_JOINTS = .05   # Ctrl+L强制推进的弯曲分布位移；单位关节间距，不是实测毫米
 FEED_OPTIONS_OVERRIDE = {
     'tracking_tolerance_deg': 8.0,  # 手调接管/运动跟踪容差；原5°，不改目标或使能交接逻辑
 }                             # 其他ContinuousFeedingOptions字段也可在这里覆盖
@@ -131,7 +132,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   失能时Ctrl+3：按实测姿态选初始窗口并形成；Ctrl+U：按配置窗口形成
   模式4→3：按实测重新选窗接管，不继承送链缓冲使能；成功后Ctrl+G滚动
   Ctrl+4 主动送链：J/H各执行一段头侧增长/缩短，到位保持，-/=目标量减半/加倍
-  送链中Ctrl+G暂停/继续；Ctrl+L只推进一帧；Ctrl+Y提前返回起态
+  送链中Ctrl+G暂停/继续；Ctrl+L沿任务方向强制推进一步，目标发完保持；Ctrl+Y提前返回起态
   Ctrl+W 自动移窗与扩缩开/关（仅滑动模式）；外侧扭矩关闭
   Ctrl+上/下 幅值±2°；Ctrl+右/左 角频率±0.05 rad/s
   Ctrl+X 全部失能（机器人会失去主动支撑）；Ctrl+Q 退出，接管后会失能
@@ -3049,6 +3050,7 @@ class ContinuousFeeding:
         self.acquisition_samples = []
         self.acquisition_reason = None
         self.acquisition_metrics = {}
+        self.forced_step = None
 
     def request_step(self, distance_m, control_time_s):
         """Start one relative action without resetting the travelling profile.
@@ -3058,6 +3060,7 @@ class ContinuousFeeding:
         """
         if not math.isfinite(distance_m) or distance_m == 0:
             raise ValueError('A finite nonzero feeding distance is required')
+        self.forced_step = None
         self.options = replace(self.options, requested_transfer_m=distance_m)
         self.goal_speed_tolerance_m_s = self.options.speed_tolerance_m_s*max(
             1., abs(distance_m)/float(np.mean(self.lengths)))
@@ -3072,6 +3075,58 @@ class ContinuousFeeding:
         self.last_length_time = None
         self.events.append(dict(kind='manual_relative_step', time_s=control_time_s,
             requested_transfer_m=distance_m, position_joints=self.position))
+
+    def start_forced_step(self, angles_deg, step_joints, control_time_s):
+        """One manual profile increment, independent of length/tracking gates.
+
+        Use the active task's intended direction, not the signed length error.
+        Hold the existing torque mask; preload any newly needed joints. The
+        target is sent gradually by advance(), without waiting for tracking.
+        """
+        angles = np.asarray(angles_deg, float)
+        if angles.shape != (self.n,) or not np.isfinite(angles).all():
+            raise ValueError('Finite complete encoder sample required')
+        if not math.isfinite(step_joints) or step_joints <= 0:
+            raise ValueError('Forced step must be a positive joint-coordinate increment')
+        direction = 1 if self.options.requested_transfer_m > 0 else -1
+        if self.stage in ('feed_return', 'review_return'):
+            direction *= -1
+        previous = self.position
+        position = float(np.clip(previous+direction*step_joints, *self.position_bounds))
+        if abs(position-previous) < 1e-12:
+            self.events.append(dict(kind='forced_step_boundary', time_s=control_time_s,
+                position_joints=previous, direction=direction))
+            return False
+        bias = -self.options.travelling_bias_amplitude*math.sin(math.pi*position)
+        desired, focus, _, _ = self.profile(position, bias)
+        # Only the new profile/buffer is needed for this explicit command;
+        # do not require a passive direction or a measured length baseline.
+        required = self.required_with_buffer(focus) | self.helper.mask(focus)
+        entering = required & ~self.enabled
+        self.targets[entering] = np.radians(angles)[entering]
+        self.enabled |= required
+        active = np.flatnonzero(self.enabled)+1
+        self.window = (int(active[0]), int(active[-1]))
+        self.position, self.bias = position, bias
+        previous_fault = self.fault
+        self.completed, self.fault = False, None
+        if self.stage in ('prepare', 'complete'):
+            self.stage = 'acquire'
+            self.baseline = self.goal_m = None
+        self.acquisition_samples = []
+        self.acquisition_metrics = {}
+        self.ready_since = self.untrusted_since = self.tracking_blocked_since = None
+        self.last_length_time = None
+        self.velocity_m_s = 0.
+        self.stage_since = control_time_s
+        self.last_time = control_time_s-.02
+        self.forced_step = dict(target_rad=desired.tolist(), from_position_joints=previous,
+            to_position_joints=position, direction=direction)
+        self.events.append(dict(kind='forced_step_requested', time_s=control_time_s,
+            from_position_joints=previous, to_position_joints=position,
+            direction=direction, previous_fault=previous_fault,
+            entering=(np.flatnonzero(entering)+1).tolist(), measured_distance_claim=False))
+        return True
 
     def acquire_start(self, angles, feedback_time, control_time, fresh):
         """Settle the actual takeover before defining zero transfer.
@@ -3274,6 +3329,20 @@ class ContinuousFeeding:
                 if self.untrusted_since is None:
                     self.untrusted_since = control_time_s
 
+        if self.forced_step is not None:
+            desired = np.array(self.forced_step['target_rad'])
+            limit = math.radians(opt.target_rate_deg_s)*min(dt, .02)
+            self.targets[self.enabled] += np.clip(desired-self.targets, -limit, limit)[self.enabled]
+            self.targets[~self.enabled] = np.radians(angles)[~self.enabled]
+            if np.max(abs(desired[self.enabled]-self.targets[self.enabled])) < 1e-10:
+                self.events.append(dict(kind='forced_step_targets_sent', time_s=control_time_s,
+                    position_joints=self.position, actual_motion_verified=False))
+                self.forced_step = None
+                self.stage_since = control_time_s
+                self.last_length_time = None
+                self.velocity_m_s = 0.
+            return self.targets.copy(), self.enabled.copy()
+
         desired = self.targets.copy()
         if self.stage == 'prepare':
             desired = self.helper.template(self.origin, 0., opt.amplitude_deg)
@@ -3373,6 +3442,7 @@ class ContinuousFeeding:
 
     def snapshot(self):
         return dict(stage=self.stage, route='continuous_feeding', window=list(self.window),
+            forced_step=None if self.forced_step is None else dict(self.forced_step),
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
             acquisition_metrics=self.acquisition_metrics,
@@ -3687,8 +3757,30 @@ class RollingArcController:
         self.feeding_pause_clock = None
         self.mode = 'run'
 
+    def force_feeding_step(self):
+        """Ctrl+L：沿当前任务方向强制推进一小步，目标发完后保持。"""
+        if self.feeding is None:
+            self.start_feeding(running=False)
+        self.refresh_compliance_feedback()
+        now, feedback = self.motor_sample_clock()
+        if feedback is None or not 0. <= now-feedback <= MAX_FEEDBACK_AGE_S:
+            raise TimeoutError('强制步需要当前全关节角反馈')
+        core = self.feeding
+        measured = self.measured_angles()
+        control_time = now-self.feeding_clock_origin
+        if not core.start_forced_step(measured, FEED_FORCE_STEP_JOINTS, control_time):
+            self.pause_feeding()
+            print('强制步未推进：已到当前模板位置边界；可用反向J/H建立反向任务。', flush=True)
+            return
+        self.feeding_paused, self.freeze_targets = False, False
+        self.feeding_pause_clock = None
+        self.mode = 'run'
+        step = core.forced_step
+        print(f'强制步：位置参数 {step["from_position_joints"]:.4f} → '
+              f'{step["to_position_joints"]:.4f}，绕过跟踪/稳定等待；目标发完后保持。', flush=True)
+
     def command_feeding(self, command):
-        """送链模式复用原Ctrl操作；J/H是一个材料量任务，L才是单帧。"""
+        """J/H仍为整段任务；L沿任务方向强制推进，目标发完后保持。"""
         if command in ('step', 'back'):
             self.start_feeding(1 if command=='step' else -1)
         elif command in ('toggle', 'run', 'pause', 'hold'):
@@ -3697,12 +3789,7 @@ class RollingArcController:
             else:
                 self.resume_feeding()
         elif command=='feed_tick':
-            if self.feeding is None:
-                self.start_feeding(running=False)
-            if self.feeding.completed:
-                return True
-            self.resume_feeding()
-            self.mode = 'step'
+            self.force_feeding_step()
         elif command=='feed_return':
             core = self.feeding
             if core is None or core.baseline is None:
@@ -3751,6 +3838,7 @@ class RollingArcController:
         measured = np.asarray(self.measured_angles())
         self.feeding_inputs = dict(angles_deg=measured.tolist(), feedback_time_s=feedback_time, control_time_s=control_time)
         before = core.stage
+        forced_before = core.forced_step is not None
         if before=='prepare':
             # 实机可以从不同姿态启动。形成过程中不固化尚未建立的切片。
             core.length_observer.cut_depth_m = None
@@ -3776,7 +3864,10 @@ class RollingArcController:
             self.feeding_last_stage = core.stage
             self.feeding_last_diagnostic_s = now
             self.show_status()
-        if self.mode=='step' or core.completed or core.fault:
+        if forced_before and core.forced_step is None:
+            print('强制步目标已发完，保持；Ctrl+L再推进，Ctrl+G继续原任务，J/H开始相对任务。', flush=True)
+            self.pause_feeding()
+        elif self.mode=='step' or core.completed or core.fault:
             self.pause_feeding()
 
     def refresh_compliance_feedback(self):
@@ -4404,6 +4495,8 @@ class RollingArcController:
         if self.feeding_selected:
             core = self.feeding
             o = {} if core is None else core.observation or {}
+            if core is not None and core.forced_step is not None:
+                print('强制步正在下发目标：绕过跟踪误差/稳定采样等待，发完后保持。', flush=True)
             delta = None if core is None or core.baseline is None or not o.get('valid') else 1000*(o['transfer_coordinate_m']-core.baseline)
             print(f'下一任务={1000*self.feed_direction*self.feed_distance_m:+g}mm | '
                   f'阶段={"就绪" if core is None else core.stage} | 几何长度代理变化={delta}mm | '

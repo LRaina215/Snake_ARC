@@ -100,6 +100,7 @@ class ContinuousFeeding:
         self.acquisition_samples = []
         self.acquisition_reason = None
         self.acquisition_metrics = {}
+        self.forced_step = None
 
     def request_step(self, distance_m, control_time_s):
         """Start one relative action without resetting the travelling profile.
@@ -109,6 +110,7 @@ class ContinuousFeeding:
         """
         if not math.isfinite(distance_m) or distance_m == 0:
             raise ValueError('A finite nonzero feeding distance is required')
+        self.forced_step = None
         self.options = replace(self.options, requested_transfer_m=distance_m)
         self.goal_speed_tolerance_m_s = self.options.speed_tolerance_m_s*max(
             1., abs(distance_m)/float(np.mean(self.lengths)))
@@ -123,6 +125,58 @@ class ContinuousFeeding:
         self.last_length_time = None
         self.events.append(dict(kind='manual_relative_step', time_s=control_time_s,
             requested_transfer_m=distance_m, position_joints=self.position))
+
+    def start_forced_step(self, angles_deg, step_joints, control_time_s):
+        """One manual profile increment, independent of length/tracking gates.
+
+        Use the active task's intended direction, not the signed length error.
+        Hold the existing torque mask; preload any newly needed joints. The
+        target is sent gradually by advance(), without waiting for tracking.
+        """
+        angles = np.asarray(angles_deg, float)
+        if angles.shape != (self.n,) or not np.isfinite(angles).all():
+            raise ValueError('Finite complete encoder sample required')
+        if not math.isfinite(step_joints) or step_joints <= 0:
+            raise ValueError('Forced step must be a positive joint-coordinate increment')
+        direction = 1 if self.options.requested_transfer_m > 0 else -1
+        if self.stage in ('feed_return', 'review_return'):
+            direction *= -1
+        previous = self.position
+        position = float(np.clip(previous+direction*step_joints, *self.position_bounds))
+        if abs(position-previous) < 1e-12:
+            self.events.append(dict(kind='forced_step_boundary', time_s=control_time_s,
+                position_joints=previous, direction=direction))
+            return False
+        bias = -self.options.travelling_bias_amplitude*math.sin(math.pi*position)
+        desired, focus, _, _ = self.profile(position, bias)
+        # Only the new profile/buffer is needed for this explicit command;
+        # do not require a passive direction or a measured length baseline.
+        required = self.required_with_buffer(focus) | self.helper.mask(focus)
+        entering = required & ~self.enabled
+        self.targets[entering] = np.radians(angles)[entering]
+        self.enabled |= required
+        active = np.flatnonzero(self.enabled)+1
+        self.window = (int(active[0]), int(active[-1]))
+        self.position, self.bias = position, bias
+        previous_fault = self.fault
+        self.completed, self.fault = False, None
+        if self.stage in ('prepare', 'complete'):
+            self.stage = 'acquire'
+            self.baseline = self.goal_m = None
+        self.acquisition_samples = []
+        self.acquisition_metrics = {}
+        self.ready_since = self.untrusted_since = self.tracking_blocked_since = None
+        self.last_length_time = None
+        self.velocity_m_s = 0.
+        self.stage_since = control_time_s
+        self.last_time = control_time_s-.02
+        self.forced_step = dict(target_rad=desired.tolist(), from_position_joints=previous,
+            to_position_joints=position, direction=direction)
+        self.events.append(dict(kind='forced_step_requested', time_s=control_time_s,
+            from_position_joints=previous, to_position_joints=position,
+            direction=direction, previous_fault=previous_fault,
+            entering=(np.flatnonzero(entering)+1).tolist(), measured_distance_claim=False))
+        return True
 
     def acquire_start(self, angles, feedback_time, control_time, fresh):
         """Settle the actual takeover before defining zero transfer.
@@ -325,6 +379,20 @@ class ContinuousFeeding:
                 if self.untrusted_since is None:
                     self.untrusted_since = control_time_s
 
+        if self.forced_step is not None:
+            desired = np.array(self.forced_step['target_rad'])
+            limit = math.radians(opt.target_rate_deg_s)*min(dt, .02)
+            self.targets[self.enabled] += np.clip(desired-self.targets, -limit, limit)[self.enabled]
+            self.targets[~self.enabled] = np.radians(angles)[~self.enabled]
+            if np.max(abs(desired[self.enabled]-self.targets[self.enabled])) < 1e-10:
+                self.events.append(dict(kind='forced_step_targets_sent', time_s=control_time_s,
+                    position_joints=self.position, actual_motion_verified=False))
+                self.forced_step = None
+                self.stage_since = control_time_s
+                self.last_length_time = None
+                self.velocity_m_s = 0.
+            return self.targets.copy(), self.enabled.copy()
+
         desired = self.targets.copy()
         if self.stage == 'prepare':
             desired = self.helper.template(self.origin, 0., opt.amplitude_deg)
@@ -424,6 +492,7 @@ class ContinuousFeeding:
 
     def snapshot(self):
         return dict(stage=self.stage, route='continuous_feeding', window=list(self.window),
+            forced_step=None if self.forced_step is None else dict(self.forced_step),
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
             acquisition_metrics=self.acquisition_metrics,

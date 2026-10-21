@@ -145,7 +145,7 @@ class FeedingPortTests(unittest.TestCase):
         self.assertAlmostEqual(c.feeding.goal_speed_tolerance_m_s,.004)
         c.cycle();self.assertEqual(set(c.states),set(range(20)))
 
-    def test_pause_resume_and_single_frame_do_not_consume_pause(self):
+    def test_pause_and_forced_step_do_not_consume_pause(self):
         c = ready();c.command('step')
         for _ in range(400):c.cycle()
         self.assertIsNotNone(c.feeding.baseline)
@@ -153,8 +153,11 @@ class FeedingPortTests(unittest.TestCase):
         c.t += 10.;c.refresh_compliance_feedback();c.tick(.02)
         self.assertEqual(c.feeding.position,p);self.assertEqual(c.targets,targets)
         c.command('feed_tick');c.tick(.02)
-        self.assertLessEqual(abs(c.feeding.position-p),.002001)
+        self.assertAlmostEqual(c.feeding.position-p,real.FEED_FORCE_STEP_JOINTS)
         self.assertLessEqual(float(np.max(abs(np.array(c.targets)-targets))),.90001)
+        for _ in range(100):
+            if c.feeding_paused:break
+            c.cycle()
         self.assertTrue(c.feeding_paused);self.assertIsNone(c.feeding.fault)
         self.assertEqual(c.feeding.stage,stage)
 
@@ -186,6 +189,9 @@ class FeedingPortTests(unittest.TestCase):
         self.assertTrue(any('直线度=' in line and '稳定=' in line for line in lines))
         self.assertTrue(any('两侧夹角=' in line for line in lines))
         c.command('feed_tick');c.tick(.02)
+        for _ in range(100):
+            if c.feeding_paused:break
+            c.cycle()
         self.assertTrue(c.feeding.observation['valid'])
         self.assertTrue(c.feeding_paused);self.assertIsNone(c.feeding.fault)
 

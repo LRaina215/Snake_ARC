@@ -1,0 +1,15 @@
+{
+  "passed": 8,
+  "hardware_run": false,
+  "new_physics": false,
+  "source_line": 3166,
+  "source": "codes/logs/rolling_arc_20261021_160548_907144.jsonl",
+  "recorded_tracking_error_deg": 8.121958959381672,
+  "forced_increment_joints": 0.05,
+  "adapters": [
+    "standalone_real",
+    "debug_mujoco"
+  ],
+  "fixed_feedback_does_not_block_target_send": true,
+  "research_embedded_targets_and_masks_match": true
+}
