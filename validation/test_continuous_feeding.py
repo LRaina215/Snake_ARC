@@ -58,13 +58,14 @@ class ContinuousFeedingTests(unittest.TestCase):
     def test_untrusted_length_finishes_shape_and_has_bounded_wait(self):
         c = ContinuousFeeding(np.full(21, .0645))
         q = np.degrees(c.targets)
-        c.advance(q, 6., 6.)
+        for t in (5.4,5.6,5.8,6.):
+            c.advance(q,t,t)
         c.stage = 'feed_return'; c.stage_since = 6.
         c.position = -1.97
         c.enabled = c.helper.mask((7, 13)); c.window = (7, 13)
         c.targets[12] = np.radians(-39.)
         q[12] = -39.
-        c.length_observer.observe = lambda angles, window: dict(valid=False, reason='temporarily_untrusted')
+        c.length_observer.observe = lambda angles, window, feedback_time: dict(valid=False, reason='temporarily_untrusted')
         c.helper.position = lambda angles, window: dict(valid=False)
         target, mask = c.advance(q, 6.2, 6.2)
         self.assertEqual(c.position, -1.97)
@@ -76,7 +77,8 @@ class ContinuousFeedingTests(unittest.TestCase):
     def test_release_requires_persistent_low_aligned_geometry(self):
         c = ContinuousFeeding(np.full(21, .0645))
         q = np.degrees(c.targets)
-        c.observation = c.length_observer.observe(q, c.origin)
+        for t in (0.,.2,.4):
+            c.observation = c.length_observer.observe(q, c.origin, t)
         self.assertTrue(c.observation['valid'])
         c.release_below_peak_m = c.observation['cut_depth_m']+.03225
         required = c.helper.mask(c.origin)
@@ -95,13 +97,14 @@ class ContinuousFeedingTests(unittest.TestCase):
             c = ContinuousFeeding(np.full(21, .0645), replace(
                 ContinuousFeedingOptions(), requested_transfer_m=direction*.258))
             q = np.degrees(c.targets)
-            c.advance(q, 6., 6.)
+            for t in (5.4,5.6,5.8,6.):
+                c.advance(q,t,t)
             c.fold_capture_position[:] = 0.
             _, mask = c.advance(q, 6.2, 6.2)
             first, last = c.window
             self.assertGreaterEqual(first-1 if direction>0 else c.n-last, 3)
             self.assertTrue(np.any(~mask))
-            self.assertTrue(c.length_observer.observe(q, c.window)['valid'])
+            self.assertTrue(c.length_observer.observe(q, c.window, 6.2)['valid'])
 
 
 if __name__ == '__main__':

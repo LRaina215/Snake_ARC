@@ -15,11 +15,12 @@ import unittest
 import numpy as np
 from unittest.mock import patch
 from snake_control.continuous_feeding import ContinuousFeeding as ResearchFeeding, ContinuousFeedingOptions as ResearchOptions
+from snake_control.whole_feeding_observer import WholeFeedingObserver
 
 spec = importlib.util.spec_from_file_location('feeding_real', ROOT/'codes/Rolling_Arc_Real.py')
 real = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(real)
-REPORT = ROOT/'validation/reports/active_feeding_port'
+REPORT = ROOT/'validation/reports/passive_segment_selection_20261021'
 
 
 class RecordingSerial(real.DryRunSerial):
@@ -63,7 +64,7 @@ def ready():
 
 
 class FeedingPortTests(unittest.TestCase):
-    def test_full_record_replay_and_actual_serial_mask_handover(self):
+    def test_full_record_current_core_matches_port_not_archived_commands(self):
         files = list((ROOT/'validation/reports/active_feeding_continuation/round_09').glob('*/status.json'))
         files += [ROOT/'validation/reports/active_feeding_continuation/round_07/small_20261014_140308/status.json']
         results = []
@@ -74,6 +75,12 @@ class FeedingPortTests(unittest.TestCase):
                 options = replace(options, fractional_middle_boost_deg=15., middle_boost_activation_joints=1.5, middle_boost_ramp_joints=1.)
             source = ResearchFeeding(np.full(21,.0645), options)
             embedded = real.ContinuousFeeding(np.full(21,.0645), real.ContinuousFeedingOptions(**options.__dict__))
+            observer = WholeFeedingObserver(np.full(21,.0645), (options.first_joint,options.last_joint))
+            last_feedback = None
+            actual_observations = invalid_after_prepare = 0
+            invalid_since = None
+            longest_invalid_s = archived_target_difference = 0.
+            archived_mask_difference = 0
             port = RecordingSerial(); bus = real.FeetechBus(port)
             maximum = 0.; mismatch = count = handovers = 0
             previous_mask = np.zeros(20,bool)
@@ -83,8 +90,22 @@ class FeedingPortTests(unittest.TestCase):
                 a, am = source.advance(*args); b,bm = embedded.advance(*args)
                 maximum = max(maximum,float(np.degrees(abs(a-b)).max()))
                 mismatch += int(not np.array_equal(am,bm))
-                self.assertLess(float(np.degrees(abs(b-np.array(row['target_rad']))).max()),1e-8)
-                self.assertTrue(np.array_equal(bm,row['enabled']))
+                # The changed observer need not reproduce old commands. The
+                # saved states are not a new closed-loop dynamics experiment.
+                archived_target_difference=max(archived_target_difference,float(np.degrees(abs(b-np.array(row['target_rad']))).max()))
+                archived_mask_difference += int(not np.array_equal(bm,row['enabled']))
+                if feed['feedback_time_s'] != last_feedback:
+                    active=np.flatnonzero(row['enabled'])+1
+                    observation=observer.observe(feed['angles_deg'],(int(active[0]),int(active[-1])),feed['feedback_time_s'])
+                    if t>=options.preparation_s:
+                        actual_observations += 1
+                        invalid_after_prepare += int(not observation['valid'])
+                        if not observation['valid']:
+                            invalid_since=feed['feedback_time_s'] if invalid_since is None else invalid_since
+                        elif invalid_since is not None:
+                            longest_invalid_s=max(longest_invalid_s,feed['feedback_time_s']-invalid_since)
+                            invalid_since=None
+                    last_feedback=feed['feedback_time_s']
                 if not np.array_equal(bm,previous_mask):
                     bus.prepare_enabled(feed['angles_deg'],bm,configure_mask=bm & ~previous_mask)
                     self.assertEqual([port.registers[sid][0x28] for sid in real.SERVO_IDS],bm.astype(int).tolist())
@@ -94,10 +115,18 @@ class FeedingPortTests(unittest.TestCase):
                 self.assertEqual(list(packet[7:-1:7]),[real.SERVO_IDS[i] for i in np.flatnonzero(bm)])
                 previous_mask = bm.copy(); count += 1
             results.append(dict(record=file.parent.name,samples=count,target_maximum_error_deg=maximum,
-                mask_mismatch_frames=mismatch,serial_mask_updates=handovers))
+                mask_mismatch_frames=mismatch,serial_mask_updates=handovers,
+                archived_target_difference_deg=archived_target_difference,archived_mask_difference_frames=archived_mask_difference,
+                actual_feedback_samples_after_prepare=actual_observations, actual_invalid_samples_after_prepare=invalid_after_prepare,
+                longest_invalid_interval_s=longest_invalid_s, counterfactual_fault=source.fault,
+                closed_loop_validation=False))
             self.assertEqual(mismatch,0);self.assertLess(maximum,1e-8)
+            if invalid_since is not None:
+                longest_invalid_s=max(longest_invalid_s,last_feedback-invalid_since)
+                results[-1]['longest_invalid_interval_s']=longest_invalid_s
+            self.assertLessEqual(longest_invalid_s,options.maximum_untrusted_s)
         REPORT.mkdir(parents=True,exist_ok=True)
-        (REPORT/'replay.json').write_text(json.dumps(dict(hardware_run=False,new_physics=False,records=results),indent=2),encoding='utf8')
+        (REPORT/'simulation_record_replay.json').write_text(json.dumps(dict(hardware_run=False,new_physics=False,records=results),indent=2),encoding='utf8')
 
     def test_hotkeys_and_idle_selection_do_not_enable(self):
         c = ClockController();c.command('gait_feeding')
@@ -140,6 +169,25 @@ class FeedingPortTests(unittest.TestCase):
         c.command('release')
         self.assertTrue(all(c.port.registers[sid][0x28]==0 for sid in real.SERVO_IDS))
         self.assertIsNone(c.feeding);self.assertFalse(c.feeding_selected)
+
+    def test_paused_feedback_keeps_segments_ready_for_human_paced_single_steps(self):
+        c=ready();c.command('step')
+        for _ in range(315):c.cycle()
+        c.command('pause')
+        before=(c.feeding.position,c.feeding.baseline,c.targets.copy(),c.enabled.copy())
+        # Multiple real encoder samples arrive while targets remain frozen.
+        for _ in range(12):
+            c.t += .2;c.refresh_compliance_feedback();c.tick(.02)
+        self.assertTrue(c.feeding.observation['valid'])
+        self.assertEqual(before,(c.feeding.position,c.feeding.baseline,c.targets,c.enabled))
+        quality=c.feeding.observation['end_quality']
+        self.assertGreaterEqual(quality['candidates'][0]['samples'],3)
+        lines=real.feeding_direction_lines(c.feeding.observation)
+        self.assertTrue(any('直线度=' in line and '稳定=' in line for line in lines))
+        self.assertTrue(any('两侧夹角=' in line for line in lines))
+        c.command('feed_tick');c.tick(.02)
+        self.assertTrue(c.feeding.observation['valid'])
+        self.assertTrue(c.feeding_paused);self.assertIsNone(c.feeding.fault)
 
     def test_switch_to_basic_preserves_sent_targets(self):
         c=ready();c.command('step');c.cycle()

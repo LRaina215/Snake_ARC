@@ -628,6 +628,15 @@ class DebugViewer:
                 amount = float('nan') if f.baseline is None or not o.get('valid') else 1000*(o['transfer_coordinate_m']-f.baseline)
                 cycle = f'{f.stage}: encoder delta {amount:+.1f} mm'
                 handover = f'paused={c.feeding_paused}; {f.fault or "running"}'
+                quality = o.get('end_quality') or {}
+                for side, end in quality.get('ends', {}).items():
+                    segment = end.get('selected') or end.get('best')
+                    if segment:
+                        cycle += (f"\n{side}: L{segment['links'][0]}-{segment['links'][1]} "
+                                  f"S={segment['straightness']:.4f} "
+                                  f"stable={segment['stable_span_s']:.2f}s "
+                                  f"{'OK' if end.get('selected') else ','.join(segment['reasons'])}")
+                handover += '\n'+quality.get('source', 'waiting encoder sample')
         elif isinstance(c.sliding, MotorFeedbackSliding):
             o = slider['observation']
             cycle = 'waiting motor angles' if o is None else f"{o['state']} offset={o.get('filtered_error_joints', float('nan')):+.2f}"
@@ -646,8 +655,8 @@ class DebugViewer:
             sign = next(iter(self.session.push_keys))
             body = self.session.sim.model.body(self.session.push_targets[sign][0]).name
             pull = f'{"left" if sign < 0 else "right"} {self.session.push_force:.1f} N @{body}'
-        observation_label = 'Motor shape observer' if isinstance(c.sliding, MotorFeedbackSliding) else 'Cycle load center'
-        left = 'Gait\nMode\nWindow\nOutside joints\nPhase\nPhysics\nTime\nPull\nSide displacement\n'+observation_label+'\nHandover'
+        observation_label = 'Passive segment observer' if c.feeding_selected else 'Motor shape observer' if isinstance(c.sliding, MotorFeedbackSliding) else 'Cycle load center'
+        left = 'Gait\nMode\nWindow\nOutside joints\nPhase\nPhysics\nTime\nPull\nSide displacement\n'+observation_label+'\n'*cycle.count('\n')+'\nHandover'
         right = (f'{gait}{" -> "+c.pending_gait if c.pending_gait else ""}\n{c.mode}'
                  f'\nJ{c.first}-J{c.last} ({sum(c.enabled)} enabled)\nHead:{c.first-1}  Tail:{real.NUM_JOINTS-c.last}'
                  f'\n{c.phase:.3f} rad'

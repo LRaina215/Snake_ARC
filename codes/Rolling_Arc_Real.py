@@ -83,6 +83,8 @@ FEED_AMPLITUDE_DEG = 60.0      # 送链起态自己的幅值，不覆盖你的�
 FEED_PREPARATION_S = 6.0       # 平滑恢复起态并静置后，用新实测角标定长度基线
 FEED_AUTOMATIC_RETURN = True   # 默认与验证相同：去程到位观察2s，再自动返回
 FEED_OPTIONS_OVERRIDE = {}     # 可覆盖第3C段ContinuousFeedingOptions字段，单位见定义
+FEED_DIRECTION_OVERRIDE = {}   # 第3C段FeedingDirectionOptions：选段/直线度/稳定时间
+FEED_DIAGNOSTIC_PERIOD_S = 2.0 # 自动显示两侧判断数值；Ctrl+K随时查看
 
 # 历史幅值/滑动窗口原型参数：只供旧仿真导入第3A段，当前实机入口不用。
 MIN_COMPLIANCE_AMPLITUDE_DEG = 25.0
@@ -2319,52 +2321,154 @@ class FeedingArcGeometry:
         return target
 
 
+@dataclass(frozen=True)
+class FeedingDirectionOptions:
+    """Angle-only quality thresholds; stability is intrinsic, not world motion."""
+    minimum_links: int = 3
+    maximum_links: int = 5
+    minimum_straightness: float = .98
+    stability_s: float = .4
+    minimum_samples: int = 3
+    maximum_shape_change_deg: float = 3.
+    maximum_sample_gap_s: float = .6
+    minimum_tip_depth_links: float = 2.5
+    minimum_segment_depth_links: float = .5
+    maximum_end_disagreement_deg: float = 25.
+
+
 class WholeFeedingObserver:
-    def __init__(self, lengths, initial_window):
+    def __init__(self, lengths, initial_window, options=FeedingDirectionOptions()):
         self.lengths = np.asarray(lengths, float)
         self.distance = np.r_[0., np.cumsum(self.lengths)]
         self.initial_window = initial_window
         self.cut_depth_m = None
+        self.options = options
+        self._histories = {}
+        self._selected = {}
+        self._single_side = None
+        self._last_feedback = None
+        self._last_angles = None
 
-    def down_direction(self, points, window):
-        candidates = []
+    def down_direction(self, points, window, angles_deg, feedback_time_s):
+        """Search wholly passive spans; retain an eligible span to avoid chatter.
+
+        History compares internal joint angles of each material span. Comparing
+        directions in the head frame across time would mistake motion of the
+        head frame for a changing gravity vector. Neither test observes gravity.
+        """
+        opt = self.options
+        q = np.asarray(angles_deg, float)
+        now = float(feedback_time_s)
+        mean_length = float(np.mean(self.lengths))
+        ends, selected, live_keys = {}, [], set()
         for name, available in (('head', window[0]-1), ('tail', len(self.lengths)-1-window[1])):
-            # Fixed distal material span avoids a different chord each time
-            # the torque mask changes. Do not include a fourth, proximal
-            # link that may still be transitioning out of the upper bend.
-            count = min(3, available)
-            if count < 3:
-                continue
-            samples = points[:count+1][::-1] if name=='head' else points[-count-1:]
-            chord = samples[-1]-samples[0]
-            length = np.linalg.norm(chord)
-            straightness = length/np.linalg.norm(np.diff(samples, axis=0), axis=1).sum()
-            direction = chord/max(length, 1e-12)
-            heights = -points @ direction
-            tip = 0 if name=='head' else len(points)-1
-            below = float(heights.max()-heights[tip])
-            if straightness >= .98 and below >= 2.5*float(np.mean(self.lengths)):
-                candidates.append(dict(name=name, count=count, available=available,
-                    straightness=float(straightness), tip_below_global_top_m=below,
-                    direction=direction.tolist()))
-        if not candidates:
-            return None, dict(source='no_straight_distal_passive_arm', candidates=[])
-        if len(candidates)==2:
-            a,b = [np.array(c['direction']) for c in candidates]
+            lo, hi = (0, available) if name=='head' else (len(self.lengths)-available, len(self.lengths))
+            tested, eligible, rejected = [], [], {}
+            for count in range(opt.minimum_links, min(opt.maximum_links, available)+1):
+                for start in range(lo, hi-count+1):
+                    stop = start+count  # links [start, stop), points [start, stop]
+                    key = (name, start, stop)
+                    live_keys.add(key)
+                    chord = points[stop]-points[start]
+                    if name=='head':
+                        chord = -chord  # always from the arc towards the free end
+                    length = float(np.linalg.norm(chord))
+                    straightness = length/float(self.lengths[start:stop].sum())
+                    direction = chord/max(length, 1e-12)
+                    heights = -points @ direction
+                    tip = 0 if name=='head' else len(points)-1
+                    below = float(heights.max()-heights[tip])
+                    segment_depth = float(heights.max()-heights[start:stop+1].max())
+                    reasons = []
+                    if straightness < opt.minimum_straightness:
+                        reasons.append('not_straight')
+                    if below < opt.minimum_tip_depth_links*mean_length:
+                        reasons.append('tip_not_below_arc')
+                    if segment_depth < opt.minimum_segment_depth_links*mean_length:
+                        reasons.append('segment_near_crest')
+                    history = self._histories.get(key, [])
+                    if reasons or (history and now-history[-1][0] > opt.maximum_sample_gap_s):
+                        history = []
+                    # A repeated encoder timestamp never counts as a new sample.
+                    if not reasons and (not history or now > history[-1][0]):
+                        history.append((now, q[start:stop-1].copy()))
+                    while len(history)>1 and history[1][0] <= now-opt.stability_s+1e-9:
+                        history.pop(0)
+                    self._histories[key] = history
+                    span = now-history[0][0] if history else 0.
+                    change = float(np.ptp(np.array([h[1] for h in history]), axis=0).max()) if history else None
+                    if not reasons:
+                        if len(history)<opt.minimum_samples or span < opt.stability_s-1e-9:
+                            reasons.append('collecting_stability')
+                        if change is not None and change > opt.maximum_shape_change_deg:
+                            reasons.append('shape_unstable')
+                    candidate = dict(name=name, links=[start+1, stop],
+                        internal_joints=[start+1, stop-1], count=count, available=available,
+                        straightness=straightness, tip_below_global_top_m=below,
+                        segment_below_global_top_m=segment_depth,
+                        stable_span_s=span, samples=len(history), shape_change_deg=change,
+                        direction=direction.tolist(), reasons=reasons)
+                    tested.append(candidate)
+                    if not reasons:
+                        eligible.append(candidate)
+                    for reason in reasons:
+                        rejected[reason] = rejected.get(reason, 0)+1
+            def rank(c):
+                return (c['count'], c['straightness'], -(c['shape_change_deg'] or 0.))
+            prior = self._selected.get(name)
+            chosen = next((c for c in eligible if c['links']==prior), None)
+            if chosen is None and eligible:
+                chosen = max(eligible, key=rank)
+            self._selected[name] = None if chosen is None else chosen['links']
+            if chosen is not None:
+                selected.append(chosen)
+            # Display one actionable candidate and rejection totals, not dozens
+            # of nearly identical overlapping spans in every 20ms log row.
+            best = chosen or (max(tested, key=lambda c: (
+                not any(r in c['reasons'] for r in ('not_straight','tip_not_below_arc','segment_near_crest')),
+                c['straightness'], c['count'])) if tested else None)
+            ends[name] = dict(available=available, tested_count=len(tested),
+                stable_count=len(eligible), selected=chosen, best=best,
+                rejection_counts=rejected,
+                reason='selected' if chosen else 'insufficient_passive_links' if not tested else 'no_eligible_segment')
+        self._histories = {k:v for k,v in self._histories.items() if k in live_keys}
+        quality = dict(source='no_stable_passive_segment', candidates=selected, ends=ends,
+            thresholds=asdict(opt), observes_world_gravity=False,
+            stability_basis='internal_joint_angles_in_material_segment')
+        if not selected:
+            self._single_side = None
+            return None, quality
+        if len(selected)==2:
+            a,b = [np.array(c['direction']) for c in selected]
             disagreement = math.degrees(math.acos(float(np.clip(a@b,-1.,1.))))
-            if disagreement <= 25.:
-                down = a+b; down /= np.linalg.norm(down)
-                return down, dict(source='global_two_consistent_ends', candidates=candidates,
-                    end_disagreement_deg=disagreement, observes_world_gravity=False)
-        chosen = max(candidates, key=lambda c:(c['available'],c['straightness']))
-        return np.array(chosen['direction']), dict(source='global_single_'+chosen['name'],
-            candidates=candidates, observes_world_gravity=False)
+            quality['end_disagreement_deg'] = disagreement
+            if disagreement <= opt.maximum_end_disagreement_deg:
+                weights = [c['count']*c['straightness'] for c in selected]
+                down = weights[0]*a+weights[1]*b
+                down /= np.linalg.norm(down)
+                quality.update(source='global_two_consistent_segments', fusion_weights=weights)
+                self._single_side = None
+                return down, quality
+            quality['fusion_rejected_reason'] = 'end_directions_disagree'
+        chosen = next((c for c in selected if c['name']==self._single_side), None)
+        if chosen is None:
+            chosen = max(selected, key=rank)
+        self._single_side = chosen['name']
+        quality.update(source='global_single_'+chosen['name'], used_sides=[chosen['name']])
+        return np.array(chosen['direction']), quality
 
-    def observe(self, angles_deg, window):
+    def observe(self, angles_deg, window, feedback_time_s):
         try:
+            t = float(feedback_time_s)
+            angles = np.asarray(angles_deg, float)
+            if not math.isfinite(t) or (self._last_feedback is not None and t < self._last_feedback):
+                raise ValueError('nonmonotonic_or_invalid_feedback_time')
+            if self._last_feedback == t and not np.array_equal(angles, self._last_angles):
+                raise ValueError('changed_angles_with_same_feedback_time')
+            self._last_feedback, self._last_angles = t, angles.copy()
             q = np.radians(angles_deg)
             points = forward(q, self.lengths)
-            down, quality = self.down_direction(points, window)
+            down, quality = self.down_direction(points, window, angles, t)
             if down is None:
                 return dict(valid=False, reason=quality['source'], end_quality=quality)
             heights = -points @ down
@@ -2561,7 +2665,7 @@ class ContinuousFeeding:
         if fresh:
             self.last_feedback = feedback_time_s
             self.previous_angles = angles.copy()
-            self.observation = self.length_observer.observe(angles, self.window)
+            self.observation = self.length_observer.observe(angles, self.window, feedback_time_s)
             if 'crest_joint' not in self.observation:
                 self.observation['crest_joint'] = None
             if self.observation['valid']:
@@ -2586,7 +2690,11 @@ class ContinuousFeeding:
             desired = self.helper.template(self.origin, 0., opt.amplitude_deg)
             if control_time_s >= opt.preparation_s-1e-8 and fresh:
                 if not self.observation['valid']:
-                    self.fault = 'initial differential length unavailable'
+                    # A fresh sample at the nominal preparation boundary may
+                    # still be gathering stable passive geometry. Use the same
+                    # bounded observation wait as during feeding, not one frame.
+                    if control_time_s >= opt.preparation_s+opt.maximum_untrusted_s:
+                        self.fault = 'initial differential length unavailable'
                 else:
                     self.baseline = self.observation['transfer_coordinate_m']
                     points = forward(np.radians(angles), self.lengths)
@@ -2866,6 +2974,7 @@ class RollingArcController:
         self.feeding_clock_origin = 0.
         self.feeding_action_id = 0
         self.feeding_inputs, self.feeding_last_stage = None, None
+        self.feeding_last_diagnostic_s = None
 
     def select_feeding(self):
         """选择只读就绪状态；任务由J/H/G明确启动，不在切模式时移窗。"""
@@ -2893,6 +3002,7 @@ class RollingArcController:
             maximum_feed_s=60. if self.feed_distance_m<=float(np.mean(LINK_LENGTHS_M))+1e-9 else 100.)
         options = replace(options, **FEED_OPTIONS_OVERRIDE)
         core = ContinuousFeeding(LINK_LENGTHS_M, options)
+        core.length_observer.options = replace(core.length_observer.options, **FEED_DIRECTION_OVERRIDE)
         measured = np.asarray(self.measured_angles())
         mask = core.enabled | np.asarray(self.enabled)
         entering = mask & ~np.asarray(self.enabled)
@@ -2911,6 +3021,7 @@ class RollingArcController:
         self.feeding_clock_origin = feedback
         self.feeding_action_id += 1
         self.feeding_last_stage = None
+        self.feeding_last_diagnostic_s = None
         self.feeding_inputs = None
         self.phase = self.command_phase = self.pending_phase = 0.
         self.forming, self.settle_remaining = False, 0.
@@ -2991,6 +3102,18 @@ class RollingArcController:
     def tick_feeding(self, dt):
         core = self.feeding
         if self.feeding_paused or core.completed or core.fault:
+            # Holding motor targets must not stop passive-shape observation.
+            # Otherwise human-paced Ctrl+L (>0.6s between keys) could never
+            # collect three consecutive samples, despite continuous full reads.
+            now, feedback = self.motor_sample_clock()
+            observer = core.length_observer
+            sample_time = None if feedback is None else feedback-self.feeding_clock_origin
+            if (feedback is not None and 0. <= now-feedback <= MAX_FEEDBACK_AGE_S and
+                    (observer._last_feedback is None or sample_time>observer._last_feedback)):
+                if core.stage=='prepare':
+                    observer.cut_depth_m = None
+                core.observation = observer.observe(self.measured_angles(), core.window,
+                    sample_time)
             self.bus.send_targets(self.targets, self.enabled)
             return
         now, feedback = self.motor_sample_clock()
@@ -3028,8 +3151,11 @@ class RollingArcController:
             core.stage_since = control_time
             core.goal_m = core.baseline+core.options.requested_transfer_m
             self.pause_feeding()
-        if core.stage!=self.feeding_last_stage or core.fault:
+        diagnostics_due = (self.feeding_last_diagnostic_s is None or
+                           now-self.feeding_last_diagnostic_s >= FEED_DIAGNOSTIC_PERIOD_S)
+        if core.stage!=self.feeding_last_stage or core.fault or diagnostics_due:
             self.feeding_last_stage = core.stage
+            self.feeding_last_diagnostic_s = now
             self.show_status()
         if self.mode=='step' or core.completed or core.fault:
             self.pause_feeding()
@@ -3597,6 +3723,8 @@ class RollingArcController:
                   f'阶段={"就绪" if core is None else core.stage} | 几何长度代理变化={delta}mm | '
                   f'目标={None if core is None or core.goal_m is None else 1000*(core.goal_m-core.baseline)}mm | '
                   f'暂停={self.feeding_paused} | 原因={None if core is None else core.fault or o.get("reason")}', flush=True)
+            for line in feeding_direction_lines(o):
+                print(line, flush=True)
         if self.compliance is not None:
             window_state = '窗口固定' if self.sliding is None else f'自动选窗={self.sliding.automatic} 待交接={self.sliding.pending is not None}'
             print(f'实测截面直接顺应 K={self.options.gain:g} | '
@@ -3623,6 +3751,40 @@ class RollingArcController:
             print('实测角：'+' '.join(f'J{i+1}={v:.1f}°' for i, v in self.last_feedback.items()), flush=True)
             print('原始负载/电流（只记录）：'+' '.join(
                 f'J{i+1}={s["load_raw"]}/{s["current_raw"]}' for i, s in self.states.items()), flush=True)
+
+
+def feeding_direction_lines(observation):
+    """同一份数值供实机/仿真控制台使用；L为连杆号，J为关节号。"""
+    quality = observation.get('end_quality') or {}
+    if not quality.get('ends'):
+        return ['向下估计：等待全关节新反馈']
+    thresholds = quality['thresholds']
+    reason_text = dict(not_straight='直线度不足', tip_not_below_arc='端点下垂距离不足',
+        segment_near_crest='区段靠近顶部', collecting_stability='收集稳定样本', shape_unstable='局部角仍在变化')
+    lines = []
+    for side, label in (('head','头侧'),('tail','尾侧')):
+        end = quality['ends'][side]
+        c = end['selected'] or end['best']
+        if c is None:
+            lines.append(f"{label}：失能连杆仅{end['available']}段，至少需要{thresholds['minimum_links']}段")
+            continue
+        drift = '--' if c['shape_change_deg'] is None else f"{c['shape_change_deg']:.2f}"
+        reason = ' / '.join(reason_text.get(r,r) for r in c['reasons']) or '可用'
+        lines.append(f"{label}：{'选中' if end['selected'] else '候选'}L{c['links'][0]}–L{c['links'][1]} "
+            f"(内部J{c['internal_joints'][0]}–J{c['internal_joints'][1]}) "
+            f"直线度={c['straightness']:.4f}/{thresholds['minimum_straightness']:.2f}；"
+            f"稳定={c['stable_span_s']:.2f}/{thresholds['stability_s']:.2f}s ({c['samples']}样本)；"
+            f"局部角变化={drift}/{thresholds['maximum_shape_change_deg']:g}°；{reason}")
+        lines.append(f"  下垂端距估计顶部={1000*c['tip_below_global_top_m']:.1f}mm，"
+            f"区段距估计顶部={1000*c['segment_below_global_top_m']:.1f}mm；"
+            f"合格区段={end['stable_count']}/{end['tested_count']}；"
+            + ' '.join(f"{reason_text.get(k,k)}:{v}" for k,v in end['rejection_counts'].items()))
+    angle = quality.get('end_disagreement_deg')
+    disagreement = '--' if angle is None else f'{angle:.2f}°'
+    lines.append(f"向下估计={quality['source']}；两侧夹角={disagreement}/"
+        f"{thresholds['maximum_end_disagreement_deg']:g}°；"
+        + ('方向不一致，使用单侧' if quality.get('fusion_rejected_reason') else '仅角度几何估计'))
+    return lines
 
 
 # ==================== 6. 实测全身构型预览（单独进程，无控制输出） ====================

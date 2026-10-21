@@ -1,0 +1,48 @@
+{
+  "hardware_run": false,
+  "new_physics": false,
+  "records": [
+    {
+      "record": "small_20261014_140308",
+      "samples": 2002,
+      "target_maximum_error_deg": 0.0,
+      "mask_mismatch_frames": 0,
+      "serial_mask_updates": 6,
+      "archived_target_difference_deg": 0.4992600445005202,
+      "archived_mask_difference_frames": 10,
+      "actual_feedback_samples_after_prepare": 171,
+      "actual_invalid_samples_after_prepare": 0,
+      "longest_invalid_interval_s": 0.0,
+      "counterfactual_fault": null,
+      "closed_loop_validation": false
+    },
+    {
+      "record": "head_large_20261014_141738",
+      "samples": 4671,
+      "target_maximum_error_deg": 0.0,
+      "mask_mismatch_frames": 0,
+      "serial_mask_updates": 12,
+      "archived_target_difference_deg": 0.8999999999979025,
+      "archived_mask_difference_frames": 1,
+      "actual_feedback_samples_after_prepare": 438,
+      "actual_invalid_samples_after_prepare": 0,
+      "longest_invalid_interval_s": 0.0,
+      "counterfactual_fault": null,
+      "closed_loop_validation": false
+    },
+    {
+      "record": "tail_large_20261014_142024",
+      "samples": 4771,
+      "target_maximum_error_deg": 0.0,
+      "mask_mismatch_frames": 0,
+      "serial_mask_updates": 14,
+      "archived_target_difference_deg": 1.0679584145580596,
+      "archived_mask_difference_frames": 2,
+      "actual_feedback_samples_after_prepare": 448,
+      "actual_invalid_samples_after_prepare": 0,
+      "longest_invalid_interval_s": 0.0,
+      "counterfactual_fault": null,
+      "closed_loop_validation": false
+    }
+  ]
+}

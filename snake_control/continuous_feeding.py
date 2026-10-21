@@ -171,7 +171,7 @@ class ContinuousFeeding:
         if fresh:
             self.last_feedback = feedback_time_s
             self.previous_angles = angles.copy()
-            self.observation = self.length_observer.observe(angles, self.window)
+            self.observation = self.length_observer.observe(angles, self.window, feedback_time_s)
             if 'crest_joint' not in self.observation:
                 self.observation['crest_joint'] = None
             if self.observation['valid']:
@@ -196,7 +196,11 @@ class ContinuousFeeding:
             desired = self.helper.template(self.origin, 0., opt.amplitude_deg)
             if control_time_s >= opt.preparation_s-1e-8 and fresh:
                 if not self.observation['valid']:
-                    self.fault = 'initial differential length unavailable'
+                    # A fresh sample at the nominal preparation boundary may
+                    # still be gathering stable passive geometry. Use the same
+                    # bounded observation wait as during feeding, not one frame.
+                    if control_time_s >= opt.preparation_s+opt.maximum_untrusted_s:
+                        self.fault = 'initial differential length unavailable'
                 else:
                     self.baseline = self.observation['transfer_coordinate_m']
                     points = forward(np.radians(angles), self.lengths)
