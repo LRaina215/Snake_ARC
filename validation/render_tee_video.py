@@ -29,7 +29,11 @@ LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
                  'source_rewrap': '原曲线缩短直尾，补偿螺旋相位',
                  'source_roll_open': '保留短直尾并滚动',
                  'source_tighten': '收紧螺旋半径',
-                 'source_finish_tail': '将余下直尾送入螺旋'}
+                 'source_finish_tail': '将余下直尾送入螺旋',
+                 'arc_approach': 'ARC 滚动接近', 'arc_adjust': 'ARC 主动调节两侧长度',
+                 'arc_capture_head': '保留 ARC 承载，头侧开始搭管',
+                 'arc_form_helix': '前部形成承载螺旋', 'arc_finish_helix': '尾侧接入螺旋',
+                 'arc_align_helix': '支管前校准螺旋方位', 'arc_form_right_u': '尝试形成释放小 U'}
 W, H = 640, 480
 
 
