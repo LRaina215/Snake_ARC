@@ -129,8 +129,28 @@ python .\validation\render_tee_video.py --input validation/reports/gm_arc_handof
 
 最终复核在成形前留足主管距离，只验收前部持续推进与右侧依次卷入。起卷阶段最大跟踪误差约 6.8°，实际关节角峰值约 74.7°，9 个采样有至少一关节达到力矩上限，失能关节输出力矩为零。下一项最小验证是由该 Helix 继续接近支管，确认解旋位置和释放方向。
 
+以下 `right_intake_joint_shift` 命令对应历史提交 `6760bac`。
+
 ```powershell
 conda activate mujoco
 python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/right_intake_joint_shift
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/right_intake_joint_shift --label locked_gait --title "18 关节｜前部推进，右侧逐节绕管" --speed 2 --fixed-camera
+```
+
+## 固定弧长区间的 Shift Control
+
+重力矩论文把常规 Shift Control 定义为改变机器人所采样的曲线部分，滚动则通过独立的初始扭转相位实现。论文横向越障采用固定头部参数 `s_h`、改变拼接段长度的形式。原版 2 的 F5/F6 改变 `straight_line`，同时用螺旋扭率补偿 `Psi_0`。之前仿真把两端待进入的直段按比例缩短，并把头侧直段缩完作为前部行程结束。该长度只表征换形进度，不能代替前部沿延伸螺旋继续采样。
+
+本轮仍用 18 关节、110 mm 主管、60 mm 向上支管、摩擦 0.5 和 2.355 N·m 限矩。ARC 的起点选在上游 x=−55 mm，让整身成形后还能在主管上继续滚动。验收包括调长后左侧半圈、右端逐节贴管、末段卷入期间头端净前进，以及悬垂直段已经耗尽后仍能继续沿管推进。控制中用原 ARC 作曲线坐标锚点，采样区间长度固定为整身弧长。随着区间向前移，前方螺旋段延长，右侧直段退出采样区间。曲率和扭率积分一次生成整身目标角，使能按关节跨越弯曲段的覆盖比例建立，右侧实际接触几何只用来决定何时可继续送进。相位补偿保持原弧坐标处的相位连续。
+
+前方螺旋延展过快的对照出现较大的起卷误差，最大实际关节角略超过 90°；延展减慢的对照降低了误差，但 J16–J18 接入期间头端净后退约 2 mm。采用中间延展速率后的默认试验维持末段推进，仍保留早期回摆的实测记录。
+
+- 12.02 s 调长完成，左侧 ARC 实测约 166.7°，右侧长段仍下垂，短端轴向领先约 153 mm。J11–J18 按顺序接入。J16 至 J18 接入时，头端 x 由 192.7 mm 到 222.1 mm，同期采样区间前移从 399.0 mm 到 451.0 mm。
+- 35.39 s 进入整身螺旋后的持续滚动检查。原尾直段 516 mm 已退出采样范围，采样区间再前移约 74 mm 至 589.8 mm，头端实际再前进约 16 mm，全身中心再前进约 31 mm。3 s 持续检查的 60 个采样均有尾部接触。全程无支管碰撞、无触地，失能执行器力矩为零。超过这一范围的采样坐标通过整身螺旋解析角度核对，未用作真实运动的证据。
+- 起卷早段头端最低退至 x=−97 mm，最大跟踪误差 40.0°，实际关节角峰值 90.0°，触及模型限位。768 个采样中有 102 个至少一关节达限矩。主管承载力仅在起始静置时有一个采样低于判据。已验证本场景的成形和成形后短时滚动。下一项最小验证是用同一红线姿态比较圆弧向螺旋过渡时的回摆；完整避障与实机仍未验收。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/window_shift_final
+python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/window_shift_final --label locked_gait --title "18 关节｜单区间 Shift Control" --speed 2 --fixed-camera
 ```

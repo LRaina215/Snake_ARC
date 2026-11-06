@@ -10,6 +10,8 @@ from .curve_gait import arc, helix, line
 class ArcHelixShift:
     """Convert an ARC to a helix by moving the joins of a single body curve."""
 
+    front_extension_rate = 1.75
+
     def __init__(self, gait, window, amplitude, radius, pitch, handed):
         self.gait = gait
         first, last = window
@@ -19,21 +21,45 @@ class ArcHelixShift:
         self.arc_curvature = amplitude/(2.*gait.l)
         self.helix = helix(0., radius, pitch, handed)
 
-    def targets(self, head_shift, tail_shift, arc_length, anchor_phase, *, tail_intake=False):
+    def targets(self, head_shift, tail_shift, arc_length, anchor_phase):
         """Keep the bending phase at the original ARC midpoint continuous."""
         head_line = self.head_length-head_shift
         tail_line = self.tail_length-tail_shift
-        converted = self.arc_length-arc_length
-        head_conversion = 0. if tail_intake else .5*converted
-        head_helix = replace(self.helix, length=head_shift+head_conversion)
-        tail_helix = replace(self.helix, length=tail_shift+(converted-head_conversion))
-        # On right-side intake the rear junction alone consumes the old ARC.
-        # Count its torsion if it has already passed the original midpoint.
-        behind_anchor = max(0., .5*self.arc_length-arc_length) if tail_intake else 0.
-        phase = anchor_phase-self.helix.tau*(head_helix.length+behind_anchor)
+        converted = .5*(self.arc_length-arc_length)
+        head_helix = replace(self.helix, length=head_shift+converted)
+        tail_helix = replace(self.helix, length=tail_shift+converted)
+        phase = anchor_phase-self.helix.tau*head_helix.length
         segments = (line(head_line), head_helix, arc(arc_length, self.arc_curvature),
                     tail_helix, line(tail_line))
         return self.gait.targets(segments, phase), phase
+
+    def shifted_window(self, shift, arc_length, anchor_phase):
+        """Sample a fixed-length interval in coordinates anchored to the initial ARC.
+
+        Moving the sample relative to the joins gives the same relative
+        coordinates as moving the joins in a frame attached to the head.
+        """
+        head = -shift
+        arc_start = self.head_length
+        arc_end = arc_start+arc_length
+        rear_join = arc_start+self.arc_length
+        # Grow the front helix toward the head from the original ARC shoulder.
+        front_join = arc_start-self.front_extension_rate*shift
+        origin = min(-self.gait.body_length, front_join, head-self.gait.l)
+        front_helix = replace(self.helix, length=arc_start-front_join)
+        rear_helix = replace(self.helix, length=rear_join-arc_end)
+        segments = (line(front_join-origin), front_helix, arc(arc_length, self.arc_curvature),
+                    rear_helix, line(self.tail_length))
+        # Compensate from a fixed curve coordinate. Adding upstream helix
+        # does not change the phase at the old ARC midpoint.
+        midpoint = arc_start+.5*self.arc_length
+        phase = anchor_phase-self.helix.tau*(front_helix.length+max(0., midpoint-arc_end))
+        q = self.gait.targets(segments, phase, offset=head-origin)
+        head_phase = phase+self.helix.tau*float(np.clip(head-front_join, 0., front_helix.length))
+        centers = head+np.arange(1, self.gait.joints+1)*self.gait.l
+        overlap = np.minimum(centers+self.gait.l, rear_join)-np.maximum(centers-self.gait.l, front_join)
+        stiffness = np.clip(overlap/self.gait.l-1., 0., 1.)
+        return q, head_phase, stiffness
 
 
 class GravityGlobalShift:

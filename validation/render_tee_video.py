@@ -66,6 +66,8 @@ def main():
     full_pos, full_size = model.geom_pos[main].copy(), model.geom_size[main].copy()
     times = trace['time']
     fixed_x = float(np.median(trace['qpos'][:, 0]))
+    shift_samples = [row for row in report.get('shift', {}).get('curve_samples', []) if 'window_shift_m' in row]
+    shift_times = [row['time_s'] for row in shift_samples]
     step = max(1, int(round(args.speed / args.fps / np.median(np.diff(times)))))
     indices = list(range(0, len(times), step))
     if indices[-1] != len(times) - 1:
@@ -127,6 +129,9 @@ def main():
             draw.text((12, 76), '斜视', fill=(80, 80, 80), font=SMALL)
             if args.fixed_camera and 'head_x_m' in sample:
                 draw.text((12, 100), f'头端 x = {sample["head_x_m"] * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
+            if shift_times and times[index] >= shift_times[0]:
+                shifted = shift_samples[np.searchsorted(shift_times, times[index], side='right')-1]['window_shift_m']
+                draw.text((12, 124), f'采样区间前移 {shifted * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
             draw.text((W + 12, 76), '端视（沿管轴）', fill=(230, 230, 230), font=SMALL)
             frame = cv2.cvtColor(np.asarray(canvas), cv2.COLOR_RGB2BGR)
             for _ in range(args.fps if fell and index == indices[-1] else 1):

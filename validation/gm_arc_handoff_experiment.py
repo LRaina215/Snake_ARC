@@ -281,14 +281,15 @@ def receive_tail(trial, stiffness, phase, radius):
 
 
 def shift_arc_to_helix(trial, transfer, parameters, phase_offset, right_intake=False):
-    """Feed both free ends into the fitted ARC/helix curve under one clock."""
+    """Advance one body sample on the fitted curve, or replay the older comparison."""
     m, d, g, drive = trial.model, trial.data, trial.gait, trial.sim.drive
     first, last = transfer.window
     curve = ArcHelixShift(g.gait, transfer.window, math.radians(parameters.amplitude_deg),
                           g.o.r_h1, g.o.pitch, g.o.handed)
     measured = d.qpos[drive.qadr].copy()
     command = measured.copy()
-    initial, _ = curve.targets(0., 0., curve.arc_length, transfer.phase)
+    initial = (curve.shifted_window(0., curve.arc_length, transfer.phase)[0] if right_intake else
+               curve.targets(0., 0., curve.arc_length, transfer.phase)[0])
     residual = np.where(transfer.enabled, measured-initial, 0.)
     stiffness = transfer.enabled.astype(float)
     joints = np.arange(1, len(measured)+1)
@@ -296,15 +297,17 @@ def shift_arc_to_helix(trial, transfer, parameters, phase_offset, right_intake=F
     eligible_since = None
     events = []
     curve_samples = []
-    head_shift = tail_shift = roll = 0.
+    head_shift = shift_distance = roll = 0.
     next_update = 0.
     goal = measured.copy()
+    desired = stiffness.copy()
     start = d.time
     points = backbone(m, d)
     initial_head_x = float(points[0, 0])
+    wrapped_at = None
 
     def advance(t):
-        nonlocal next_update, goal, head_shift, tail_shift, roll, accepted, eligible_since
+        nonlocal next_update, goal, desired, head_shift, shift_distance, roll, accepted, eligible_since
         angles = d.qpos[drive.qadr]
         if t >= next_update:
             dt = .02
@@ -315,32 +318,39 @@ def shift_arc_to_helix(trial, transfer, parameters, phase_offset, right_intake=F
                 if t-eligible_since >= .24:
                     accepted += 1
                     eligible_since = None
+                    movement = (dict(window_shift_m=shift_distance) if right_intake else
+                                dict(head_shift_m=head_shift, tail_shift_m=shift_distance))
                     events.append(dict(joint=accepted, time_s=float(d.time), head_x_m=float(points[0, 0]),
-                                       head_shift_m=head_shift, tail_shift_m=tail_shift))
+                                       **movement))
             else:
                 eligible_since = None
             error = np.max(abs(command[stiffness >= .75]-angles[stiffness >= .75]))
             pace = float(np.clip((math.radians(25.)-error)/math.radians(18.), .15, 1.))
             tail_limit = (accepted-last+1.5)*g.l
-            tail_shift = min(curve.tail_length, tail_limit, tail_shift+.026*pace*dt)
-            # Advance both cut positions until the final link enters. With a
-            # fixed ratio the shorter head straight can run out early.
-            head_progress = (curve.head_length*(tail_shift/curve.tail_length) if right_intake else
-                             head_shift+.035*pace*dt)
-            head_shift = min(curve.head_length, head_progress)
             roll += math.copysign(.23, g.o.roll_rate)*smooth(t/1.5)*pace*dt
-            arc_length = curve.arc_length*(1.-smooth((head_shift+tail_shift)/.22))
             phase = transfer.phase+roll+phase_offset*smooth(t/4.)
-            goal, trial.phase = curve.targets(head_shift, tail_shift, arc_length, phase, tail_intake=right_intake)
+            if right_intake:
+                if accepted == len(measured):
+                    tail_limit = math.inf
+                shift_distance = min(tail_limit, shift_distance+.026*pace*dt)
+                arc_length = curve.arc_length*(1.-smooth(shift_distance/.16))
+                goal, trial.phase, desired = curve.shifted_window(shift_distance, arc_length, phase)
+                lengths = dict(window_shift_m=shift_distance, head_curve_s_m=-shift_distance,
+                               front_helix_m=curve.front_extension_rate*shift_distance,
+                               tail_line_m=max(0., curve.tail_length-shift_distance))
+            else:
+                shift_distance = min(curve.tail_length, tail_limit, shift_distance+.026*pace*dt)
+                head_shift = min(curve.head_length, head_shift+.035*pace*dt)
+                arc_length = curve.arc_length*(1.-smooth((head_shift+shift_distance)/.22))
+                goal, trial.phase = curve.targets(head_shift, shift_distance, arc_length, phase)
+                desired = np.clip(np.where(joints < first, head_shift/g.l+joints-first+1.,
+                                           np.where(joints > last, shift_distance/g.l+last-joints+1., 1.)), 0., 1.)
+                lengths = dict(head_line_m=curve.head_length-head_shift, tail_line_m=curve.tail_length-shift_distance)
             if not curve_samples or d.time-curve_samples[-1]['time_s'] >= .1:
-                curve_samples.append(dict(time_s=float(d.time), head_line_m=curve.head_length-head_shift,
-                                          tail_line_m=curve.tail_length-tail_shift, arc_m=arc_length,
-                                          anchor_phase_rad=phase))
+                curve_samples.append(dict(time_s=float(d.time), arc_m=arc_length, anchor_phase_rad=phase, **lengths))
             goal += residual*(1.-smooth(t/2.))
             np.clip(goal, -math.radians(88.), math.radians(88.), out=goal)
             next_update = t+dt
-        desired = np.clip(np.where(joints < first, head_shift/g.l+joints-first+1.,
-                                   np.where(joints > last, tail_shift/g.l+last-joints+1., 1.)), 0., 1.)
         stiffness[:] += np.clip(desired-stiffness, -m.opt.timestep/.5, m.opt.timestep/.5)
         step = math.radians(23.)*m.opt.timestep
         command[:] += np.clip(goal-command, -step, step)
@@ -348,16 +358,24 @@ def shift_arc_to_helix(trial, transfer, parameters, phase_offset, right_intake=F
         return command
 
     def attached(_):
-        return (head_shift == curve.head_length and tail_shift == curve.tail_length and
-                accepted == len(measured) and len(trial.samples) >= 8 and
-                all(tail_engaged(row) for row in trial.samples[-8:]))
+        nonlocal wrapped_at
+        covered = (shift_distance >= curve.tail_length if right_intake else
+                   head_shift == curve.head_length and shift_distance == curve.tail_length)
+        wrapped = (covered and accepted == len(measured) and len(trial.samples) >= 8 and
+                   all(tail_engaged(row) for row in trial.samples[-8:]))
+        if not right_intake:
+            return wrapped
+        wrapped_at = (d.time if wrapped_at is None else wrapped_at) if wrapped else None
+        return wrapped_at is not None and d.time-wrapped_at >= 3.
 
     formed = trial.phase_run(1, 'arc_curve_shift', 55., advance, stiffness=lambda: stiffness, stop_when=attached)
+    movement = (dict(window_shift_m=shift_distance, wrapped_at_s=wrapped_at) if right_intake else
+                dict(head_shift_m=head_shift, tail_shift_m=shift_distance))
     return dict(completed=bool(formed and not trial.stopped), start_s=float(start),
                 end_s=float(d.time), initial_window=[first, last], events=events,
                 curve_samples=curve_samples,
-                head_shift_m=head_shift, tail_shift_m=tail_shift, accepted_through=accepted,
-                head_x_start_m=initial_head_x, head_x_end_m=float(backbone(m, d)[0, 0]))
+                accepted_through=accepted, head_x_start_m=initial_head_x,
+                head_x_end_m=float(backbone(m, d)[0, 0]), **movement)
 
 
 def enter_helix_then_unwind(trial, stiffness, mask, phase, release_radius, release_line, progressive=False):
@@ -681,7 +699,7 @@ if __name__ == '__main__':
     right_intake = curve_shift and not args.two_sided_curve
     # Finish the wrap on the unobstructed approach, with room for the head's
     # axial excursion before the tee starts to obstruct the front helix.
-    default_start = .025 if right_intake else (.295 if curve_shift else (.12 if args.legacy_entry else .22))
+    default_start = -.055 if right_intake else (.295 if curve_shift else (.12 if args.legacy_entry else .22))
     start_x = args.start_x if args.start_x is not None else default_start
     trigger_x = args.trigger_x if args.trigger_x is not None else (.270 if args.legacy_entry else .295)
     feed_steps = args.feed_steps or (1 if args.legacy_entry else 2)
