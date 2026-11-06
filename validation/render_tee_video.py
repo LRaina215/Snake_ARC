@@ -23,7 +23,13 @@ GM_STAGES = {'settle': '静置', 'approach': '阶段1 螺旋滚动接近', 'arc'
 LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
                  'coupled_rewrap': '尾段沿曲线回卷，前部同时滚动', 'recover_roll': '恢复螺旋滚动',
                  'unwind_arc': '尾部再次解旋成小 U', 'unwind_line': '小 U 搭上主管右侧',
-                 'progressive_rewrap': '前部滚动，尾段逐节接入'}
+                 'progressive_rewrap': '前部滚动，尾段逐节接入',
+                 'source_seat': '版2：按顺序恢复切线圆弧与直尾',
+                 'source_active_straight': '版6：下发低速伸直目标',
+                 'source_rewrap': '原曲线缩短直尾，补偿螺旋相位',
+                 'source_roll_open': '保留短直尾并滚动',
+                 'source_tighten': '收紧螺旋半径',
+                 'source_finish_tail': '将余下直尾送入螺旋'}
 W, H = 640, 480
 
 

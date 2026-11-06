@@ -83,3 +83,26 @@ conda activate mujoco
 python .\validation\gm_locked_experiment.py --replay-intake --checkpoint validation/reports/gm_locked_process/continuous26_final/locked_gait.json --checkpoint-time 67.45 --output validation/reports/gm_locked_process/progressive26_connected
 python .\validation\render_tee_video.py --input validation/reports/gm_locked_process/progressive26_connected --label locked_gait --title "26 关节｜逐节接入对照" --speed 3
 ```
+
+## 对照用户提供的《重力矩避障.zip》
+
+压缩包内的版 2 和版 6 对尾段执行不同的操作。版 2 的 `Flag_Space` 调用 `FT_Torsion(..., 0)`，从前后分界起依次发位置指令，尾部接成切线圆弧和直线。版 6 的 `Flag_Space` 发送低速同步位置指令，等 1 s 后开始缩短直线。版 6 在这条分支没有调用失能。两者的送链都通过减少直线长度、同步减去 `Δs × τ` 来移动螺旋边界。版 6 的额外滚动在送链完成后执行，仍留约三个连杆的直尾。曲线中的递推补偿与额外滚动是两个不同的量。
+
+移植保留了原代码从尾到头的直线、切线圆弧、反向 U 圆弧和螺旋积分，以及奇偶舵机的角度映射。用原压缩包中纯曲线类作对照，对两种螺距下的直尾、U、接管及回卷构型逐关节比较，最大差 (8.73\times10^{-9}) rad。MuJoCo 采用模型实际 64.5 mm 节长。串口发送和反馈线程不在仿真入口。压缩包没有这段视频对应的完整初始姿态、自动门限和每一步位置指令，因此使用实验场景的主管支撑、支管接触和实测姿态作模拟人工触发。仿真伺服速度按源代码不同速度档近似，力矩限幅为原模型的 2.355 N·m。
+
+本轮验收要求是在相同 26 关节 T 管模型上观察真实右 U、轴下回落、按序收卷、整身通过和越障后继续滚动。完整结果如下。
+
+| 对照 | 实际结果 |
+| --- | --- |
+| 260 mm 螺距，版 2 被动释放和版 6 曲线 | 7.489 s 右 U 搭管，J16–J26 零力矩。尾段质心一度距管轴横向 5.8 mm，头端却退了约 15 mm。曲线推进时 J16–J24 依次恢复；回卷末尾最后七点最大距管轴约 404 mm，未贴管。 |
+| 同起点加入版 2 逐个位置写入，再按版 6 的送链、滚动顺序执行 | 旧记录的释放偏差仍在。24.251 s 开始送链，结束时尾端包络仍离轴约 386 mm，回卷 279 个采样全部出现至少一个力矩饱和关节。第二轮未形成可释放的右 U。 |
+| 版 6 自动主动伸直对照 | 采用版 6 的 0.4 节/步、80 ms 节奏和伸直后滚动。两轮都未清障，第二轮送链末尾尾部仍无接触，距管轴最大约 685 mm。全程未触地，最大关节角约 81.9°。 |
+| 版 2 的 140 mm 螺距、94 mm 半径 | 三节短直尾和全螺旋预包绕两种初态均未形成右侧受承托的小 U。260 mm 螺距收紧至 90 mm 时则形成右 U，但释放后尾部没有摆至轴下。 |
+
+主对照回放覆盖了第一次搭管、被动下落、逐个恢复、送链和第二轮搭管失败。最差骨架高度约 303 mm，实际最大关节角 87.3°，未触地。原曲线和指令逻辑已移植，当前仿真工况尚未复现完整越障。260 mm 工况最早的偏差是下落时前部后退；后续回卷还出现持续饱和。下一项最小对照是复现源视频在**释放前**的前部绕向、支管卡在哪两圈之间，以及实际包绕长度，记录相同几何下的被动前移，再复核原回卷。源代码各版本说明中的实验效果与此次仿真结果分开记录。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_source_experiment.py --sequential-seat --output validation/reports/gm_locked_process/source26_source_order
+python .\validation\gm_source_experiment.py --source-auto --output validation/reports/gm_locked_process/source26_v6_auto
+```
