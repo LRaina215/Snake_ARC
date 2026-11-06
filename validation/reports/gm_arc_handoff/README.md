@@ -89,9 +89,9 @@ python .\validation\gm_arc_handoff_experiment.py --curve-shift --output validati
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/curve_shift_tighten --label locked_gait --title "18 关节｜调长后按曲线移位越障" --speed 4
 ```
 
-## 短侧朝前，长侧逐节卷入
+## 短侧朝前的双侧接入对照
 
-沿用 18 关节、110 mm 主管与 60 mm 向上支管，物理参数同上一轮。默认从静置半圆 ARC 开始，把使能窗从 J7–J12 向头侧移两步到 J5–J10。实测短侧 6.18 节、长侧 7.84 节，短端在起卷前已沿轴向领先约 153 mm。起卷后长侧 J11–J18 依次接入，34.01 s 形成完整 Helix。随后未达到右 U 的释放条件。诊断中强行继续延长直段，虽然可达到释放条件，但落下后失去承载。默认流程保留有主管承托的轨迹。用旧方向调出头长尾短的对照时，程序停在调长结束处。
+沿用 18 关节、110 mm 主管与 60 mm 向上支管，物理参数同上一轮。两步对照从静置半圆 ARC 开始，把使能窗从 J7–J12 向头侧移两步到 J5–J10。实测短侧 6.18 节、长侧 7.84 节，短端在起卷前已沿轴向领先约 153 mm。起卷后长侧 J11–J18 依次接入，34.01 s 形成完整 Helix。随后未达到右 U 的释放条件。诊断中继续延长直段达到释放条件，但落下后失去承载。用旧方向调出头长尾短的对照时，程序停在调长结束处。
 
 一步调长的连续越障对照使用 J6–J11，实测头侧悬垂 7.29→6.55 节，尾侧 6.80→7.48 节，关节点绕管角跨度从 181.9° 变为 172.9°。调长完成约 7.00 s。此时短端末端斜向后，x=215 mm，长端末端 x=345 mm。起卷后短端先沿主管向前，约 9.5 s 时短端 x=505 mm、长端 x=156 mm。长侧 J12–J18 随同一拼接曲线逐节接入，25.60 s 形成完整 Helix。头端一度超过最终入位位置，随后随支管接触回到约 x=409 mm。
 
@@ -103,8 +103,22 @@ python .\validation\render_tee_video.py --input validation/reports/gm_arc_handof
 
 ```powershell
 conda activate mujoco
-python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/short_head_aligned
+python .\validation\gm_arc_handoff_experiment.py --two-sided-curve --output validation/reports/gm_arc_handoff/short_head_aligned
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/short_head_aligned --label locked_gait --title "18 关节｜短端预先在前，长尾逐节绕管" --speed 4
-python .\validation\gm_arc_handoff_experiment.py --feed-steps 1 --output validation/reports/gm_arc_handoff/short_head_continuous
+python .\validation\gm_arc_handoff_experiment.py --two-sided-curve --feed-steps 1 --output validation/reports/gm_arc_handoff/short_head_continuous
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/short_head_continuous --label locked_gait --title "18 关节｜短侧在前，长尾逐节绕管" --speed 4
+```
+
+## 左侧半圈承载，右侧逐节绕管
+
+仍用 18 关节、110 mm 水平主管和 60 mm 向上支管，摩擦 0.5、力矩上限 2.355 N·m。以原图端视方向定义左右，从尾向头看左为 `+Y`，右为 `−Y`，前进为 `+X`。试验先调整为偏左的开弧和右侧悬垂，之后按同一条拼接曲线同时移位与接入。本轮验收止于整身形成 Helix。姿态、接入和承载判断使用 MuJoCo 的世界骨架与接触，保持舵机失能时的输出力矩为零。
+
+- 起卷前 12.02 s，使能窗是 J5–J10，绕轴角跨度为 166.7°，关节点平均偏左 55.8 mm。短端在左、长端在右，悬垂长度分别为 6.18 节和 7.84 节，短端沿管轴领先 150.7 mm。红线是画面上的示意，验收依据是上述三维几何和实际接触。
+- 右侧直段缩短，右侧螺旋与原 ARC 的拼接边界向前移动。原 ARC 的缩短量全部转入右侧螺旋；前部采样位置与右侧送链共用长度进度，同时保持滚动相位连续。J11–J18 依次接入。J11 到 J12 接入期间，头端沿管轴由 323 mm 进到 512 mm，碰支管后回摆。34.07 s 形成 Helix，头端 x=416 mm，骨架绕轴约 1.98 圈，各关节点距轴 80–108 mm，前部和尾部均有主管接触。尾端上行经过管顶时，尚未接入的末节短暂外伸。
+- 全程 682 个采样均记录到主管承载力，无触地，峰值跟踪误差 13.5°，最大关节角 79.5°。343 个采样出现至少一个关节达到限矩，主要发生在右侧接入期间。末段持续接触并满足径向和跨度判据，结束时测到一个尾部接触连杆。完整重力矩释放及越障未沿用这条轨迹验证。若继续验证，下一项从本轮实际成形的 Helix 检查右侧解旋的承托与释放方向。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/right_intake_18
+python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/right_intake_18 --label locked_gait --title "18 关节｜左侧半圈，右侧逐节绕管" --speed 2
 ```

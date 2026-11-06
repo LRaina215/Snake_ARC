@@ -99,6 +99,8 @@ def main():
             raw = sample.get('stage', 'roll' if times[index] >= 2 else 'settle')
             key = raw.split('_', 1)[1] if re.match(r'c\d+_', raw) else raw
             stage = (raw.split('_')[0] + ' ' if re.match(r'c\d+_', raw) else '') + STAGES.get(key, key)
+            if report.get('right_intake') and raw == 'arc_curve_shift':
+                stage = '前部移位，右侧逐节上管'
             if args.label == 'locked_gait' and 'cycle' in sample:
                 stage = f"第 {sample['cycle']} 轮  {stage}"
             fell = sample.get('ground_force_n', 0.) > 1.

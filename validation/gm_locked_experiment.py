@@ -68,12 +68,12 @@ def tail_engaged(row):
     return bool(row['distal_contacts']) and row['tail_span_deg'] >= 75. and row['tail_max_radius_m'] < .14
 
 
-def intake_connections(points, radius, pitch):
+def intake_connections(points, radius, pitch, winding=1.):
     """Adjacent link centres must join the same winding around the main pipe."""
     centers = (points[:-1]+points[1:])*.5
     yz = centers[:, 1:]-[0., PIPE_HEIGHT]
     radial = np.linalg.norm(yz, axis=1)
-    angle_step = np.diff(np.unwrap(np.arctan2(yz[:, 1], yz[:, 0])))
+    angle_step = winding*np.diff(np.unwrap(np.arctan2(yz[:, 1], yz[:, 0])))
     axial_step = np.diff(centers[:, 0])
     near = (radial > .065) & (radial < radius+.017)
     return (near[:-1] & near[1:] & (angle_step < -.24) & (angle_step > -1.16) &

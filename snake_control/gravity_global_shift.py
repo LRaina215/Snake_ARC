@@ -19,14 +19,18 @@ class ArcHelixShift:
         self.arc_curvature = amplitude/(2.*gait.l)
         self.helix = helix(0., radius, pitch, handed)
 
-    def targets(self, head_shift, tail_shift, arc_length, anchor_phase):
+    def targets(self, head_shift, tail_shift, arc_length, anchor_phase, *, tail_intake=False):
         """Keep the bending phase at the original ARC midpoint continuous."""
         head_line = self.head_length-head_shift
         tail_line = self.tail_length-tail_shift
-        converted = .5*(self.arc_length-arc_length)
-        head_helix = replace(self.helix, length=head_shift+converted)
-        tail_helix = replace(self.helix, length=tail_shift+converted)
-        phase = anchor_phase-self.helix.tau*head_helix.length
+        converted = self.arc_length-arc_length
+        head_conversion = 0. if tail_intake else .5*converted
+        head_helix = replace(self.helix, length=head_shift+head_conversion)
+        tail_helix = replace(self.helix, length=tail_shift+(converted-head_conversion))
+        # On right-side intake the rear junction alone consumes the old ARC.
+        # Count its torsion if it has already passed the original midpoint.
+        behind_anchor = max(0., .5*self.arc_length-arc_length) if tail_intake else 0.
+        phase = anchor_phase-self.helix.tau*(head_helix.length+behind_anchor)
         segments = (line(head_line), head_helix, arc(arc_length, self.arc_curvature),
                     tail_helix, line(tail_line))
         return self.gait.targets(segments, phase), phase

@@ -38,7 +38,17 @@ def support_material(trial):
                 arc_mid_joint=float(.5*(a+b)))
 
 
-def place_arc_for_adjustment(trial, parameters, center_x):
+def arc_entry_pose(trial, window):
+    """Record the red-line layout in the tail-to-head view (+y is left)."""
+    points = backbone(trial.model, trial.data)
+    first, last = window
+    yz = points[first:last+1, 1:]-[0., PIPE_HEIGHT]
+    azimuths = np.unwrap(np.arctan2(yz[:, 1], yz[:, 0]))
+    return dict(sweep_deg=float(np.degrees(np.ptp(azimuths))), arc_y_m=float(np.mean(yz[:, 0])),
+                head_xyz_m=points[0].tolist(), tail_xyz_m=points[-1].tolist())
+
+
+def place_arc_for_adjustment(trial, parameters, center_x, tail_on_right=False):
     """Place the initial open ARC at rest, with both free ends pointing down."""
     m, d = trial.model, trial.data
     trial.sim.place(center_x)
@@ -49,6 +59,8 @@ def place_arc_for_adjustment(trial, parameters, center_x):
     side = points[right]-points[left]
     side -= (side@up)*up
     side /= np.linalg.norm(side)
+    if tail_on_right:
+        side = -side
     rotation = Rotation.from_matrix(np.array([np.cross(side, up), side, up]))
     root = Rotation.from_quat(d.qpos[[4, 5, 6, 3]])
     d.qpos[3:7] = (rotation*root).as_quat()[[3, 0, 1, 2]]
@@ -268,7 +280,7 @@ def receive_tail(trial, stiffness, phase, radius):
                 events=events, duration_s=float(d.time-started))
 
 
-def shift_arc_to_helix(trial, transfer, parameters, phase_offset):
+def shift_arc_to_helix(trial, transfer, parameters, phase_offset, right_intake=False):
     """Feed both free ends into the fitted ARC/helix curve under one clock."""
     m, d, g, drive = trial.model, trial.data, trial.gait, trial.sim.drive
     first, last = transfer.window
@@ -297,7 +309,7 @@ def shift_arc_to_helix(trial, transfer, parameters, phase_offset):
         if t >= next_update:
             dt = .02
             points = backbone(m, d)
-            near = intake_connections(points, g.o.r_h1, g.o.pitch)
+            near = intake_connections(points, g.o.r_h1, g.o.pitch, winding=-g.o.handed)
             if accepted < len(measured) and near[accepted-1] and near[accepted]:
                 eligible_since = t if eligible_since is None else eligible_since
                 if t-eligible_since >= .24:
@@ -309,13 +321,14 @@ def shift_arc_to_helix(trial, transfer, parameters, phase_offset):
                 eligible_since = None
             error = np.max(abs(command[stiffness >= .75]-angles[stiffness >= .75]))
             pace = float(np.clip((math.radians(25.)-error)/math.radians(18.), .15, 1.))
-            head_shift = min(curve.head_length, head_shift+.035*pace*dt)
             tail_limit = (accepted-last+1.5)*g.l
             tail_shift = min(curve.tail_length, tail_limit, tail_shift+.026*pace*dt)
-            roll += .23*smooth(t/1.5)*pace*dt
+            head_progress = 1.35*tail_shift if right_intake else head_shift+.035*pace*dt
+            head_shift = min(curve.head_length, head_progress)
+            roll += math.copysign(.23, g.o.roll_rate)*smooth(t/1.5)*pace*dt
             arc_length = curve.arc_length*(1.-smooth((head_shift+tail_shift)/.22))
             phase = transfer.phase+roll+phase_offset*smooth(t/4.)
-            goal, trial.phase = curve.targets(head_shift, tail_shift, arc_length, phase)
+            goal, trial.phase = curve.targets(head_shift, tail_shift, arc_length, phase, tail_intake=right_intake)
             if not curve_samples or d.time-curve_samples[-1]['time_s'] >= .1:
                 curve_samples.append(dict(time_s=float(d.time), head_line_m=curve.head_length-head_shift,
                                           tail_line_m=curve.tail_length-tail_shift, arc_m=arc_length,
@@ -545,11 +558,16 @@ def capture(trial, transfer, phase_offset, align=False, full_helix=False, keep_a
 
 
 def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix, keep_arc, feed_direction,
-        fit_support, guide_tail, progressive, start_x=.12, curve_shift=False, initial_arc_phase=0.):
-    trial = CycleTrial(setup=APPROACH_SETUP)
+        fit_support, guide_tail, progressive, start_x=.12, curve_shift=False, initial_arc_phase=0.,
+        right_intake=False):
+    setup = APPROACH_SETUP
+    if right_intake:
+        setup = dict(APPROACH_SETUP, options=dict(APPROACH_SETUP['options'], handed=1, roll_rate=-.6))
+    trial = CycleTrial(setup=setup)
     sim, d = trial.sim, trial.data
+    initial_phase = math.pi if mirrored else initial_arc_phase
     p = replace(sim.p, first_joint=7, last_joint=12,
-                initial_phase_rad=math.pi if mirrored else initial_arc_phase)
+                initial_phase_rad=math.pi-initial_phase if right_intake else initial_phase)
     sim.p = sim.drive.p = p
     reference = None
     if guide_tail:
@@ -560,8 +578,8 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
             scratch.qpos[:] = trace['qpos'][index]
         mujoco.mj_forward(trial.model, scratch)
         reference = backbone(trial.model, scratch)
-    if curve_shift and initial_arc_phase:
-        place_arc_for_adjustment(trial, p, start_x)
+    if curve_shift and (initial_arc_phase or right_intake):
+        place_arc_for_adjustment(trial, p, start_x, tail_on_right=right_intake)
     else:
         sim.place(start_x)  # only physical placement
     trial.phase_run(1, 'settle', p.settle_s, lambda _: p.targets(p.initial_phase_rad), p.enabled)
@@ -582,10 +600,10 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
     summary = dict(arc_trigger_x_m=trigger_x, phase_offset_rad=phase_offset, align_before_u=align,
                    mirrored_arc=mirrored, feed_steps=feed_steps, feed_direction=feed_direction,
                    full_helix=full_helix, keep_arc=keep_arc, fit_support=fit_support, guide_tail=guide_tail,
-                   progressive_intake=progressive, curve_shift=curve_shift,
+                   progressive_intake=progressive, curve_shift=curve_shift, right_intake=right_intake,
                    initial_arc_phase_rad=p.initial_phase_rad,
                    reached_approach=bool(reached), start_x_m=start_x,
-                   setup={k: APPROACH_SETUP[k] for k in ('scene', 'joints', 'friction', 'options')})
+                   setup={k: setup[k] for k in ('scene', 'joints', 'friction', 'options')})
     if reached and not trial.stopped:
         transfer, feed = adjust_arc(trial, p, feed_steps, feed_direction)
         summary['feed'] = feed
@@ -595,11 +613,20 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
                 material = feed['after']
                 short_head = material is not None and material['head_links'] < material['tail_links']
                 summary['short_head_at_start'] = short_head
-                shift = (shift_arc_to_helix(trial, transfer, p, phase_offset) if short_head else
-                         {'completed': False, 'reason': 'head-side free length is not shorter'})
+                pose = arc_entry_pose(trial, transfer.window)
+                summary['arc_entry_pose'] = pose
+                left_arc = (150. <= pose['sweep_deg'] <= 210. and pose['arc_y_m'] > 0. and
+                            pose['tail_xyz_m'][1] < 0. < pose['head_xyz_m'][1] and
+                            pose['head_xyz_m'][0] > pose['tail_xyz_m'][0])
+                if not short_head:
+                    shift = {'completed': False, 'reason': 'head-side free length is not shorter'}
+                elif right_intake and not left_arc:
+                    shift = {'completed': False, 'reason': 'left half ARC and right hanging tail were not observed'}
+                else:
+                    shift = shift_arc_to_helix(trial, transfer, p, phase_offset, right_intake)
                 summary['shift'] = shift
                 target = None
-                if shift['completed']:
+                if shift['completed'] and not right_intake:
                     target, summary['helix'] = align_and_unwind(trial, mask, .09554165, .32201388,
                                                                 {'formed': entry_geometry(trial, mask)},
                                                                 head_alignment=(90., 105.), min_release_moment=.63)
@@ -640,7 +667,8 @@ if __name__ == '__main__':
                        help='Reproduce the earlier direct-lift and comparison runs')
     entry.add_argument('--staged-entry', action='store_true', help='Reproduce the earlier staged approach')
     entry.add_argument('--curve-shift', action='store_true',
-                       help='Fit and shift a single ARC-to-helix curve with the short side leading (default)')
+                       help='Form a helix from a left-side ARC using right-side intake (default)')
+    entry.add_argument('--two-sided-curve', action='store_true', help='Reproduce the earlier two-sided curve shift')
     parser.add_argument('--initial-arc-phase', type=float)
     args = parser.parse_args()
     if not args.legacy_entry and (args.guide_tail or args.fit_retained_support or
@@ -658,4 +686,4 @@ if __name__ == '__main__':
     run(args.output, trigger_x, args.phase_offset, args.align_before_u, args.mirrored_arc, feed_steps,
         args.unwind_from_helix, args.keep_arc_during_head_capture, -1 if feed_direction == 'head' else 1,
         args.fit_retained_support, args.guide_tail, not args.legacy_entry, start_x, curve_shift,
-        initial_phase)
+        initial_phase, right_intake=curve_shift and not args.two_sided_curve)
