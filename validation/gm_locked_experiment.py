@@ -142,7 +142,7 @@ def fit_intake_window(trial, scratch, start_joint, accepted, end_joint, nominal,
 
 
 def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., fit_local=True,
-                       tighten_before_speed=False, roll_when_blocked=0.):
+                       tighten_before_speed=False, roll_when_blocked=0., initial_stiffness=None):
     """Roll the supported helix and accept one adjacent hanging joint at a time."""
     g, d, m = trial.gait, trial.data, trial.model
     qadr = trial.sim.drive.qadr
@@ -151,10 +151,15 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., 
     # Keep the powered front intact even if only part of it is still in
     # contact. Measured attachment guides the tail fit, not the front mask.
     initial_prefix = accepted = support_count
-    trial.phase = phase_from_front(g, radius, measured, support_count)
-    curve = MeasuredGravityShift(g, radius, trial.phase, measured, initial_prefix,
+    phase_reference = phase_from_front(g, radius, measured, support_count)
+    trial.phase = phase_reference
+    curve = MeasuredGravityShift(g, radius, phase_reference, measured, initial_prefix,
                                  upstream_m=(initial_prefix+1)*g.l)
-    stiffness = (np.arange(len(measured)) < support_count).astype(float)
+    stiffness = ((np.arange(len(measured)) < support_count).astype(float)
+                 if initial_stiffness is None else np.asarray(initial_stiffness,float).copy())
+    if (stiffness.shape != measured.shape or not np.all((stiffness>=0.) & (stiffness<=1.)) or
+            np.any(stiffness[support_count:])):
+        raise ValueError('The initial shift-rolling mask must leave the tail passive')
     scratch = mujoco.MjData(m) if fit_local else None
     command = measured.copy()
     local_guide = command.copy()
@@ -178,7 +183,8 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., 
                 accepted_since = None
             if accepted_since is not None and t-accepted_since >= .30:
                 accepted += 1
-                events.append(dict(time_s=float(d.time), joint=accepted, shift_m=offset))
+                events.append(dict(time_s=float(d.time), joint=accepted, shift_m=offset,
+                                   active_roll_rad=roll, head_x_m=float(backbone(m,d)[0,0])))
                 accepted_since = None
                 fit_at = t
 
@@ -200,6 +206,7 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., 
         if receiving and offset == lead:
             roll_step = max(roll_step, roll_when_blocked*pace*m.opt.timestep)
         roll += roll_step
+        trial.phase = phase_reference-curve.torsion*offset+roll
         q = curve.targets(offset, roll)
         nominal = curve.helical_targets(offset, roll)
         q[:accepted] += smooth(offset/g.turn_length(radius))*(nominal[:accepted]-q[:accepted])
@@ -231,7 +238,7 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., 
     if ready_at is not None:
         # The physical helix is already complete. Leave the measured curve at
         # its current phase and bring the front back to the cruise rate.
-        phase = trial.phase-curve.torsion*offset+roll
+        phase = phase_reference-curve.torsion*offset+roll
         residual = command-g.targets(phase, radius)[0]
         initial_rate = speed*(roll_rate/.05-curve.torsion)
         tighten_start, speed_start = (0., 3.) if tighten_before_speed else (2., 0.)

@@ -36,6 +36,7 @@ LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
                  'arc_intake': '尾部沿主管逐节包绕',
                  'arc_curve_shift': '曲线移位，头侧螺旋，尾侧接入',
                  'arc_align_helix': '支管前校准螺旋方位', 'arc_form_right_u': '尝试形成释放小 U',
+                 'front_only_coil': '前部先包绕，后段保持失能',
                  'direct_shift': '整身采样区间向前移，尾部逐节接入',
                  'direct_shift_cruise': '接入全螺旋后继续推进'}
 W, H = 640, 480
