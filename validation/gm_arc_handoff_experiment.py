@@ -592,13 +592,17 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
         if feed['completed'] and not trial.stopped:
             if curve_shift:
                 mask = np.arange(p.joints) < 8
-                shift = shift_arc_to_helix(trial, transfer, p, phase_offset)
+                material = feed['after']
+                short_head = material is not None and material['head_links'] < material['tail_links']
+                summary['short_head_at_start'] = short_head
+                shift = (shift_arc_to_helix(trial, transfer, p, phase_offset) if short_head else
+                         {'completed': False, 'reason': 'head-side free length is not shorter'})
                 summary['shift'] = shift
                 target = None
                 if shift['completed']:
                     target, summary['helix'] = align_and_unwind(trial, mask, .09554165, .32201388,
                                                                 {'formed': entry_geometry(trial, mask)},
-                                                                head_alignment=(143., 153.), min_release_moment=.63)
+                                                                head_alignment=(90., 105.), min_release_moment=.63)
             else:
                 target, mask, after_head = capture(trial, transfer, phase_offset, align, full_helix, keep_arc,
                                                    fit_support, reference, progressive)
@@ -607,11 +611,13 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
             if target is not None and not trial.stopped:
                 rewrap_method = rewrap
                 if curve_shift:
-                    rewrap_method = partial(progressive_rewrap, fit_local=False, tighten_before_speed=True)
+                    rewrap_method = partial(progressive_rewrap, fit_local=False, tighten_before_speed=True,
+                                            roll_when_blocked=.055)
                 elif progressive:
                     rewrap_method = progressive_rewrap
                 summary['crossing'] = drop_and_rewrap(
-                    trial, 1, target, mask, mask, .098, .40, .35, False, rewrap_method)
+                    trial, 1, target, mask, mask, .098, .40, .35, False, rewrap_method,
+                    pickup_earliest_s=1. if curve_shift else 2.)
     save(trial, output, 'locked_gait', None, release_events=trial.release_events, **summary)
 
 
@@ -629,25 +635,27 @@ if __name__ == '__main__':
     parser.add_argument('--keep-arc-during-head-capture', action='store_true')
     parser.add_argument('--fit-retained-support', action='store_true')
     parser.add_argument('--guide-tail', action='store_true')
-    parser.add_argument('--legacy-entry', action='store_true',
-                        help='Reproduce the earlier direct-lift and comparison runs')
-    parser.add_argument('--curve-shift', action='store_true', help='Fit and shift a single ARC-to-helix curve')
+    entry = parser.add_mutually_exclusive_group()
+    entry.add_argument('--legacy-entry', action='store_true',
+                       help='Reproduce the earlier direct-lift and comparison runs')
+    entry.add_argument('--staged-entry', action='store_true', help='Reproduce the earlier staged approach')
+    entry.add_argument('--curve-shift', action='store_true',
+                       help='Fit and shift a single ARC-to-helix curve with the short side leading (default)')
     parser.add_argument('--initial-arc-phase', type=float)
     args = parser.parse_args()
     if not args.legacy_entry and (args.guide_tail or args.fit_retained_support or
                                   args.align_before_u or args.unwind_from_helix):
         parser.error('the old entry variants require --legacy-entry')
-    if args.curve_shift and args.legacy_entry:
-        parser.error('--curve-shift and --legacy-entry are separate approaches')
-    default_start = .295 if args.curve_shift else (.12 if args.legacy_entry else .22)
+    curve_shift = not (args.legacy_entry or args.staged_entry)
+    default_start = .295 if curve_shift else (.12 if args.legacy_entry else .22)
     start_x = args.start_x if args.start_x is not None else default_start
     trigger_x = args.trigger_x if args.trigger_x is not None else (.270 if args.legacy_entry else .295)
     feed_steps = args.feed_steps or (1 if args.legacy_entry else 2)
-    feed_direction = args.feed_direction or ('head' if args.legacy_entry else 'tail')
+    feed_direction = args.feed_direction or ('head' if curve_shift or args.legacy_entry else 'tail')
     initial_phase = args.initial_arc_phase
     if initial_phase is None:
-        initial_phase = 2.09 if args.curve_shift else 0.
+        initial_phase = 2.09 if curve_shift else 0.
     run(args.output, trigger_x, args.phase_offset, args.align_before_u, args.mirrored_arc, feed_steps,
         args.unwind_from_helix, args.keep_arc_during_head_capture, -1 if feed_direction == 'head' else 1,
-        args.fit_retained_support, args.guide_tail, not args.legacy_entry, start_x, args.curve_shift,
+        args.fit_retained_support, args.guide_tail, not args.legacy_entry, start_x, curve_shift,
         initial_phase)

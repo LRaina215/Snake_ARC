@@ -38,7 +38,7 @@ python .\validation\render_tee_video.py --input validation/reports/gm_arc_handof
 
 ```powershell
 conda activate mujoco
-python .\validation\gm_arc_handoff_experiment.py --start-x .12 --trigger-x .195 --feed-direction head --feed-steps 1 --output validation/reports/gm_arc_handoff/progressive_intake
+python .\validation\gm_arc_handoff_experiment.py --staged-entry --start-x .12 --trigger-x .195 --feed-direction head --feed-steps 1 --output validation/reports/gm_arc_handoff/progressive_intake
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/progressive_intake --label locked_gait --title "18 关节｜ARC 后尾部逐节包绕" --speed 2
 ```
 
@@ -62,11 +62,11 @@ python .\validation\render_tee_video.py --input validation/reports/gm_arc_handof
 
 ```powershell
 conda activate mujoco
-python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/continuous18_smooth
+python .\validation\gm_arc_handoff_experiment.py --staged-entry --output validation/reports/gm_arc_handoff/continuous18_smooth
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/continuous18_smooth --label locked_gait --title "18 关节｜ARC 接入重力矩越障" --speed 4
 ```
 
-## 半圆调长后用拼接曲线移位越障
+## 长侧在前的历史对照
 
 本轮固定 18 关节、110 mm 水平主管、60 mm 向上支管、摩擦 0.5、限矩 2.355 N·m。测试顺序是静置半圆、两侧调长、曲线移位与同时滚动、右 U 释放、曲线回卷、清障后持续滚动。只在起点布置 ARC，初始相位 2.09 rad，弧段中心 x=295 mm。先用原主动调长方法移动两步，再启动滚动。红线来自单张斜视图，本轮用头侧长、尾侧短的实测开弧作三维近似，未从图中反推精确尺寸。
 
@@ -81,8 +81,30 @@ python .\validation\render_tee_video.py --input validation/reports/gm_arc_handof
 
 完整轨迹 127.80 s，无触地。释放阶段有一个采样的主管承载力低于判据，随后恢复。调长后的起卷阶段一度碰支管，最大跟踪误差约 59°，实际角峰值约 90.2°，达到模型限位附近。全程 2,557 个采样里有 1,164 个至少一关节达到 2.355 N·m，主要集中在约 72 s 的回卷。诊断中，初始相位取 0 时也能形成 Helix，但没搭成右 U；使用 2.09 rad 时右 U 能就位，过早释放会令尾段错过稳定轴下接管。回卷结束后先加速的对照丢了六次尾部接触，改成先低速收紧后加速才通过完整恢复判据。本次只验收这个 18 关节仿真工况。下一项最小验证可在相同场景保持初始构型，针对起卷碰支管产生的跟踪误差做一次曲线移位速率对照。
 
+下列命令对应历史提交 `714fcdf`。该轮把长侧作为前端，与实际要求相反。
+
 ```powershell
 conda activate mujoco
 python .\validation\gm_arc_handoff_experiment.py --curve-shift --output validation/reports/gm_arc_handoff/curve_shift_tighten
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/curve_shift_tighten --label locked_gait --title "18 关节｜调长后按曲线移位越障" --speed 4
+```
+
+## 短侧朝前，长侧逐节卷入
+
+沿用 18 关节、110 mm 主管与 60 mm 向上支管，物理参数同上一轮。默认从静置半圆 ARC 开始，把使能窗从 J7–J12 向头侧移两步到 J5–J10。实测短侧 6.18 节、长侧 7.84 节，短端在起卷前已沿轴向领先约 153 mm。起卷后长侧 J11–J18 依次接入，34.01 s 形成完整 Helix。随后未达到右 U 的释放条件。诊断中强行继续延长直段，虽然可达到释放条件，但落下后失去承载。默认流程保留有主管承托的轨迹。用旧方向调出头长尾短的对照时，程序停在调长结束处。
+
+一步调长的连续越障对照使用 J6–J11，实测头侧悬垂 7.29→6.55 节，尾侧 6.80→7.48 节，关节点绕管角跨度从 181.9° 变为 172.9°。调长完成约 7.00 s。此时短端末端斜向后，x=215 mm，长端末端 x=345 mm。起卷后短端先沿主管向前，约 9.5 s 时短端 x=505 mm、长端 x=156 mm。长侧 J12–J18 随同一拼接曲线逐节接入，25.60 s 形成完整 Helix。头端一度超过最终入位位置，随后随支管接触回到约 x=409 mm。
+
+上一轮长侧在前时使用的解旋头部方位在短侧入位后达不到。短侧轨迹在约 90° 时实际在支管前后形成两个管顶穿越点，因此在该方位区间接原解旋曲线。32.52 s，前部和尾侧连杆 13 同时受主管承托，J9–J18 失能。前部相位保持固定，实际滑转 72.9°、头端前移 11.0 mm。短侧的尾段约 1.33 s 就满足轴下居中和前移判据，旧的 2 s 等待会错过这段接管时机。
+
+长尾回卷中，下一节未贴管时暂停增加移位量，前部仍可低速滚动以改变接触方位。J9–J18 逐节接入，129.60 s 回到持续滚动。整身通过 x=409 mm 的清障线后继续贴管 15.40 s，309 个采样均有尾部主管接触，最后端继续前进 232.1 mm。
+
+一步调长全程 145.07 s，无触地，失能关节力矩为零。失能后有两个采样的主管承载力低于判据，随后恢复。回卷约 96 s，出现长时间低速接入，最大跟踪误差 31.9°、最大实际关节角 84.0°。全程 2,902 个样本中有 1,799 个至少一关节达到限矩，主要在回卷。两步调长满足起卷前短端轴向领先和成形 Helix，完整越障还未通过。实机和其他场景仍未验证。下一项最小验证是保持两步调长后的实际 Helix，比较支管接触位置与前部在释放后的承托变化。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/short_head_aligned
+python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/short_head_aligned --label locked_gait --title "18 关节｜短端预先在前，长尾逐节绕管" --speed 4
+python .\validation\gm_arc_handoff_experiment.py --feed-steps 1 --output validation/reports/gm_arc_handoff/short_head_continuous
+python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/short_head_continuous --label locked_gait --title "18 关节｜短侧在前，长尾逐节绕管" --speed 4
 ```

@@ -142,7 +142,7 @@ def fit_intake_window(trial, scratch, start_joint, accepted, end_joint, nominal,
 
 
 def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., fit_local=True,
-                       tighten_before_speed=False):
+                       tighten_before_speed=False, roll_when_blocked=0.):
     """Roll the supported helix and accept one adjacent hanging joint at a time."""
     g, d, m = trial.gait, trial.data, trial.model
     qadr = trial.sim.drive.qadr
@@ -194,8 +194,12 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., 
         next_offset = min(lead, offset+speed*pace*m.opt.timestep)
         increment = next_offset-offset
         offset = next_offset
-        # Share one material clock so the rotating front cannot outrun intake.
-        roll += increment*roll_rate/.05
+        # Coordinate roll with the intake. At a blocked boundary, a slow roll
+        # can change the contact phase without advancing the hanging curve.
+        roll_step = increment*roll_rate/.05
+        if receiving and offset == lead:
+            roll_step = max(roll_step, roll_when_blocked*pace*m.opt.timestep)
+        roll += roll_step
         q = curve.targets(offset, roll)
         nominal = curve.helical_targets(offset, roll)
         q[:accepted] += smooth(offset/g.turn_length(radius))*(nominal[:accepted]-q[:accepted])
@@ -406,7 +410,7 @@ def release_snapshot(trial, mask):
 
 
 def drop_and_rewrap(trial, cycle, start_target, mask, helix_mask, slip_radius, opening_s, roll_rate, observed_release,
-                    rewrap_method):
+                    rewrap_method, pickup_earliest_s=2.):
     g, d = trial.gait, trial.data
     release = release_snapshot(trial, mask)
     if observed_release and not right_u_ready(trial, mask):
@@ -425,7 +429,7 @@ def drop_and_rewrap(trial, cycle, start_target, mask, helix_mask, slip_radius, o
     def hanging(_):
         nonlocal pickup_ready
         rows = trial.samples[max(drop_start, len(trial.samples)-3):]
-        if len(rows) < 3 or rows[-1]['time_s']-release_time < 2.:
+        if len(rows) < 3 or rows[-1]['time_s']-release_time < pickup_earliest_s:
             return False
         if any(abs(row['released_tail_y_m']) > .015 or
                row['released_tail_com_m'][2] > PIPE_HEIGHT-.10 for row in rows):
