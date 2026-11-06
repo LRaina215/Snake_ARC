@@ -2,6 +2,7 @@
 import argparse
 import math
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 import sys
 
@@ -13,9 +14,11 @@ from snake_control.gravity_moment import smooth
 from snake_control.simulation import backbone
 from snake_control.tee_simulation import PIPE_HEIGHT
 from validation.gm_arc_approach_handoff import START_PHASE, adaptive_short_head, approach_roll
-from validation.gm_arc_handoff_experiment import place_arc_for_adjustment
+from validation.gm_arc_handoff_experiment import (
+    align_and_unwind, entry_geometry, helix_alignment_ready, place_arc_for_adjustment,
+)
 from validation.gm_experiment import BRANCH_X, BRANCH_R, LINK_R
-from validation.gm_locked_experiment import APPROACH_SETUP, progressive_rewrap, tail_engaged
+from validation.gm_locked_experiment import APPROACH_SETUP, drop_and_rewrap, progressive_rewrap, tail_engaged
 from validation.gm_replay_wrap_experiment import save
 from validation.gm_shift_cycle_experiment import CycleTrial
 from validation.gm_wrap_first_experiment import pipe_contacts
@@ -82,7 +85,22 @@ def front_coil(trial, transfer, parameters, head_clearance, physical_front_seat)
     return bool(formed and not trial.stopped),geometry,stiffness
 
 
-def run(output,start_x,roll_rate,head_clearance,physical_front_seat):
+def continue_gravity_gait(trial, roll_rate, align_options):
+    ready = helix_alignment_ready(trial,align_options['head_alignment'],align_options['unwind_phase'],
+                                  align_options['phase_tolerance'])
+    keep = np.arange(trial.model.nu)<8
+    target, report = align_and_unwind(trial,keep,.09554165,.32201388,
+        {'formed':entry_geometry(trial,keep)},min_release_moment=.63,already_aligned=ready,**align_options)
+    report['gravity_entry_reached'] = target is not None and not trial.stopped
+    if report['gravity_entry_reached']:
+        rewrap = partial(progressive_rewrap,duration=125.,fit_local=False,
+                         tighten_before_speed=True,roll_when_blocked=.055)
+        report['gravity_crossing'] = drop_and_rewrap(trial,1,target,keep,keep,.098,.40,roll_rate,
+                                                     False,rewrap,pickup_earliest_s=1.)
+    return report
+
+
+def run(output,start_x,roll_rate,head_clearance,physical_front_seat,gravity=False):
     trial = CycleTrial(setup=APPROACH_SETUP)
     sim,d = trial.sim,trial.data
     p = replace(sim.p,first_joint=7,last_joint=12,initial_phase_rad=START_PHASE)
@@ -97,19 +115,31 @@ def run(output,start_x,roll_rate,head_clearance,physical_front_seat):
     transfer,lengths,ready = adaptive_short_head(trial,p)
     report = dict(start_x_m=start_x, length_observations=lengths, short_head_ready=ready,
                   roll_rate_rad_s=roll_rate,head_clearance_m=head_clearance,
-                  physical_front_seat=physical_front_seat,front_ready=False,crossing=False)
+                  physical_front_seat=physical_front_seat,gravity_requested=gravity,front_ready=False,crossing=False)
     if ready and not trial.stopped:
         ready,geometry,stiffness = front_coil(trial,transfer,p,head_clearance,physical_front_seat)
         report.update(front_ready=ready,front_at_handoff=geometry)
         if ready:
             first_row = len(trial.samples)
+            align_options = dict(head_alignment=(90.,108.),unwind_phase=1.035,phase_tolerance=.075)
+
+            def aligned(_):
+                return helix_alignment_ready(trial,align_options['head_alignment'],
+                    align_options['unwind_phase'],align_options['phase_tolerance'])
+
             report['shift_rolling'] = progressive_rewrap(trial,transfer.window[1],roll_rate,
                 duration=105.,fit_local=False,tighten_before_speed=True,roll_when_blocked=.055,
-                initial_stiffness=stiffness)
+                initial_stiffness=stiffness,recover_stop_when=aligned if gravity else None)
+            if gravity and not trial.stopped and report['shift_rolling']['rolling_handoff_s'] is not None:
+                report['gravity_handoff'] = continue_gravity_gait(trial,roll_rate,align_options)
             rows = trial.samples[first_row:]
             clearance = BRANCH_X+BRANCH_R+LINK_R
             report['crossing'] = (not trial.stopped and len(rows)>=40 and all(
                 row['x_min_m']>clearance and not row['branch_links'] and tail_engaged(row) for row in rows[-40:]))
+            if gravity:
+                crossing = report.get('gravity_handoff', {}).get('gravity_crossing', {})
+                report['crossing'] = (report['crossing'] and crossing.get('drop', {}).get('passed', False)
+                                      and crossing.get('recovery', {}).get('passed', False))
     save(trial,output,'locked_gait',None,**report)
 
 
@@ -121,5 +151,7 @@ if __name__=='__main__':
     parser.add_argument('--head-clearance',type=float,default=BRANCH_X+BRANCH_R)
     parser.add_argument('--physical-front-seat',action='store_true',
                         help='Use physical head contact even while J1 is still coming on')
+    parser.add_argument('--gravity-handoff',action='store_true',
+                        help='Continue into the existing gravity drop and rewrap')
     args=parser.parse_args()
-    run(args.output,args.start_x,args.roll_rate,args.head_clearance,args.physical_front_seat)
+    run(args.output,args.start_x,args.roll_rate,args.head_clearance,args.physical_front_seat,args.gravity_handoff)

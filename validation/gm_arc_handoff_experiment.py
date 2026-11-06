@@ -410,10 +410,21 @@ def enter_helix_then_unwind(trial, stiffness, mask, phase, release_radius, relea
     return align_and_unwind(trial, mask, release_radius, release_line, outcome, progressive)
 
 
+def helix_alignment_ready(trial, head_alignment, unwind_phase=None, phase_tolerance=.20):
+    if unwind_phase is not None and abs(math.remainder(trial.phase-unwind_phase,math.tau)) >= phase_tolerance:
+        return False
+    points = backbone(trial.model,trial.data)
+    main, branch, _ = pipe_contacts(trial.sim)
+    crossings = top_crossings(points)
+    return (any(link >= 13 for link in main) and any(8 <= link <= 12 for link in branch) and
+            any(.25 < x < .32 for x in crossings) and any(.39 < x < .45 for x in crossings) and
+            head_alignment[0] < angle(points[0]) < head_alignment[1])
+
+
 def align_and_unwind(trial, mask, release_radius, release_line, outcome, progressive=True,
                      head_alignment=(97., 151.), min_release_moment=0., approach_s=14., unwind_phase=None,
-                     line_reserve=0., alignment_min_roll_s=.2):
-    d, g, sim = trial.data, trial.gait, trial.sim
+                     line_reserve=0., alignment_min_roll_s=.2, phase_tolerance=.20, already_aligned=False):
+    d, g = trial.data, trial.gait
     radius, phase = g.o.r_h1, trial.phase
     roll_start = d.time
 
@@ -422,18 +433,12 @@ def align_and_unwind(trial, mask, release_radius, release_line, outcome, progres
         return g.targets(trial.phase, radius)[0]
 
     def aligned(_):
-        points = backbone(trial.model, d)
-        main, branch, _ = pipe_contacts(sim)
-        crossings = top_crossings(points)
-        phase_ready = unwind_phase is None or abs(math.remainder(trial.phase-unwind_phase, math.tau)) < .20
-        # In the verified 18-joint approach the branch sat between
-        # crossings at about x=0.286 and 0.422 m, with the head above.
-        return (d.time-roll_start > alignment_min_roll_s and phase_ready and any(link >= 13 for link in main) and
-                any(8 <= link <= 12 for link in branch) and
-                any(.25 < x < .32 for x in crossings) and any(.39 < x < .45 for x in crossings) and
-                head_alignment[0] < angle(points[0]) < head_alignment[1])
+        return d.time-roll_start > alignment_min_roll_s and helix_alignment_ready(
+            trial,head_alignment,unwind_phase,phase_tolerance)
 
-    located = trial.phase_run(1, 'arc_align_helix', approach_s, roll, stop_when=aligned)
+    located = (helix_alignment_ready(trial,head_alignment,unwind_phase,phase_tolerance)
+               if already_aligned else
+               trial.phase_run(1, 'arc_align_helix', approach_s, roll, stop_when=aligned))
     outcome['alignment'] = entry_geometry(trial, mask)
     outcome['alignment']['phase_aligned'] = bool(located)
     if trial.stopped or not located:

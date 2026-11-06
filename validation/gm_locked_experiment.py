@@ -142,7 +142,8 @@ def fit_intake_window(trial, scratch, start_joint, accepted, end_joint, nominal,
 
 
 def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., fit_local=True,
-                       tighten_before_speed=False, roll_when_blocked=0., initial_stiffness=None):
+                       tighten_before_speed=False, roll_when_blocked=0., initial_stiffness=None,
+                       recover_stop_when=None):
     """Roll the supported helix and accept one adjacent hanging joint at a time."""
     g, d, m = trial.gait, trial.data, trial.model
     qadr = trial.sim.drive.qadr
@@ -253,7 +254,8 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., 
             return g.targets(trial.phase, r)[0]+(1.-smooth(t/2.))*residual
 
         transition = max(tighten_start+tighten_duration, speed_start+2.)
-        trial.phase_run(cycle, 'recover_roll', transition+2.*math.pi/g.o.roll_rate, recover)
+        trial.phase_run(cycle, 'recover_roll', transition+2.*math.pi/g.o.roll_rate, recover,
+                        stop_when=recover_stop_when)
     return dict(cycle=cycle, method='progressive_intake', start_s=start,
                 initial_prefix=initial_prefix, accepted_joints=accepted, intake_events=events,
                 shift_m=offset, full_shift_m=curve.shift_limit_m, active_roll_rad=roll,
@@ -448,7 +450,7 @@ def drop_and_rewrap(trial, cycle, start_target, mask, helix_mask, slip_radius, o
     metrics = drop_metrics(trial.samples[drop_start:])
     if roll_rate is not None and (pickup_ready or (metrics['passed'] and not observed_release)) and not trial.stopped:
         trial.rewrap_checks.append(rewrap_method(trial, int(mask.sum()), roll_rate, cycle))
-    recovery = recovery_metrics([r for r in trial.samples if r['cycle'] == cycle and r['stage'] == 'recover_roll'])
+    recovery = recovery_metrics([r for r in trial.samples[drop_start:] if r['stage'] == 'recover_roll'])
     return dict(cycle=cycle, release=release, drop=metrics, pickup_ready=pickup_ready, recovery=recovery)
 
 

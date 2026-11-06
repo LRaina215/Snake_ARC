@@ -111,6 +111,13 @@ def main():
                 stage = '前部移位，右侧逐节上管'
             if args.label == 'locked_gait' and 'cycle' in sample:
                 stage = f"第 {sample['cycle']} 轮  {stage}"
+            if report.get('gravity_requested'):
+                release = report.get('gravity_handoff', {}).get('gravity_crossing', {}).get('release', {})
+                released = sample['time_s'] >= release.get('time_s', float('inf'))
+                if raw == 'progressive_rewrap':
+                    stage = '重力矩释放后回卷' if released else '首次 Shift Rolling，逐节送尾'
+                elif raw == 'recover_roll':
+                    stage = '越障后持续滚动' if released else '卷尾后对准解旋方位'
             fell = sample.get('ground_force_n', 0.) > 1.
             if fell:
                 stage = '失去主管支撑，落地'
