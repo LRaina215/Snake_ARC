@@ -38,6 +38,30 @@ python .\validation\render_tee_video.py --input validation/reports/gm_arc_handof
 
 ```powershell
 conda activate mujoco
-python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/progressive_intake
+python .\validation\gm_arc_handoff_experiment.py --start-x .12 --trigger-x .195 --feed-direction head --feed-steps 1 --output validation/reports/gm_arc_handoff/progressive_intake
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/progressive_intake --label locked_gait --title "18 关节｜ARC 后尾部逐节包绕" --speed 2
+```
+
+## 从 ARC 连续接入重力矩越障
+
+沿用 18 关节、110 mm 主管和 60 mm 向上支管。假设普通螺旋滚动能推进，但改变不了头部相对于主管的绕管方位。改用 ARC 调长改变参与起卷的头侧长度，再在支管前的合适轴向位置起卷。预定验收条件为开放 ARC 接近、窗口实际交接、逐节贴管、支管进入前后两圈之间、右侧小 U 受主管支撑、失能后尾段进入轴下且前部净前进、逐节回卷及整身过障后持续滚动。状态只在仿真起点设置一次。
+
+已有完整轨迹显示，旧进路中螺旋滚了 14 s，头端绕管方位仍主要在 35–56°，支管接触索引 7–8。把目标相位分别增减 90°也未建立正确对准，正向对照连承载螺旋都未完成。改为把窗口向尾侧移两步，使头侧有更多连杆可起卷。起卷距离过远时，前一圈先撞到支管；让实际起卷跨过支管纵向位置后，支管进入两圈之间。尾部形成几何包绕后，增加一段慢滚动以取得尾侧真实承载。
+
+释放判断从半径放松阶段提前到解旋展直阶段逐步执行，条件沿用右侧质心、尾端位置和两侧主管接触。旧释放后回卷按从头开始的连续接触计算使能段，误关闭了仍需承载的关节。现保留 J1–J8，接入条件只判断接续处相邻实测连杆，尾侧局部拟合与前部滚动同步。首次改动能接完尾部，但慢速回卷的时限不足以走完整条拟合曲线。试过贴管后直接加速送链，结果尾部再次离管。最终在尾部接入、连续承载且实测角接近螺旋参考时结束回卷，保留当前相位，渐消参考残差，再平滑恢复滚动速度和主管半径。
+
+| 动作 | 通过轨迹的实测结果 |
+| --- | --- |
+| ARC 接近和调长 | 接近时 J7–J12 的绕管角跨度为 175.2–181.5°。两次交接后使能 J9–J14，头侧和尾侧悬垂分别由 6.67、7.46 节变为 8.57、5.43 节。 |
+| 支管前后两圈与尾部接入 | J15–J18 依次接入，仿真 29.95 s 尾侧取得主管接触，随后支管位于前后两圈之间。 |
+| 右侧失能 | 36.74 s 时前部和尾侧连杆 15 同时搭在主管上，待释放段质心在右侧 43.8 mm，J9–J18 同步失能。前部相位固定期间实际滑转 48.2°，头端净前移 21.6 mm。回卷前尾部质心已低于管轴约 408 mm、距轴线横向 14.2 mm。 |
+| 前部滚动与尾部逐节回卷 | 38.85 s 开始局部接入，J9 到 J18 逐节确认，最后一节在 91.19 s 接入。96.00 s 时回到持续滚动。 |
+| 越障后 | 整身在清障线 x=409 mm 前方持续滚动 14.40 s，289 个采样都有尾部主管接触，无支管接触。最后端继续前进 263.7 mm，最终 x=738.1 mm。 |
+
+全程 110.48 s，无触地，失能关节执行器力矩为零。调长中有一个 50 ms 采样记录的主管承载力为零，下一样本恢复。解旋展直时最大跟踪误差为 40.4°。回卷较慢且是主要限矩阶段，全程 1,000 个采样出现至少一个关节达到 2.355 N·m，回卷期间最大关节角为 90.09°，触及模型的 ±90° 限位附近。已验证本场景单次连续越障。仿真接触和世界骨架充当观察员，未验证实机或不同起始方位。若继续验证可迁移性，下一项用同一 18 关节场景改变一次 ARC 初始绕管相位，仍按实际形状和接触判断交接。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/continuous18_smooth
+python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/continuous18_smooth --label locked_gait --title "18 关节｜ARC 接入重力矩越障" --speed 4
 ```

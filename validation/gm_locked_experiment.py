@@ -147,11 +147,9 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
     qadr = trial.sim.drive.qadr
     measured = d.qpos[qadr].copy()
     radius = g.o.r_h2
-    initial_connections = intake_connections(backbone(m, d), radius, g.o.pitch)
-    # The head may stand clear of the pipe. Find the last connected link in
-    # the current helix, starting from the first pair that is actually on it.
-    accepted = attached_prefix(initial_connections, support_count) or support_count
-    initial_prefix = accepted
+    # Keep the powered front intact even if only part of it is still in
+    # contact. Measured attachment guides the tail fit, not the front mask.
+    initial_prefix = accepted = support_count
     trial.phase = phase_from_front(g, radius, measured, support_count)
     curve = MeasuredGravityShift(g, radius, trial.phase, measured, initial_prefix,
                                  upstream_m=(initial_prefix+1)*g.l)
@@ -160,7 +158,6 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
     command = measured.copy()
     local_guide = command.copy()
     fit_at = 0.
-    attached = accepted
     offset = roll = 0.
     accepted_since = None
     events = []
@@ -168,12 +165,13 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
     speed = .012
 
     def coupled(t):
-        nonlocal accepted, accepted_since, offset, roll, command, local_guide, fit_at, attached
+        nonlocal accepted, accepted_since, offset, roll, command, local_guide, fit_at
         angles = d.qpos[qadr]
         if accepted < len(angles):
             near = intake_connections(backbone(m, d), radius, g.o.pitch)
-            attached = attached_prefix(near, accepted+1)
-            if attached > accepted:
+            connections = np.flatnonzero(near[:accepted])
+            attached = int(connections[-1])+1 if connections.size else support_count
+            if near[accepted-1] and near[accepted]:
                 accepted_since = t if accepted_since is None else accepted_since
             else:
                 accepted_since = None
@@ -202,12 +200,12 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
         q[:accepted] += smooth(offset/g.turn_length(radius))*(nominal[:accepted]-q[:accepted])
         # If an already accepted link lifts off, move the fit back to the
         # section still connected to the pipe. Keep the free tail out of it.
-        window_first = max(1, min(accepted-1, attached+1)) if attached else max(1, accepted-1)
-        window_last = accepted+receiving
-        if receiving and t >= fit_at:
-            local_guide = fit_intake_window(trial, scratch, window_first, accepted, window_last, q, radius)
-            fit_at = t+.04
         if receiving:
+            window_first = max(1, min(accepted-1, attached+1))
+            window_last = accepted+receiving
+            if t >= fit_at:
+                local_guide = fit_intake_window(trial, scratch, window_first, accepted, window_last, q, radius)
+                fit_at = t+.04
             window = slice(window_first-1, window_last)
             q[window] += smooth(t/.6)*.90*(local_guide[window]-q[window])
         q = np.clip(q, -math.radians(88.), math.radians(88.))
@@ -216,18 +214,34 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
         return command.copy()
 
     def ready(_):
-        return (accepted == len(measured) and offset >= curve.shift_limit_m and
-                bool(trial.samples) and tail_engaged(trial.samples[-1]))
+        if (accepted != len(measured) or len(trial.samples) < 8 or
+                not all(tail_engaged(row) for row in trial.samples[-8:])):
+            return False
+        nominal = curve.helical_targets(offset, roll)
+        return np.max(np.abs(nominal-d.qpos[qadr])) <= math.radians(2.)
 
     trial.phase_run(cycle, 'progressive_rewrap', duration, coupled, stop_when=ready,
                     stiffness=lambda: stiffness)
-    if ready(None) and not trial.stopped:
+    ready_at = float(d.time) if ready(None) and not trial.stopped else None
+    if ready_at is not None:
+        # The physical helix is already complete. Leave the measured curve at
+        # its current phase and bring the front back to the cruise rate.
         phase = trial.phase-curve.torsion*offset+roll
-        trial.phase_run(cycle, 'recover_roll', 2.+2.*math.pi/g.o.roll_rate,
-            lambda t: g.targets(phase+g.o.roll_rate*t, radius+(g.o.r_h1-radius)*smooth(t/2.))[0])
+        residual = command-g.targets(phase, radius)[0]
+        initial_rate = speed*(roll_rate/.05-curve.torsion)
+
+        def recover(t):
+            ramp = min(t, 2.)
+            advance = initial_rate*ramp+(g.o.roll_rate-initial_rate)*ramp**2/4.
+            trial.phase = phase+advance+g.o.roll_rate*(t-ramp)
+            r = radius+(g.o.r_h1-radius)*smooth((t-2.)/2.)
+            return g.targets(trial.phase, r)[0]+(1.-smooth(t/2.))*residual
+
+        trial.phase_run(cycle, 'recover_roll', 4.+2.*math.pi/g.o.roll_rate, recover)
     return dict(cycle=cycle, method='progressive_intake', start_s=start,
                 initial_prefix=initial_prefix, accepted_joints=accepted, intake_events=events,
-                shift_m=offset, full_shift_m=curve.shift_limit_m, active_roll_rad=roll)
+                shift_m=offset, full_shift_m=curve.shift_limit_m, active_roll_rad=roll,
+                rolling_handoff_s=ready_at)
 
 
 def rewrap(trial, support_count, roll_rate, cycle=1):
