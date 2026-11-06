@@ -75,7 +75,7 @@ class LocalMotorDrive:
         target = self.p.targets(phase)
         return self.apply_targets(data, target, self.p.enabled)
 
-    def apply_targets(self, data, target, enabled, *, stiffness=None):
+    def apply_targets(self, data, target, enabled, *, stiffness=None, torque_limit=None):
         """Step2 also uses this explicit angle/mask interface; inactive torque is zero."""
         target, enabled = np.asarray(target, float), np.asarray(enabled, bool)
         if target.shape != (self.p.joints,) or enabled.shape != target.shape or not np.isfinite(target).all():
@@ -84,5 +84,6 @@ class LocalMotorDrive:
         if stiffness is not None:
             position *= stiffness
         torque = position - self.p.kd * data.qvel[self.vadr]
-        data.ctrl[:] = np.where(enabled, np.clip(torque, -self.p.torque_limit_nm, self.p.torque_limit_nm), 0.0)
+        limit = self.p.torque_limit_nm if torque_limit is None else torque_limit
+        data.ctrl[:] = np.where(enabled, np.clip(torque, -limit, limit), 0.0)
         return target

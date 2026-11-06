@@ -106,3 +106,26 @@ conda activate mujoco
 python .\validation\gm_source_experiment.py --sequential-seat --output validation/reports/gm_locked_process/source26_source_order
 python .\validation\gm_source_experiment.py --source-auto --output validation/reports/gm_locked_process/source26_v6_auto
 ```
+
+## 直接执行压缩包版 2 的阶段对照
+
+新增入口调用《重力矩避障-版2.py》的原曲线类、`Control()`、`Gait()` 和原按键函数。压缩包里的“版2-改Rolling爬水平管”常规位置写入只覆盖 J13–J17，本次使用向全部关节下发的版 2。只加载明确列出的步态定义，串口、键盘线程和硬件主循环不启动。模拟写位置时保留原有的自动使能语义，模拟 `sleep` 时推进 MuJoCo，逐个位置写入的顺序及速度档全部记录。
+
+在 110/60 mm T 管上从预包绕起始完整试跑，140 mm 螺距下没有同时满足右 U 承托与向前失能下落的释放点。130 mm 螺距和小幅调整初始对准也没有通过。释放条件由模拟操作员从实际管面接触与姿态筛选，然后仅用私有 MuJoCo 状态预演被动下落。未确认向前滑转时停止，避免将先前的无效下落继续接入回卷。
+
+后半程对照使用旧 26 关节记录中第二轮释放前的 62.75 s 真实状态。原版曲线参数从保存的已发角度重建，误差小于 (2\times10^{-13}) 度。实际自由根和关节从原状态连续积分，随后不重置。J17–J26 同时失能，零执行器力矩。前部被动滑转 38.0°，头端前移 14.2 mm，尾段质心最后距管轴横向约 3.1 mm。随后原 `Gait()` 从 J13 到 J26 每秒发送一个位置目标，接着用原 F6 和滚动命令送链。
+
+| 同一个右 U 起点 | 整身清障后的实际表现 |
+| --- | --- |
+| 2.355 N·m，半径收至 92 mm | 整身清障并继续前进，但恢复段 253 个采样均无末段连杆接触，尾部距管轴最大约 269 mm。 |
+| 回卷后 3.925 N·m，半径收至 94 mm | 末段形成螺旋包绕，253 个恢复采样中有 210 个满足末段贴管判据。按原判据未通过。 |
+| 回卷后 3.925 N·m，半径收至 92 mm | 末段在恢复滚动的 12.6 s 内全部 253 个采样满足贴管判据，整身保持在支管前方，最后端再前进 278 mm。末段覆盖角最小约 228°，距轴最大约 103 mm。 |
+
+提高限矩只从逐节位置恢复开始生效，释放前和下落阶段两条轨迹相同。2.355 N·m 取自参考仓库为 EXE 的 300/1000 配置采用的名义限矩。版 2 串口脚本没有写该寄存器，3.925 N·m 只是仿真对照值，尚未标定为这台实机的可用力矩。前进和末段贴管分别验收。通过的回放全程无触地，逐节恢复最差骨架高度约 439 mm，实际最大关节角约 90.1°，回卷有两个采样点未测到主管承载力，随后恢复。恢复段全程有支撑，107/253 个采样仍有至少一个执行器达到诊断限矩。
+
+这一轮通过的是从已支持右 U 开始的释放、回卷和恢复滚动。还需核对从接近到右 U 的实物初始对准，以及实机在版 2 控制时保留的舵机限矩，再做同条件整段复现。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_v2_native_experiment.py --archive "$env:USERPROFILE/Downloads/重力矩避障.zip" --checkpoint validation/reports/gm_locked_process/continuous26_final/locked_gait.json --checkpoint-time 62.75 --rewrap-cap 3.925 --final-radius-mm 92 --output validation/reports/gm_locked_process/native_v2_torque_r92
+```

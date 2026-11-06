@@ -90,8 +90,9 @@ class CycleTrial:
         return length, lh
 
     def phase_run(self, cycle, name, duration, targets, mask=None, stop_on_wrap=False, stop_when=None,
-                  stiffness=None):
+                  stiffness=None, torque_limit=None):
         d, m, sim = self.data, self.model, self.sim
+        saturation_limit = sim.p.torque_limit_nm if torque_limit is None else torque_limit
         mask = self.full_mask if mask is None else mask
         damping = self.powered_damping.copy()
         if self.passive_tail_damping is not None:
@@ -108,7 +109,7 @@ class CycleTrial:
                 mask = scale > 0.
                 if self.passive_tail_damping is not None:
                     m.dof_damping[sim.drive.vadr] = np.where(mask, self.powered_damping, self.passive_tail_damping)
-            sim.drive.apply_targets(d, q, mask, stiffness=scale)
+            sim.drive.apply_targets(d, q, mask, stiffness=scale, torque_limit=torque_limit)
             mujoco.mj_step(m, d)
             if name == 'drop' and elapsed == 0.:
                 self.release_events.append(dict(command_time_s=start, first_step_time_s=float(d.time),
@@ -144,7 +145,7 @@ class CycleTrial:
                 branch_force_world_n=branch_force.tolist(), support_n=metrics['normal_force_n'],
                 ground_force_n=metrics['ground_contact_force_n'], enabled_count=int(mask.sum()),
                 tracking_max_deg=float(max(error[mask])), actual_max_joint_deg=float(max(abs(np.degrees(d.qpos[sim.drive.qadr])))),
-                saturated_joints=(np.flatnonzero(abs(d.actuator_force) >= sim.p.torque_limit_nm-1e-6)+1).tolist()))
+                saturated_joints=(np.flatnonzero(abs(d.actuator_force) >= saturation_limit-1e-6)+1).tolist()))
             if name == 'drop':
                 tail_y, torque = self.release_moment(mask)
                 head = m.body('head').id
