@@ -37,6 +37,8 @@ python .\codes\Rolling_Arc_Real.py
 
 **主动送链调长**：形成完成后按**Ctrl+4**，每按一次**Ctrl+J/H**执行一段头侧增长/缩短，到位保持，不自动往返。默认请求64.5 mm，**Ctrl+-/=**减半/加倍；到可达边界停止同向推进，反向键可退出。**Ctrl+G**暂停/继续，**Ctrl+L**推进一帧，**Ctrl+Y**手动返回本步起态，**Ctrl+X**全部失能。仿真同键位；参数在实机文件顶部`FEED_*`修改。[完整操作说明](docs/主动送链实机验收说明.md)。
 
+**ARC→Helix**：搭管圆弧稳定后按 **Ctrl+B**，此时保持现状。**Ctrl+J** 逐步推进，**Ctrl+G** 连续或暂停，**Ctrl+空格** 暂停，**Ctrl+K** 查看阶段。实机和仿真手调同键位。[三种起态的仿真记录](validation/reports/arc_helix_motor_feedback/README.md)
+
 也可在使用`mujoco`解释器的IDE中直接运行该文件。需要固定端口时修改文件顶部的`PORT`；不连接机器人演练时将顶部`DRY_RUN`改为`True`，再运行同一文件。运行前关闭其他占用串口的程序。
 
 ## 自动实验
