@@ -13,8 +13,11 @@ def main():
     src = ROOT/'snake_control'
     curve = declaration(src/'curve_gait.py', {'Segment', 'line', 'arc', 'helix', 'CurveGait'})
     curve = re.sub(r'\bSegment\b', 'HelixCurveSegment', curve)
-    parts = [curve, declaration(src/'gravity_global_shift.py', {'ArcHelixShift'}),
-             declaration(src/'active_arc_transfer.py'), declaration(src/'arc_helix_transition.py')]
+    gravity = declaration(src/'gravity_moment.py', {'GravityMomentOptions', 'GravityMomentGait', 'smooth'})
+    gravity = re.sub(r'\bSegment\b', 'HelixCurveSegment', gravity)
+    parts = [curve, declaration(src/'gravity_global_shift.py', {'ArcHelixShift', 'MeasuredGravityShift'}),
+             declaration(src/'active_arc_transfer.py'), declaration(src/'arc_helix_transition.py'),
+             gravity, declaration(src/'gravity_handoff.py')]
     target = ROOT/'codes/Rolling_Arc_Real.py'
     source = target.read_text(encoding='utf-8')
     if BEGIN in source:

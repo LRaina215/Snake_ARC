@@ -39,6 +39,8 @@ python .\codes\Rolling_Arc_Real.py
 
 **ARC→Helix**：搭管圆弧稳定后按 **Ctrl+5**，此时保持现状。**Ctrl+J** 逐步推进，**Ctrl+G** 连续或暂停，**Ctrl+空格** 暂停，**Ctrl+K** 查看阶段和两侧长度估计。第一次推进时按最新关节角重新判断是否先调长。实机和仿真手调同键位。[三种起态的仿真记录](validation/reports/arc_helix_motor_feedback/README.md)
 
+**T 管重力矩越障（实机）**用 **Ctrl+6** 选择，保持 J1 为前端。**Ctrl+J/G** 单步或连续推进，暂停后用 **Ctrl+L** 确认当前姿态，**Ctrl+K** 查看下一步。[操作顺序与参数](validation/reports/gm_arc_handoff/README.md#实机操作)。
+
 也可在使用`mujoco`解释器的IDE中直接运行该文件。需要固定端口时修改文件顶部的`PORT`；不连接机器人演练时将顶部`DRY_RUN`改为`True`，再运行同一文件。运行前关闭其他占用串口的程序。
 
 ## 自动实验
