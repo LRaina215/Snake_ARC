@@ -15,9 +15,10 @@ def backbone(model, data):
 
 
 class ArcSimulation:
-    def __init__(self, scene, parameters, start_x=-.5):
+    def __init__(self, scene, parameters, start_x=-.5, *, model=None):
         self.scene, self.p = scene, parameters
-        self.model = mujoco.MjModel.from_xml_path(str(ROOT / 'mujoco_model' / f'Snake_Robot_o20_Rolling_Arc_{scene}.xml'))
+        self.model = (mujoco.MjModel.from_xml_path(str(ROOT / 'mujoco_model' / f'Snake_Robot_o20_Rolling_Arc_{scene}.xml'))
+                      if model is None else model)
         self.data = mujoco.MjData(self.model)
         self.drive = LocalMotorDrive(self.model, parameters)
         self.model.dof_damping[self.drive.vadr] = parameters.passive_damping
