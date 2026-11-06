@@ -412,7 +412,7 @@ def enter_helix_then_unwind(trial, stiffness, mask, phase, release_radius, relea
 
 def align_and_unwind(trial, mask, release_radius, release_line, outcome, progressive=True,
                      head_alignment=(97., 151.), min_release_moment=0., approach_s=14., unwind_phase=None,
-                     line_reserve=0.):
+                     line_reserve=0., alignment_min_roll_s=.2):
     d, g, sim = trial.data, trial.gait, trial.sim
     radius, phase = g.o.r_h1, trial.phase
     roll_start = d.time
@@ -428,7 +428,7 @@ def align_and_unwind(trial, mask, release_radius, release_line, outcome, progres
         phase_ready = unwind_phase is None or abs(math.remainder(trial.phase-unwind_phase, math.tau)) < .20
         # In the verified 18-joint approach the branch sat between
         # crossings at about x=0.286 and 0.422 m, with the head above.
-        return (d.time-roll_start > .2 and phase_ready and any(link >= 13 for link in main) and
+        return (d.time-roll_start > alignment_min_roll_s and phase_ready and any(link >= 13 for link in main) and
                 any(8 <= link <= 12 for link in branch) and
                 any(.25 < x < .32 for x in crossings) and any(.39 < x < .45 for x in crossings) and
                 head_alignment[0] < angle(points[0]) < head_alignment[1])

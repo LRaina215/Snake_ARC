@@ -43,7 +43,7 @@ class ArcHelixTransition:
         self.arc_turn_deg = math.degrees(section['total_turn'])
         if not 125. <= self.arc_turn_deg <= 232. or section['fit_rms'] > .025:
             raise ValueError('当前使能区域没有可拟合的开放圆弧')
-        head_length, tail_length, head_depth, tail_depth = self._end_geometry(q, section, window)
+        head_length, tail_length, head_depth, tail_depth = self.estimate_end_geometry(q, self.lengths, section, window)
         self.end_lengths_m = (head_length, tail_length)
         self.end_depths_m = (head_depth, tail_depth)
         near_equal = abs(head_length-tail_length) <= 2*self.l
@@ -76,21 +76,22 @@ class ArcHelixTransition:
         else:
             self._plan_entry(leading_depth)
 
-    def _end_geometry(self, q, section, window):
+    @classmethod
+    def estimate_end_geometry(cls, q, lengths, section, window):
         """Estimate arm lengths and end depths using a cut through the fitted ARC center."""
         points = section['projected'][1:-1]
         system = np.column_stack((2.*points, np.ones(len(points))))
         center = np.linalg.lstsq(system, np.sum(points**2, axis=1), rcond=None)[0][:2]
         crown = points.mean(axis=0)-center
         direction = crown/np.linalg.norm(crown)
-        backbone = forward(q, self.lengths)
+        backbone = forward(q, lengths)
         projected = (backbone-section['axis']['point'])@section['axis']['basis'][:,:2]
         height = (projected-center)@direction
         first, last = window
         top = first+int(np.argmax(height[first:last+2]))
-        material = np.r_[0., np.cumsum(self.lengths)]
-        head = self._length_after_cut(height[top::-1], material[top]-material[top::-1])
-        tail = self._length_after_cut(height[top:], material[top:]-material[top])
+        material = np.r_[0., np.cumsum(lengths)]
+        head = cls._length_after_cut(height[top::-1], material[top]-material[top::-1])
+        tail = cls._length_after_cut(height[top:], material[top:]-material[top])
         return head, tail, -float(height[0]), -float(height[-1])
 
     @staticmethod
@@ -143,7 +144,7 @@ class ArcHelixTransition:
 
     def _check_front_entry(self):
         section = local_section(self.measured, self.lengths, *self.window)
-        head_length, _, head_depth, _ = self._end_geometry(self.measured, section, self.window)
+        head_length, _, head_depth, _ = self.estimate_end_geometry(self.measured, self.lengths, section, self.window)
         self.events.append(dict(stage='front_check', window=list(self.window),
                                 head_length_m=head_length, head_depth_m=head_depth))
         if head_length <= self.options.front_entry_max_links*self.l:
