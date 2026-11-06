@@ -122,3 +122,15 @@ conda activate mujoco
 python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/right_intake_18
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/right_intake_18 --label locked_gait --title "18 关节｜左侧半圈，右侧逐节绕管" --speed 2
 ```
+
+上面的 `right_intake_18` 对应提交 `a11d52c`。后续检查发现，最后几节绕管时头端没有净前移。到 J13 接入时头侧直段长度已经耗尽，只有滚动相位仍在更新。主管支管同时顶住连杆 8 一带，J16–J18 接入期间头端倒退约 14 mm。
+
+同一场景把起卷位置移到上游直管段，保留原曲线调度，末段头端恢复净前移 23 mm。这说明支管过早接触是主要阻碍。最终让弧段起点从 x=295 mm 改到 x=25 mm，保留左半圈和右侧悬垂，并让前后待送入的直段按同一比例缩短，直到 J18 接入后一起完成。头端在 J16 和 J18 接入时分别位于 x=245 mm 和 x=277 mm，Helix 完成时到 x=289 mm。同期全身中心由 x=130 mm 到 x=164 mm，末态骨架绕管约 1.99 圈。401 个起卷采样都保持主管承载、没有触地或支管接触；末段头端仍有随滚动产生的小幅回摆。
+
+最终复核在成形前留足主管距离，只验收前部持续推进与右侧依次卷入。起卷阶段最大跟踪误差约 6.8°，实际关节角峰值约 74.7°，9 个采样有至少一关节达到力矩上限，失能关节输出力矩为零。下一项最小验证是由该 Helix 继续接近支管，确认解旋位置和释放方向。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/right_intake_joint_shift
+python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/right_intake_joint_shift --label locked_gait --title "18 关节｜前部推进，右侧逐节绕管" --speed 2 --fixed-camera
+```

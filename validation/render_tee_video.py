@@ -46,6 +46,7 @@ def main():
     parser.add_argument('--title', required=True)
     parser.add_argument('--speed', type=float, default=4.)
     parser.add_argument('--fps', type=int, default=20)
+    parser.add_argument('--fixed-camera', action='store_true', help='Keep the oblique view fixed along the pipe')
     args = parser.parse_args()
     data = json.loads((args.input / f'{args.label}.json').read_text(encoding='utf-8'))
     report, samples = data['summary'], data['samples']
@@ -64,6 +65,7 @@ def main():
     main = model.geom('pipe_main').id
     full_pos, full_size = model.geom_pos[main].copy(), model.geom_size[main].copy()
     times = trace['time']
+    fixed_x = float(np.median(trace['qpos'][:, 0]))
     step = max(1, int(round(args.speed / args.fps / np.median(np.diff(times)))))
     indices = list(range(0, len(times), step))
     if indices[-1] != len(times) - 1:
@@ -91,7 +93,8 @@ def main():
                     model.geom_size[main][1] = .25
                 mujoco.mj_forward(model, d)
                 cam = mujoco.MjvCamera()
-                cam.lookat[:] = [center[0], 0, 1.05]
+                view_x = fixed_x if args.fixed_camera and name == 'oblique' else center[0]
+                cam.lookat[:] = [view_x, 0, 1.05]
                 cam.azimuth, cam.elevation, cam.distance = az, el, dist
                 renderer.update_scene(d, camera=cam)
                 views.append(renderer.render())
@@ -122,6 +125,8 @@ def main():
                                 f'支管接触: {"连杆" + ",".join(map(str, contact)) if contact else "无"}    '
                                 f'{args.speed:g}倍速回放（{colors}）', fill=(62, 86, 102), font=SMALL)
             draw.text((12, 76), '斜视', fill=(80, 80, 80), font=SMALL)
+            if args.fixed_camera and 'head_x_m' in sample:
+                draw.text((12, 100), f'头端 x = {sample["head_x_m"] * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
             draw.text((W + 12, 76), '端视（沿管轴）', fill=(230, 230, 230), font=SMALL)
             frame = cv2.cvtColor(np.asarray(canvas), cv2.COLOR_RGB2BGR)
             for _ in range(args.fps if fell and index == indices[-1] else 1):

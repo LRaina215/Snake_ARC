@@ -323,7 +323,10 @@ def shift_arc_to_helix(trial, transfer, parameters, phase_offset, right_intake=F
             pace = float(np.clip((math.radians(25.)-error)/math.radians(18.), .15, 1.))
             tail_limit = (accepted-last+1.5)*g.l
             tail_shift = min(curve.tail_length, tail_limit, tail_shift+.026*pace*dt)
-            head_progress = 1.35*tail_shift if right_intake else head_shift+.035*pace*dt
+            # Advance both cut positions until the final link enters. With a
+            # fixed ratio the shorter head straight can run out early.
+            head_progress = (curve.head_length*(tail_shift/curve.tail_length) if right_intake else
+                             head_shift+.035*pace*dt)
             head_shift = min(curve.head_length, head_progress)
             roll += math.copysign(.23, g.o.roll_rate)*smooth(t/1.5)*pace*dt
             arc_length = curve.arc_length*(1.-smooth((head_shift+tail_shift)/.22))
@@ -675,7 +678,10 @@ if __name__ == '__main__':
                                   args.align_before_u or args.unwind_from_helix):
         parser.error('the old entry variants require --legacy-entry')
     curve_shift = not (args.legacy_entry or args.staged_entry)
-    default_start = .295 if curve_shift else (.12 if args.legacy_entry else .22)
+    right_intake = curve_shift and not args.two_sided_curve
+    # Finish the wrap on the unobstructed approach, with room for the head's
+    # axial excursion before the tee starts to obstruct the front helix.
+    default_start = .025 if right_intake else (.295 if curve_shift else (.12 if args.legacy_entry else .22))
     start_x = args.start_x if args.start_x is not None else default_start
     trigger_x = args.trigger_x if args.trigger_x is not None else (.270 if args.legacy_entry else .295)
     feed_steps = args.feed_steps or (1 if args.legacy_entry else 2)
@@ -686,4 +692,4 @@ if __name__ == '__main__':
     run(args.output, trigger_x, args.phase_offset, args.align_before_u, args.mirrored_arc, feed_steps,
         args.unwind_from_helix, args.keep_arc_during_head_capture, -1 if feed_direction == 'head' else 1,
         args.fit_retained_support, args.guide_tail, not args.legacy_entry, start_x, curve_shift,
-        initial_phase, right_intake=curve_shift and not args.two_sided_curve)
+        initial_phase, right_intake=right_intake)
