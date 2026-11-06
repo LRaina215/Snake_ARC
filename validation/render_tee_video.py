@@ -21,7 +21,8 @@ GM_STAGES = {'settle': '静置', 'approach': '阶段1 螺旋滚动接近', 'arc'
              'loosen': '阶段2 半径放大', 'drop': '阶段2 尾部失能下落', 'extend': '阶段3 尾部伸展', 'extend_hold': '阶段3 保持',
              'rewind': '阶段4 卷回螺旋（带滚动）', 'straighten': '回到阶段1'}
 LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
-                 'coupled_rewrap': '尾段沿曲线回卷，前部同时滚动', 'recover_roll': '恢复螺旋滚动'}
+                 'coupled_rewrap': '尾段沿曲线回卷，前部同时滚动', 'recover_roll': '恢复螺旋滚动',
+                 'unwind_arc': '尾部再次解旋成小 U', 'unwind_line': '小 U 搭上主管右侧'}
 W, H = 640, 480
 
 
@@ -51,12 +52,15 @@ def main():
     full_pos, full_size = model.geom_pos[main].copy(), model.geom_size[main].copy()
     times = trace['time']
     step = max(1, int(round(args.speed / args.fps / np.median(np.diff(times)))))
+    indices = list(range(0, len(times), step))
+    if indices[-1] != len(times) - 1:
+        indices.append(len(times) - 1)
     out = args.input / f'{args.label}_{args.speed:g}x.mp4'
     writer = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*'mp4v'), args.fps, (2 * W, H + 70))
     if not writer.isOpened():
         raise RuntimeError('could not open video writer')
     with mujoco.Renderer(model, height=H, width=W) as renderer:
-        for index in range(0, len(times), step):
+        for index in indices:
             d.qpos[:] = trace['qpos'][index]
             mask = trace['masks'][index] if 'masks' in trace.files else sim.p.enabled
             model.geom_rgba[model.geom_bodyid >= head] = [.50, .26, .70, 1]
@@ -80,6 +84,11 @@ def main():
             raw = sample.get('stage', 'roll' if times[index] >= 2 else 'settle')
             key = raw.split('_', 1)[1] if re.match(r'c\d+_', raw) else raw
             stage = (raw.split('_')[0] + ' ' if re.match(r'c\d+_', raw) else '') + STAGES.get(key, key)
+            if args.label == 'locked_gait' and 'cycle' in sample:
+                stage = f"第 {sample['cycle']} 轮  {stage}"
+            fell = sample.get('ground_force_n', 0.) > 1.
+            if fell:
+                stage = '失去主管支撑，落地'
             canvas = Image.new('RGB', (2 * W, H + 70), 'white')
             canvas.paste(Image.fromarray(views[0]), (0, 70))
             canvas.paste(Image.fromarray(views[1]), (W, 70))
@@ -91,7 +100,9 @@ def main():
                                 f'{args.speed:g}倍速回放（蓝=使能 紫=失能）', fill=(62, 86, 102), font=SMALL)
             draw.text((12, 76), '斜视', fill=(80, 80, 80), font=SMALL)
             draw.text((W + 12, 76), '端视（沿管轴）', fill=(230, 230, 230), font=SMALL)
-            writer.write(cv2.cvtColor(np.asarray(canvas), cv2.COLOR_RGB2BGR))
+            frame = cv2.cvtColor(np.asarray(canvas), cv2.COLOR_RGB2BGR)
+            for _ in range(args.fps if fell and index == indices[-1] else 1):
+                writer.write(frame)
     writer.release()
     check = cv2.VideoCapture(str(out))
     frames = int(check.get(cv2.CAP_PROP_FRAME_COUNT))
