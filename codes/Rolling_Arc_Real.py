@@ -3914,6 +3914,9 @@ class ArcHelixOptions:
     min_end_depth_links: float = 1.5
     max_feedback_age_s: float = .8
     step_s: float = 1.
+    staged_shift_m_s: float = .022
+    staged_roll_rad_s: float = .14
+    staged_target_rate_deg_s: float = 14.
 
 
 class ArcHelixTransition:
@@ -3934,7 +3937,10 @@ class ArcHelixTransition:
         head_length, tail_length, head_depth, tail_depth = self._end_geometry(q, section, window)
         self.end_lengths_m = (head_length, tail_length)
         self.end_depths_m = (head_depth, tail_depth)
-        self.reversed = head_length > tail_length+2*self.l
+        near_equal = abs(head_length-tail_length) <= 2*self.l
+        self.staged = near_equal and min(head_length, tail_length) >= 3*self.l
+        # Tail first for the near-equal mounting convention (tail on the left).
+        self.reversed = self.staged or head_length > tail_length+2*self.l
         self.roll_direction = -direction if self.reversed else direction
         if self.reversed:
             self.lengths = self.lengths[::-1].copy()
@@ -3947,7 +3953,7 @@ class ArcHelixTransition:
         self.running = False
         self.started = False
         self.step_left = 0.
-        self.events = [dict(stage='entry', reversed_intake=self.reversed, window=list(window),
+        self.events = [dict(stage='entry', reversed_intake=self.reversed, staged=self.staged, window=list(window),
                             head_length_m=head_length, tail_length_m=tail_length,
                             head_depth_m=head_depth, tail_depth_m=tail_depth)]
         self.transfer = None
@@ -4039,8 +4045,9 @@ class ArcHelixTransition:
                                 after=list(self.physical_window((first+direction,last+direction)))))
 
     def _prepare_shift(self):
-        self.stage = 'shift'
+        self.stage = 'lead' if self.staged else 'shift'
         self.shift = self.roll = self.shift_time = 0.
+        self.receive_shift = 0.
         self.accepted = self.window[1]
         self.confirmed = 0
         self.ready = 0
@@ -4050,7 +4057,7 @@ class ArcHelixTransition:
         self.curve.front_extension_rate = max(1.75, 1.+self.curve.head_length/max(.40,self.curve.tail_length))
         nominal, _, _ = self.curve.shifted_window(0., self.curve.arc_length, self.phase)
         self.residual = np.where(self._enabled, self.measured-nominal, 0.)
-        self.events.append(dict(stage='shift', window=list(self.physical_window(self.window))))
+        self.events.append(dict(stage=self.stage, window=list(self.physical_window(self.window))))
 
     def step_once(self):
         if self.stage not in ('complete','blocked'):
@@ -4062,7 +4069,7 @@ class ArcHelixTransition:
         self.step_left = 0.
 
     def status(self):
-        accepted = getattr(self, 'accepted', None)
+        accepted = None if self.staged else getattr(self, 'accepted', None)
         if accepted is not None and self.reversed:
             accepted = self.n+1-accepted
         return dict(stage=self.stage, arc_window=list(self.physical_window(self.window)),
@@ -4071,6 +4078,7 @@ class ArcHelixTransition:
                     accepted_joint=accepted,
                     entry_end_lengths_m=self.end_lengths_m, entry_end_depths_m=self.end_depths_m,
                     shift_m=getattr(self, 'shift', 0.), step_remaining_s=self.step_left,
+                    receive_shift_m=getattr(self, 'receive_shift', 0.),
                     transfer_stage=None if self.transfer is None or self.stage != 'adjust' else self.transfer.stage,
                     events=self.events.copy())
 
@@ -4090,6 +4098,8 @@ class ArcHelixTransition:
             self.step_left = 0.
         if self.stage == 'adjust':
             self._advance_transfer(dt)
+        elif self.staged:
+            self._advance_staged(dt, fresh)
         else:
             self._advance_shift(dt, fresh)
         return True
@@ -4111,29 +4121,56 @@ class ArcHelixTransition:
             self.window = transfer.window
             self._prepare_shift()
 
-    def _advance_shift(self, dt, fresh):
-        opt = self.options
-        curve = self.curve
+    def _tracking_pace(self):
         error = np.max(np.abs(self._targets[self._enabled]-self.measured[self._enabled]))
-        pace = float(np.clip((math.radians(25.)-error)/math.radians(18.), .15, 1.))
+        return float(np.clip((math.radians(25.)-error)/math.radians(18.), .15, 1.))
+
+    def _advance_staged(self, dt, fresh):
+        opt, curve = self.options, self.curve
+        first, last = self.window
+        leading = self.stage == 'lead'
+        pace = self._tracking_pace()
+        distance = opt.staged_shift_m_s*pace*dt
+        self.shift_time += dt
+        self.roll += self.roll_direction*opt.staged_roll_rad_s*ease(self.shift_time/1.5)*pace*dt
+        if leading:
+            self.shift = min(curve.head_length, self.shift+distance)
+        else:
+            self.receive_shift = min(curve.tail_length, self.receive_shift+distance)
+        # Keep the initial supporting ARC while only the first straight arm
+        # is converted. Shorten the ARC as the second arm enters the curve.
+        arc_length = curve.arc_length*(1.-ease(self.receive_shift/min(.12,curve.tail_length)))
+        goal, _ = curve.targets(self.shift, self.receive_shift, arc_length, self.phase+self.roll)
+        j = np.arange(1,self.n+1)
+        coverage = np.clip(np.where(j < first, self.shift/self.l+j-first,
+                                    np.where(j > last, self.receive_shift/self.l+last-j, 1.))+.999, 0., 1.)
+        goal = self._apply_curve(goal, coverage, opt.staged_target_rate_deg_s, dt)
+        if not fresh:
+            return
+        if leading:
+            error = np.max(abs(goal[:last]-self.measured[:last]))
+            settled = self.shift == curve.head_length and error <= math.radians(opt.intake_error_deg)
+        else:
+            error = np.max(abs(goal-self.measured))
+            settled = self.receive_shift == curve.tail_length and error <= math.radians(10.)
+        self.ready = self.ready+1 if settled else 0
+        if self.ready >= 3:
+            self.ready = 0
+            self.stage = 'receive' if leading else 'complete'
+            self.events.append(dict(stage=self.stage, shift_m=self.shift, receive_shift_m=self.receive_shift))
+            if not leading:
+                self.pause()
+
+    def _advance_shift(self, dt, fresh):
+        opt, curve = self.options, self.curve
+        pace = self._tracking_pace()
         limit = (self.accepted-self.window[1]+1.5)*self.l if self.accepted < self.n else math.inf
         self.shift_time += dt
         self.shift = min(limit, self.shift+opt.shift_m_s*pace*dt)
         self.roll += self.roll_direction*opt.roll_rad_s*ease(self.shift_time/1.5)*pace*dt
         arc_length = curve.arc_length*(1.-ease(self.shift/.16))
         goal, _, coverage = curve.shifted_window(self.shift, arc_length, self.phase+self.roll)
-        goal = np.clip(goal+self.residual*(1.-ease(self.shift_time/2.)), -math.radians(88.), math.radians(88.))
-        entering = (coverage > 1.e-6) & ~self._enabled
-        self._targets[entering] = self.measured[entering]
-        self._enabled |= entering
-        # Apply the overlap as a position blend. Both backends use the same
-        # binary enable mask; no simulated stiffness or contact is supplied.
-        receive = self._enabled & (coverage < .999)
-        blended = goal.copy()
-        blended[receive] = self.measured[receive]+coverage[receive]*(goal[receive]-self.measured[receive])
-        rate = math.radians(opt.target_rate_deg_s)*dt
-        self._targets += np.clip(blended-self._targets,-rate,rate)
-        self._targets[~self._enabled] = self.measured[~self._enabled]
+        goal = self._apply_curve(goal, coverage, opt.target_rate_deg_s, dt)
         if fresh and self.accepted < self.n:
             i = self.accepted
             follows = np.max(np.abs(goal[i-1:i+1]-self.measured[i-1:i+1])) <= math.radians(opt.intake_error_deg)
@@ -4149,6 +4186,21 @@ class ArcHelixTransition:
                 self.stage = 'complete'
                 self.pause()
                 self.events.append(dict(stage=self.stage, shift_m=self.shift))
+
+    def _apply_curve(self, goal, coverage, rate_deg_s, dt):
+        goal = np.clip(goal+self.residual*(1.-ease(self.shift_time/2.)), -math.radians(88.), math.radians(88.))
+        entering = (coverage > 1.e-6) & ~self._enabled
+        self._targets[entering] = self.measured[entering]
+        self._enabled |= entering
+        # Apply the overlap as a position blend. Both backends use the same
+        # binary enable mask; no simulated stiffness or contact is supplied.
+        receive = self._enabled & (coverage < .999)
+        blended = goal.copy()
+        blended[receive] = self.measured[receive]+coverage[receive]*(goal[receive]-self.measured[receive])
+        rate = math.radians(rate_deg_s)*dt
+        self._targets += np.clip(blended-self._targets,-rate,rate)
+        self._targets[~self._enabled] = self.measured[~self._enabled]
+        return goal
 # END ARC_HELIX_CORE
 
 # ==================== 4. 飞特串口协议（只有主循环操作串口） ====================
@@ -5249,6 +5301,8 @@ class RollingArcController:
                   f'端点距截面圆心深度 {1000*head_depth:.0f}/{1000*tail_depth:.0f} mm', flush=True)
             print(f"阶段={h['stage']} | 起卷端={h['leading_end']} | 已接收边界={h['accepted_joint']} | "
                   f"曲线移位={h['shift_m']*1000:.1f} mm | 调长阶段={h['transfer_stage']}", flush=True)
+            if h['stage'] in ('lead', 'receive'):
+                print(f"分段进给 起卷侧/接收侧={h['shift_m']*1000:.1f}/{h['receive_shift_m']*1000:.1f} mm", flush=True)
             if h['stage'] == 'blocked':
                 print(f"停在当前目标：{h['events'][-1]['reason']}", flush=True)
         if self.feeding_selected:

@@ -14,7 +14,8 @@ from snake_control.rolling_arc import ArcParameters
 from snake_control.simulation import ArcSimulation, backbone
 
 
-WINDOWS = {'balanced': (8, 13), 'right_short': (2, 7), 'left_short': (14, 19)}
+WINDOWS = {'balanced': (8, 13), 'right_short': (2, 7), 'left_short': (14, 19),
+           'left_moderate': (11, 16), 'right_moderate': (5, 10)}
 
 
 def run(case, output):
@@ -58,6 +59,7 @@ def run(case, output):
         angles = np.unwrap(np.arctan2(yz[:, 1], yz[:, 0]))
         rows.append(dict(time_s=d.time, stage=core.stage, head_x_m=float(points[0,0]),
                          center_x_m=float(points[:,0].mean()), shift_m=getattr(core,'shift',0.),
+                         receive_shift_m=getattr(core, 'receive_shift', 0.),
                          turns=float(abs(angles[-1]-angles[0])/(2.*np.pi)),
                          max_radius_m=float(max(np.linalg.norm(yz,axis=1))),
                          main_links=truth['contact_links'], support_n=truth['normal_force_n'],
