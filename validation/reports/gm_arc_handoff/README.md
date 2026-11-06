@@ -154,3 +154,22 @@ conda activate mujoco
 python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/window_shift_final
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/window_shift_final --label locked_gait --title "18 关节｜单区间 Shift Control" --speed 2 --fixed-camera
 ```
+
+## ARC 到 T 管的连续复跑
+
+本轮在同一 18 关节模型上验证完整流程。核对 XML 中主管半径 55 mm，向上支管半径 30 mm、轴线 x=350 mm，摩擦 0.5、限矩 2.355 N·m。初始只摆放一次开放半圆 ARC，随后连续求解。验收要求实际形成 Helix、右侧搭管后失能、重力使前部滑转与净前进、尾部回卷，并在整身超过 x=409 mm 后持续贴管滚动。接触和世界坐标用于仿真观察员与评价。
+
+| 工况 | 实际结果 |
+| --- | --- |
+| 原单区间 Helix 继续接近 | 头端越过支管轴，但两个管顶穿越点仍在支管后方，连杆 7–8 卡住。 |
+| 单区间换用可配合右侧释放的旋向 | 形成完整 Helix，调整初始轴向距离和解旋相位后，主管承托右侧小 U。释放时尾段质心偏右约 47 mm，J9–J18 失能。头端碰支管并随后失去主管承载，未接入回卷。减小前部放松半径至 95.8 mm 可以保住承载，但头部持续顶住支管，尾段质心停在轴右约 123 mm。中间半径 96.6 mm 仍未建立足够的正向滑转，最终失去支撑。 |
+| 一步调长的双侧拼接曲线对照 | 25.60 s 由 ARC 形成完整 Helix，32.52 s 右侧搭管后释放。前部相位固定期间实际滑转 72.9°、头端前移 11.0 mm。回卷完成后，整身在清障线前方持续滚动 15.40 s，309 个采样均有尾部主管接触，最后端再前进 232 mm。 |
+
+通过轨迹和原 `short_head_continuous` 的状态、目标、掩码和力矩数组一致。145.07 s 全程无触地，失能关节输出力矩为零，失能后两个采样承载力低于判据、随后恢复。回卷约 96 s，是主要耗时与限矩阶段，最大跟踪误差 31.9°、实际关节角峰值 84.0°，2,902 个采样中 1,799 个至少一关节达到限矩。成功复跑只覆盖这个上支管场景，实机及单区间入口的完整越障尚未验收。单区间组首先要比较失能后的头端与支管距离以及前部接触连杆，再继续验证回卷。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_arc_handoff_experiment.py --two-sided-curve --feed-steps 1 --output validation/reports/gm_arc_handoff/tee_reference_rerun
+python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/tee_reference_rerun --label locked_gait --title "18 关节｜半圆 ARC 到完整 T 管越障" --speed 4
+python .\validation\gm_arc_handoff_experiment.py --try-single-window-tee --output validation/reports/gm_arc_handoff/tee_single_release
+```

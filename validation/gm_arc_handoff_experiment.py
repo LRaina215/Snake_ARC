@@ -411,27 +411,29 @@ def enter_helix_then_unwind(trial, stiffness, mask, phase, release_radius, relea
 
 
 def align_and_unwind(trial, mask, release_radius, release_line, outcome, progressive=True,
-                     head_alignment=(97., 151.), min_release_moment=0.):
+                     head_alignment=(97., 151.), min_release_moment=0., approach_s=14., unwind_phase=None,
+                     line_reserve=0.):
     d, g, sim = trial.data, trial.gait, trial.sim
     radius, phase = g.o.r_h1, trial.phase
     roll_start = d.time
 
     def roll(t):
-        trial.phase = phase+.6*t
+        trial.phase = phase+g.o.roll_rate*t
         return g.targets(trial.phase, radius)[0]
 
     def aligned(_):
         points = backbone(trial.model, d)
         main, branch, _ = pipe_contacts(sim)
         crossings = top_crossings(points)
+        phase_ready = unwind_phase is None or abs(math.remainder(trial.phase-unwind_phase, math.tau)) < .20
         # In the verified 18-joint approach the branch sat between
         # crossings at about x=0.286 and 0.422 m, with the head above.
-        return (d.time-roll_start > .2 and any(link >= 13 for link in main) and
+        return (d.time-roll_start > .2 and phase_ready and any(link >= 13 for link in main) and
                 any(8 <= link <= 12 for link in branch) and
                 any(.25 < x < .32 for x in crossings) and any(.39 < x < .45 for x in crossings) and
                 head_alignment[0] < angle(points[0]) < head_alignment[1])
 
-    located = trial.phase_run(1, 'arc_align_helix', 14., roll, stop_when=aligned)
+    located = trial.phase_run(1, 'arc_align_helix', approach_s, roll, stop_when=aligned)
     outcome['alignment'] = entry_geometry(trial, mask)
     outcome['alignment']['phase_aligned'] = bool(located)
     if trial.stopped or not located:
@@ -456,6 +458,10 @@ def align_and_unwind(trial, mask, release_radius, release_line, outcome, progres
                     stop_when=seated if progressive else None)
     if target is None:
         trial.phase_run(1, 'arc_form_right_u', 2., opening, stop_when=seated)
+    if target is None and line_reserve and not trial.stopped:
+        trial.phase_run(1, 'arc_form_right_u', 3., lambda t: g.targets(
+            fixed, release_radius, ls=release_line+line_reserve*smooth(t/2.5), th1=math.pi)[0],
+            stop_when=seated)
     return target, outcome
 
 
@@ -580,15 +586,16 @@ def capture(trial, transfer, phase_offset, align=False, full_helix=False, keep_a
 
 def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix, keep_arc, feed_direction,
         fit_support, guide_tail, progressive, start_x=.12, curve_shift=False, initial_arc_phase=0.,
-        right_intake=False):
+        right_intake=False, cross_tee=False):
     setup = APPROACH_SETUP
-    if right_intake:
+    mirrored_intake = right_intake and not cross_tee
+    if mirrored_intake:
         setup = dict(APPROACH_SETUP, options=dict(APPROACH_SETUP['options'], handed=1, roll_rate=-.6))
     trial = CycleTrial(setup=setup)
     sim, d = trial.sim, trial.data
     initial_phase = math.pi if mirrored else initial_arc_phase
     p = replace(sim.p, first_joint=7, last_joint=12,
-                initial_phase_rad=math.pi-initial_phase if right_intake else initial_phase)
+                initial_phase_rad=math.pi-initial_phase if mirrored_intake else initial_phase)
     sim.p = sim.drive.p = p
     reference = None
     if guide_tail:
@@ -600,7 +607,7 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
         mujoco.mj_forward(trial.model, scratch)
         reference = backbone(trial.model, scratch)
     if curve_shift and (initial_arc_phase or right_intake):
-        place_arc_for_adjustment(trial, p, start_x, tail_on_right=right_intake)
+        place_arc_for_adjustment(trial, p, start_x, tail_on_right=mirrored_intake)
     else:
         sim.place(start_x)  # only physical placement
     trial.phase_run(1, 'settle', p.settle_s, lambda _: p.targets(p.initial_phase_rad), p.enabled)
@@ -621,7 +628,8 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
     summary = dict(arc_trigger_x_m=trigger_x, phase_offset_rad=phase_offset, align_before_u=align,
                    mirrored_arc=mirrored, feed_steps=feed_steps, feed_direction=feed_direction,
                    full_helix=full_helix, keep_arc=keep_arc, fit_support=fit_support, guide_tail=guide_tail,
-                   progressive_intake=progressive, curve_shift=curve_shift, right_intake=right_intake,
+                   progressive_intake=progressive, curve_shift=curve_shift, right_intake=mirrored_intake,
+                   cross_tee=cross_tee, single_window_shift=right_intake,
                    initial_arc_phase_rad=p.initial_phase_rad,
                    reached_approach=bool(reached), start_x_m=start_x,
                    setup={k: setup[k] for k in ('scene', 'joints', 'friction', 'options')})
@@ -641,16 +649,20 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
                             pose['head_xyz_m'][0] > pose['tail_xyz_m'][0])
                 if not short_head:
                     shift = {'completed': False, 'reason': 'head-side free length is not shorter'}
-                elif right_intake and not left_arc:
+                elif mirrored_intake and not left_arc:
                     shift = {'completed': False, 'reason': 'left half ARC and right hanging tail were not observed'}
                 else:
                     shift = shift_arc_to_helix(trial, transfer, p, phase_offset, right_intake)
                 summary['shift'] = shift
                 target = None
-                if shift['completed'] and not right_intake:
+                if shift['completed'] and (not right_intake or cross_tee):
                     target, summary['helix'] = align_and_unwind(trial, mask, .09554165, .32201388,
                                                                 {'formed': entry_geometry(trial, mask)},
-                                                                head_alignment=(90., 105.), min_release_moment=.63)
+                                                                head_alignment=(90., 153.) if cross_tee else (90., 105.),
+                                                                min_release_moment=.63,
+                                                                approach_s=20. if cross_tee else 14.,
+                                                                unwind_phase=5.72 if cross_tee else None,
+                                                                line_reserve=.055 if cross_tee else 0.)
             else:
                 target, mask, after_head = capture(trial, transfer, phase_offset, align, full_helix, keep_arc,
                                                    fit_support, reference, progressive)
@@ -690,6 +702,8 @@ if __name__ == '__main__':
     entry.add_argument('--curve-shift', action='store_true',
                        help='Form a helix from a left-side ARC using right-side intake (default)')
     entry.add_argument('--two-sided-curve', action='store_true', help='Reproduce the earlier two-sided curve shift')
+    entry.add_argument('--try-single-window-tee', dest='cross_tee', action='store_true',
+                       help='Attempt a tee crossing from the single-window ARC gait (experimental)')
     parser.add_argument('--initial-arc-phase', type=float)
     args = parser.parse_args()
     if not args.legacy_entry and (args.guide_tail or args.fit_retained_support or
@@ -699,10 +713,11 @@ if __name__ == '__main__':
     right_intake = curve_shift and not args.two_sided_curve
     # Finish the wrap on the unobstructed approach, with room for the head's
     # axial excursion before the tee starts to obstruct the front helix.
-    default_start = -.055 if right_intake else (.295 if curve_shift else (.12 if args.legacy_entry else .22))
+    default_start = (.095 if args.cross_tee else -.055) if right_intake else (
+        .295 if curve_shift else (.12 if args.legacy_entry else .22))
     start_x = args.start_x if args.start_x is not None else default_start
     trigger_x = args.trigger_x if args.trigger_x is not None else (.270 if args.legacy_entry else .295)
-    feed_steps = args.feed_steps or (1 if args.legacy_entry else 2)
+    feed_steps = args.feed_steps or (1 if args.legacy_entry or args.cross_tee else 2)
     feed_direction = args.feed_direction or ('head' if curve_shift or args.legacy_entry else 'tail')
     initial_phase = args.initial_arc_phase
     if initial_phase is None:
@@ -710,4 +725,4 @@ if __name__ == '__main__':
     run(args.output, trigger_x, args.phase_offset, args.align_before_u, args.mirrored_arc, feed_steps,
         args.unwind_from_helix, args.keep_arc_during_head_capture, -1 if feed_direction == 'head' else 1,
         args.fit_retained_support, args.guide_tail, not args.legacy_entry, start_x, curve_shift,
-        initial_phase, right_intake=right_intake)
+        initial_phase, right_intake=right_intake, cross_tee=args.cross_tee)
