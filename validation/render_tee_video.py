@@ -22,7 +22,8 @@ GM_STAGES = {'settle': '静置', 'approach': '阶段1 螺旋滚动接近', 'arc'
              'rewind': '阶段4 卷回螺旋（带滚动）', 'straighten': '回到阶段1'}
 LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
                  'coupled_rewrap': '尾段沿曲线回卷，前部同时滚动', 'recover_roll': '恢复螺旋滚动',
-                 'unwind_arc': '尾部再次解旋成小 U', 'unwind_line': '小 U 搭上主管右侧'}
+                 'unwind_arc': '尾部再次解旋成小 U', 'unwind_line': '小 U 搭上主管右侧',
+                 'progressive_rewrap': '前部滚动，尾段逐节接入'}
 W, H = 640, 480
 
 
@@ -63,9 +64,11 @@ def main():
         for index in indices:
             d.qpos[:] = trace['qpos'][index]
             mask = trace['masks'][index] if 'masks' in trace.files else sim.p.enabled
+            stiffness = trace['stiffness_scale'][index] if 'stiffness_scale' in trace.files else mask.astype(float)
             model.geom_rgba[model.geom_bodyid >= head] = [.50, .26, .70, 1]
             for j in np.flatnonzero(mask) + 1:
-                model.geom_rgba[model.geom_bodyid == model.jnt_bodyid[model.joint(f'joint{j}').id]] = [.10, .48, .85, 1]
+                color = [.10, .48, .85, 1] if stiffness[j-1] >= .99 else [.10, .72, .65, 1]
+                model.geom_rgba[model.geom_bodyid == model.jnt_bodyid[model.joint(f'joint{j}').id]] = color
             mujoco.mj_forward(model, d)
             center = d.xpos[head:].mean(axis=0)
             views = []
@@ -95,9 +98,12 @@ def main():
             draw = ImageDraw.Draw(canvas)
             draw.text((12, 6), f'{args.title}    t = {times[index]:5.1f} s    {stage}', fill=(23, 53, 74), font=FONT)
             contact = sample.get('branch_links') or []
-            draw.text((12, 40), f'全身平均位置 x = {center[0] * 1000:6.0f} mm（支管轴 x = 350 mm）    使能 {int(np.sum(mask))} 关节    '
+            control = (f'全刚度 {int(np.sum(stiffness >= .99))}  接收 {int(np.sum(mask & (stiffness < .99)))}'
+                       if raw == 'progressive_rewrap' else f'使能 {int(np.sum(mask))} 关节')
+            colors = '蓝=全刚度 绿=接收 紫=失能' if raw == 'progressive_rewrap' else '蓝=使能 紫=失能'
+            draw.text((12, 40), f'全身平均位置 x = {center[0] * 1000:6.0f} mm（支管轴 x = 350 mm）    {control}    '
                                 f'支管接触: {"连杆" + ",".join(map(str, contact)) if contact else "无"}    '
-                                f'{args.speed:g}倍速回放（蓝=使能 紫=失能）', fill=(62, 86, 102), font=SMALL)
+                                f'{args.speed:g}倍速回放（{colors}）', fill=(62, 86, 102), font=SMALL)
             draw.text((12, 76), '斜视', fill=(80, 80, 80), font=SMALL)
             draw.text((W + 12, 76), '端视（沿管轴）', fill=(230, 230, 230), font=SMALL)
             frame = cv2.cvtColor(np.asarray(canvas), cv2.COLOR_RGB2BGR)

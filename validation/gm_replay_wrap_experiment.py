@@ -28,7 +28,8 @@ def save(trial, output, label, source_time, **extra):
     output.mkdir(parents=True, exist_ok=True)
     (output/(label+'.json')).write_text(json.dumps(dict(summary=summary, samples=rows), indent=1), encoding='utf-8')
     np.savez_compressed(output/(label+'_trace.npz'), time=[r['time_s'] for r in rows], qpos=trial.states,
-        qvel=trial.velocities, targets=trial.targets, masks=trial.masks, actuator_force=trial.forces)
+        qvel=trial.velocities, targets=trial.targets, masks=trial.masks, actuator_force=trial.forces,
+        stiffness_scale=trial.stiffness_scales)
     print(json.dumps(summary, indent=2))
 
 

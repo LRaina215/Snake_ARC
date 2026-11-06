@@ -65,3 +65,21 @@ conda activate mujoco
 python .\validation\gm_locked_experiment.py --from-approach --joints 26 --observed-release --cycles 2 --output validation/reports/gm_locked_process/continuous26_final
 python .\validation\render_tee_video.py --input validation/reports/gm_locked_process/continuous26_final --label locked_gait --title "26 关节｜两轮越过支管，随后失稳" --speed 5
 ```
+
+## 26 关节第二轮逐节回卷对照
+
+原 5 倍速视频约 00:14 对应仿真 70 s。记录显示 67.45 s 时 J17–J26 均为零力矩，67.50 s 已全部恢复驱动。原回卷从实际关节角构造一条曲率积分曲线，但移动曲线时所有关节都开始位置跟踪，未对尾部设置逐节接收区，也未在接入点沿主管拟合空间过渡。将它称为逐节回卷不准确。
+
+参照 Snake_Robot_Gait 的水平直管 J03 收卷代码。J03 从前段预包绕、后段悬垂的初态开始，已贴管段主动滚动，接收区部分刚度，后方自由段没有位置刚度。相邻连杆的实际周向顺序、径向位置和轴向接续满足要求后，才将关节接入全刚度区。
+
+本次假设是让已贴管段带动、沿管面局部拟合接收区，能够把自由尾部逐节送入螺旋。对照从原记录 67.45 s 的实际关节、位姿和速度开始，保持主管、支管、重力、阻尼、摩擦和 2.355 N·m 力矩限幅。位置刚度用三段控制。实际已接入的前缀为全刚度，紧邻的最多三个接收关节渐变至部分刚度，其余尾关节保持零电机力矩。接收螺旋以实测管上连杆为起点，在主管坐标中拟合局部过渡。私有运动学只生成关节目标，真实根位姿由动力学积分。验收分别检查逐关节恢复顺序、接入后的实际支撑、最终贴管和恢复滚动。
+
+仅将旧曲率曲线加上逐节使能时，J12 短暂接入，后续停住。加入局部空间拟合后，J11–J14 依次达到接收条件。根据实际连续贴合位置重新选拟合起点，送链量由 201 mm 增至 268 mm，接收仍停在 J14。第 5.65 s 时连续接入到连杆 14，第 10 s 退回到连杆 11，最后只连续到连杆 9。全程 J18–J26 均为零电机力矩，无落地，2,000 个采样均有主管支撑。至少一个关节在各采样点达到力矩上限，最大实际角约 90.2°。整身没有清障，尾端没有贴管，也没有进入恢复滚动。
+
+这次对照验证了位置刚度逐节恢复的时序，未通过持续贴管和整身越障。接收段在负载下抬离主管是实际观察。由此推测，下一项最小对照应检查已接入段如何持续承托自由尾段，尤其是 J11–J14 附近的负载与切向，而非只继续推进接收编号。本次未从完整接近过程运行新回卷入口。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_locked_experiment.py --replay-intake --checkpoint validation/reports/gm_locked_process/continuous26_final/locked_gait.json --checkpoint-time 67.45 --output validation/reports/gm_locked_process/progressive26_connected
+python .\validation\render_tee_video.py --input validation/reports/gm_locked_process/progressive26_connected --label locked_gait --title "26 关节｜逐节接入对照" --speed 3
+```

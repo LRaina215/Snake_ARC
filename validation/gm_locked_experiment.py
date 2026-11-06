@@ -68,6 +68,168 @@ def tail_engaged(row):
     return bool(row['distal_contacts']) and row['tail_span_deg'] >= 75. and row['tail_max_radius_m'] < .14
 
 
+def intake_connections(points, radius, pitch):
+    """Adjacent link centres must join the same winding around the main pipe."""
+    centers = (points[:-1]+points[1:])*.5
+    yz = centers[:, 1:]-[0., PIPE_HEIGHT]
+    radial = np.linalg.norm(yz, axis=1)
+    angle_step = np.diff(np.unwrap(np.arctan2(yz[:, 1], yz[:, 0])))
+    axial_step = np.diff(centers[:, 0])
+    near = (radial > .065) & (radial < radius+.017)
+    return (near[:-1] & near[1:] & (angle_step < -.24) & (angle_step > -1.16) &
+            (axial_step < .012) & (abs(axial_step-pitch*angle_step/(2*np.pi)) < .028))
+
+
+def attached_prefix(connections, search_limit):
+    """The head can overhang. Track the connected run after it enters the helix."""
+    entry = np.flatnonzero(connections[:min(4, search_limit)])
+    if not len(entry):
+        return 0
+    count = int(entry[0])+1
+    while count < search_limit and connections[count]:
+        count += 1
+    return count
+
+
+def fit_intake_window(trial, scratch, start_joint, accepted, end_joint, nominal, radius):
+    """Fit the transition to a pipe helix joined to the actual wrapped prefix."""
+    m, d, drive = trial.model, trial.data, trial.sim.drive
+    if accepted >= end_joint:
+        return nominal
+    points = backbone(m, d)
+    centers = (points[:-1]+points[1:])*.5
+    # Use the first secure upstream link as a spatial anchor. The measured
+    # centre and tube axis fix the phase of this short receiving curve.
+    anchor = centers[start_joint-1]
+    angle = math.atan2(anchor[2]-PIPE_HEIGHT, anchor[1])
+    start_radius = float(np.linalg.norm(anchor[1:]-[0., PIPE_HEIGHT]))
+    fitted_radius = float(np.clip(np.median(np.linalg.norm(
+        centers[max(0, start_joint-4):start_joint, 1:]-[0., PIPE_HEIGHT], axis=1)), .086, radius))
+    angle_step = -2.*math.asin(trial.gait.l/(2.*fitted_radius))
+    indices = np.arange(start_joint, end_joint+1)
+    span = indices-start_joint+1
+    phi = angle+span*angle_step
+    rr = fitted_radius+(start_radius-fitted_radius)*np.maximum(0., 1.-span/3.)
+    target = np.column_stack((anchor[0]+trial.gait.o.pitch*(phi-angle)/(2*np.pi),
+                              rr*np.cos(phi), PIPE_HEIGHT+rr*np.sin(phi)))
+    controlled = indices-1
+    scratch.qpos[:] = d.qpos
+    q_initial = d.qpos[drive.qadr[controlled]]
+    q_fit = q_initial.copy()
+    jac = np.zeros((3, m.nv))
+    head = m.body('head').id
+    weight = np.where(indices <= accepted, 1., np.maximum(.35, 1.15-.22*(indices-accepted)))
+    for _ in range(3):
+        scratch.qpos[drive.qadr[controlled]] = q_fit
+        mujoco.mj_kinematics(m, scratch)
+        mujoco.mj_comPos(m, scratch)
+        p = backbone(m, scratch)
+        current = (p[indices]+p[indices+1])*.5
+        columns = []
+        for link, point, w in zip(indices, current, weight):
+            mujoco.mj_jac(m, scratch, jac, None, point, head+int(link))
+            columns.append(w*jac[:, drive.vadr[controlled]])
+        matrix = np.concatenate(columns)
+        residual = (weight[:, None]*(target-current)).ravel()
+        damping = .024
+        delta = np.linalg.solve(matrix.T@matrix+damping**2*np.eye(len(controlled)), matrix.T@residual)
+        q_fit += np.clip(delta, -.14, .14)
+        q_fit = np.clip(q_fit, np.maximum(-math.radians(88.), q_initial-.33),
+                        np.minimum(math.radians(88.), q_initial+.33))
+    result = nominal.copy()
+    result[controlled] = q_fit
+    return result
+
+
+def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
+    """Roll the supported helix and accept one adjacent hanging joint at a time."""
+    g, d, m = trial.gait, trial.data, trial.model
+    qadr = trial.sim.drive.qadr
+    measured = d.qpos[qadr].copy()
+    radius = g.o.r_h2
+    initial_connections = intake_connections(backbone(m, d), radius, g.o.pitch)
+    # The head may stand clear of the pipe. Find the last connected link in
+    # the current helix, starting from the first pair that is actually on it.
+    accepted = attached_prefix(initial_connections, support_count) or support_count
+    initial_prefix = accepted
+    trial.phase = phase_from_front(g, radius, measured, support_count)
+    curve = MeasuredGravityShift(g, radius, trial.phase, measured, initial_prefix,
+                                 upstream_m=(initial_prefix+1)*g.l)
+    stiffness = (np.arange(len(measured)) < support_count).astype(float)
+    scratch = mujoco.MjData(m)
+    command = measured.copy()
+    local_guide = command.copy()
+    fit_at = 0.
+    attached = accepted
+    offset = roll = 0.
+    accepted_since = None
+    events = []
+    start = float(d.time)
+    speed = .012
+
+    def coupled(t):
+        nonlocal accepted, accepted_since, offset, roll, command, local_guide, fit_at, attached
+        angles = d.qpos[qadr]
+        if accepted < len(angles):
+            near = intake_connections(backbone(m, d), radius, g.o.pitch)
+            attached = attached_prefix(near, accepted+1)
+            if attached > accepted:
+                accepted_since = t if accepted_since is None else accepted_since
+            else:
+                accepted_since = None
+            if accepted_since is not None and t-accepted_since >= .30:
+                accepted += 1
+                events.append(dict(time_s=float(d.time), joint=accepted, shift_m=offset))
+                accepted_since = None
+                fit_at = t
+
+        target_scale = np.zeros_like(stiffness)
+        target_scale[:accepted] = 1.
+        receiving = min(3, len(angles)-accepted)
+        target_scale[accepted:accepted+receiving] = [.55, .45, .30][:receiving]
+        stiffness[:] += np.clip(target_scale-stiffness, -m.opt.timestep/.75, m.opt.timestep/.75)
+
+        error = float(np.max(abs(command[:accepted+receiving]-angles[:accepted+receiving])))
+        pace = float(np.clip((math.radians(23)-error)/math.radians(17), .10, 1.))
+        lead = curve.shift_limit_m if accepted == len(angles) else (accepted-initial_prefix+2)*g.l
+        next_offset = min(lead, offset+speed*pace*m.opt.timestep)
+        increment = next_offset-offset
+        offset = next_offset
+        # Share one material clock so the rotating front cannot outrun intake.
+        roll += increment*roll_rate/.05
+        q = curve.targets(offset, roll)
+        nominal = curve.helical_targets(offset, roll)
+        q[:accepted] += smooth(offset/g.turn_length(radius))*(nominal[:accepted]-q[:accepted])
+        # If an already accepted link lifts off, move the fit back to the
+        # section still connected to the pipe. Keep the free tail out of it.
+        window_first = max(1, min(accepted-1, attached+1)) if attached else max(1, accepted-1)
+        window_last = accepted+receiving
+        if receiving and t >= fit_at:
+            local_guide = fit_intake_window(trial, scratch, window_first, accepted, window_last, q, radius)
+            fit_at = t+.04
+        if receiving:
+            window = slice(window_first-1, window_last)
+            q[window] += smooth(t/.6)*.90*(local_guide[window]-q[window])
+        q = np.clip(q, -math.radians(88.), math.radians(88.))
+        command += np.clip(q-command, -math.radians(18.)*m.opt.timestep, math.radians(18.)*m.opt.timestep)
+        command[stiffness <= 0.] = angles[stiffness <= 0.]
+        return command.copy()
+
+    def ready(_):
+        return (accepted == len(measured) and offset >= curve.shift_limit_m and
+                bool(trial.samples) and tail_engaged(trial.samples[-1]))
+
+    trial.phase_run(cycle, 'progressive_rewrap', duration, coupled, stop_when=ready,
+                    stiffness=lambda: stiffness)
+    if ready(None) and not trial.stopped:
+        phase = trial.phase-curve.torsion*offset+roll
+        trial.phase_run(cycle, 'recover_roll', 2.+2.*math.pi/g.o.roll_rate,
+            lambda t: g.targets(phase+g.o.roll_rate*t, radius+(g.o.r_h1-radius)*smooth(t/2.))[0])
+    return dict(cycle=cycle, method='progressive_intake', start_s=start,
+                initial_prefix=initial_prefix, accepted_joints=accepted, intake_events=events,
+                shift_m=offset, full_shift_m=curve.shift_limit_m, active_roll_rad=roll)
+
+
 def rewrap(trial, support_count, roll_rate, cycle=1):
     """Shift the measured body along a single curve while rolling its front."""
     g, d, m = trial.gait, trial.data, trial.model
@@ -224,7 +386,8 @@ def release_snapshot(trial, mask):
                 tail_start_z_m=float(points[-1, 2]), support_count=count)
 
 
-def drop_and_rewrap(trial, cycle, start_target, mask, helix_mask, slip_radius, opening_s, roll_rate, observed_release):
+def drop_and_rewrap(trial, cycle, start_target, mask, helix_mask, slip_radius, opening_s, roll_rate, observed_release,
+                    rewrap_method):
     g, d = trial.gait, trial.data
     release = release_snapshot(trial, mask)
     if observed_release and not right_u_ready(trial, mask):
@@ -254,13 +417,14 @@ def drop_and_rewrap(trial, cycle, start_target, mask, helix_mask, slip_radius, o
     trial.phase_run(cycle, 'drop', 5., passive_drop, mask, stop_when=hanging if roll_rate is not None else None)
     metrics = drop_metrics(trial.samples[drop_start:])
     if roll_rate is not None and (pickup_ready or (metrics['passed'] and not observed_release)) and not trial.stopped:
-        trial.rewrap_checks.append(rewrap(trial, int(mask.sum()), roll_rate, cycle))
+        trial.rewrap_checks.append(rewrap_method(trial, int(mask.sum()), roll_rate, cycle))
     recovery = recovery_metrics([r for r in trial.samples if r['cycle'] == cycle and r['stage'] == 'recover_roll'])
     return dict(cycle=cycle, release=release, drop=metrics, pickup_ready=pickup_ready, recovery=recovery)
 
 
 def run(checkpoint, checkpoint_time, output, slip_radius, opening_s, axial_offset, keep=None, damping=None,
-        roll_rate=None, from_approach=False, joints=None, align_x=None, observed_release=False, cycles=1):
+        roll_rate=None, from_approach=False, joints=None, align_x=None, observed_release=False, cycles=1,
+        rewrap_method=rewrap):
     if from_approach:
         summary = (APPROACH_SETUP if checkpoint is None else
                    json.loads(checkpoint.read_text(encoding='utf-8'))['summary'])
@@ -312,7 +476,7 @@ def run(checkpoint, checkpoint_time, output, slip_radius, opening_s, axial_offse
              release=release, failure='right U not supported at proposed release')
         return
     results = [drop_and_rewrap(trial, 1, start_target, mask, helix_mask,
-                               slip_radius, opening_s, roll_rate, observed_release)]
+                               slip_radius, opening_s, roll_rate, observed_release, rewrap_method)]
     clearance = BRANCH_X+BRANCH_R+LINK_R
     for cycle in range(2, cycles+1):
         recent = trial.samples[-8:]
@@ -324,13 +488,31 @@ def run(checkpoint, checkpoint_time, output, slip_radius, opening_s, axial_offse
             results.append(dict(cycle=cycle, failure='right U not observed during the repeat unwind'))
             break
         results.append(drop_and_rewrap(trial, cycle, target, mask, helix_mask,
-                                      slip_radius, opening_s, roll_rate, observed_release))
+                                      slip_radius, opening_s, roll_rate, observed_release, rewrap_method))
     first = {k: v for k, v in results[0].items() if k not in ('cycle', 'recovery')}
     save(trial, output, 'locked_gait', initial, checkpoint=source, setup=summary if from_approach else None,
          slip_radius_m=slip_radius,
          axial_offset_m=axial_offset, opening_s=opening_s, passive_tail_damping=damping,
          from_approach=from_approach, release_events=trial.release_events, cycles=results,
          recovery=results[-1].get('recovery', dict(passed=False, reason=results[-1].get('failure'))), **first)
+
+
+def replay_intake(checkpoint, checkpoint_time, output, roll_rate):
+    """Compare rewraps from the same recorded end-of-drop state."""
+    record = json.loads(checkpoint.read_text(encoding='utf-8'))
+    trial = CycleTrial(setup=record['summary']['setup'])
+    with np.load(checkpoint.with_name(checkpoint.stem+'_trace.npz')) as trace:
+        index = int(np.argmin(abs(trace['time']-checkpoint_time)))
+        sample = record['samples'][index]
+        if sample['stage'] != 'drop':
+            raise ValueError('Intake comparison must start from the actual passive drop')
+        trial.data.qpos[:] = trace['qpos'][index]
+        trial.data.qvel[:] = trace['qvel'][index]
+        support_count = int(trace['masks'][index].sum())
+    mujoco.mj_forward(trial.model, trial.data)
+    trial.rewrap_checks.append(progressive_rewrap(trial, support_count, roll_rate, sample['cycle']))
+    recovery = recovery_metrics([row for row in trial.samples if row['stage'] == 'recover_roll'])
+    save(trial, output, 'locked_gait', sample['time_s'], checkpoint=str(checkpoint), recovery=recovery)
 
 
 if __name__ == '__main__':
@@ -347,11 +529,20 @@ if __name__ == '__main__':
     parser.add_argument('--observed-release', action='store_true',
                         help='Release on actual supported right U, before the given time limit')
     parser.add_argument('--cycles', type=int, choices=(1, 2), default=1)
+    parser.add_argument('--progressive-rewrap', action='store_true',
+                        help='Use a moving receiving region during rewrap')
+    parser.add_argument('--replay-intake', action='store_true',
+                        help='Compare rewrap from a saved passive-drop state')
     parser.add_argument('--damping', type=float)
     parser.add_argument('--roll-rate', type=float, help='Continue from the centered drop into coupled rewrap')
     parser.add_argument('--from-approach', action='store_true',
                         help='Run approach and unwind continuously; checkpoint time becomes release time')
     args = parser.parse_args()
+    if args.replay_intake:
+        if args.checkpoint is None or args.checkpoint_time is None:
+            parser.error('--replay-intake requires --checkpoint and --checkpoint-time')
+        replay_intake(args.checkpoint, args.checkpoint_time, args.output, args.roll_rate or .35)
+        sys.exit()
     if (args.observed_release or args.joints is not None or args.align_x is not None) and not args.from_approach:
         parser.error('--observed-release, --joints and --align-x require --from-approach')
     if args.cycles > 1 and not args.observed_release:
@@ -365,4 +556,4 @@ if __name__ == '__main__':
     roll_rate = args.roll_rate if args.roll_rate is not None else (.35 if args.from_approach else None)
     run(checkpoint, release_time, args.output, slip_radius, args.opening_s, args.axial_offset,
         keep, args.damping, roll_rate, args.from_approach, args.joints, args.align_x, args.observed_release,
-        args.cycles)
+        args.cycles, progressive_rewrap if args.progressive_rewrap else rewrap)

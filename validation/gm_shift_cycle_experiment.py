@@ -52,6 +52,7 @@ class CycleTrial:
         self.passive_tail_damping = passive_tail_damping
         self.next_sample = 0.
         self.samples, self.states, self.velocities, self.targets, self.masks, self.forces = ([] for _ in range(6))
+        self.stiffness_scales = []
         self.choices = []
         self.release_checks = []
         self.release_events = []
@@ -88,7 +89,8 @@ class CycleTrial:
                                  planned_u_min_above_axis_m=height, planned_tail_moment_nm=moment))
         return length, lh
 
-    def phase_run(self, cycle, name, duration, targets, mask=None, stop_on_wrap=False, stop_when=None):
+    def phase_run(self, cycle, name, duration, targets, mask=None, stop_on_wrap=False, stop_when=None,
+                  stiffness=None):
         d, m, sim = self.data, self.model, self.sim
         mask = self.full_mask if mask is None else mask
         damping = self.powered_damping.copy()
@@ -101,7 +103,12 @@ class CycleTrial:
         while d.time-start < duration and not self.stopped:
             elapsed = d.time-start
             q = targets(elapsed)
-            sim.drive.apply_targets(d, q, mask)
+            scale = None if stiffness is None else stiffness()
+            if scale is not None:
+                mask = scale > 0.
+                if self.passive_tail_damping is not None:
+                    m.dof_damping[sim.drive.vadr] = np.where(mask, self.powered_damping, self.passive_tail_damping)
+            sim.drive.apply_targets(d, q, mask, stiffness=scale)
             mujoco.mj_step(m, d)
             if name == 'drop' and elapsed == 0.:
                 self.release_events.append(dict(command_time_s=start, first_step_time_s=float(d.time),
@@ -151,6 +158,7 @@ class CycleTrial:
             self.targets.append(q.copy())
             self.masks.append(mask.copy())
             self.forces.append(d.actuator_force.copy())
+            self.stiffness_scales.append(mask.astype(float) if scale is None else scale.copy())
             if self.samples[-1]['ground_force_n'] > 1.:
                 self.stopped = True
             if name == 'aux_roll':
