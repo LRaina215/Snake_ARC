@@ -33,7 +33,7 @@ class ArcHelixShift:
                     tail_helix, line(tail_line))
         return self.gait.targets(segments, phase), phase
 
-    def shifted_window(self, shift, arc_length, anchor_phase):
+    def shifted_window(self, shift, arc_length, anchor_phase, leading_extension=0., leading_helix=None):
         """Sample a fixed-length interval in coordinates anchored to the initial ARC.
 
         Moving the sample relative to the joins gives the same relative
@@ -44,18 +44,22 @@ class ArcHelixShift:
         arc_end = arc_start+arc_length
         rear_join = arc_start+self.arc_length
         # Grow the front helix toward the head from the original ARC shoulder.
-        front_join = arc_start-self.front_extension_rate*shift
+        front_join = arc_start-leading_extension-self.front_extension_rate*shift
         origin = min(-self.gait.body_length, front_join, head-self.gait.l)
-        front_helix = replace(self.helix, length=arc_start-front_join)
+        front_helix = replace(self.helix if leading_helix is None else leading_helix, length=arc_start-front_join)
         rear_helix = replace(self.helix, length=rear_join-arc_end)
         segments = (line(front_join-origin), front_helix, arc(arc_length, self.arc_curvature),
                     rear_helix, line(self.tail_length))
         # Compensate from a fixed curve coordinate. Adding upstream helix
         # does not change the phase at the old ARC midpoint.
         midpoint = arc_start+.5*self.arc_length
-        phase = anchor_phase-self.helix.tau*(front_helix.length+max(0., midpoint-arc_end))
+        rear_overlap = max(0., midpoint-arc_end)
+        if leading_helix is None:
+            phase = anchor_phase-self.helix.tau*(front_helix.length+rear_overlap)
+        else:
+            phase = anchor_phase-(front_helix.tau*front_helix.length+self.helix.tau*rear_overlap)
         q = self.gait.targets(segments, phase, offset=head-origin)
-        head_phase = phase+self.helix.tau*float(np.clip(head-front_join, 0., front_helix.length))
+        head_phase = phase+front_helix.tau*float(np.clip(head-front_join, 0., front_helix.length))
         centers = head+np.arange(1, self.gait.joints+1)*self.gait.l
         overlap = np.minimum(centers+self.gait.l, rear_join)-np.maximum(centers-self.gait.l, front_join)
         stiffness = np.clip(overlap/self.gait.l-1., 0., 1.)

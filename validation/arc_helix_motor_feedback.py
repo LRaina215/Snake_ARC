@@ -9,7 +9,7 @@ import mujoco
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from snake_control.arc_helix_transition import ArcHelixTransition
+from snake_control.arc_helix_transition import ArcHelixOptions, ArcHelixTransition
 from snake_control.rolling_arc import ArcParameters
 from snake_control.simulation import ArcSimulation, backbone
 
@@ -18,7 +18,7 @@ WINDOWS = {'balanced': (8, 13), 'right_short': (2, 7), 'left_short': (14, 19),
            'left_moderate': (11, 16), 'right_moderate': (5, 10)}
 
 
-def run(case, output):
+def run(case, output, *, prepare_front=False):
     params = ArcParameters(first_joint=WINDOWS[case][0], last_joint=WINDOWS[case][1])
     sim = ArcSimulation('straight', params, start_x=-.5)
     m, d, drive = sim.model, sim.data, sim.drive
@@ -36,14 +36,15 @@ def run(case, output):
     crossings = np.flatnonzero((z[:-1] >= 0.) != (z[1:] >= 0.))
     a, b = crossings+z[crossings]/(z[crossings]-z[crossings+1])
     feedback = np.degrees(d.qpos[drive.qadr])
-    core = ArcHelixTransition(np.full(params.joints+1, .0645), WINDOWS[case], feedback)
+    options = ArcHelixOptions(prepare_front=prepare_front)
+    core = ArcHelixTransition(np.full(params.joints+1, .0645), WINDOWS[case], feedback, options=options)
     core.running = True
     rows, states, forces, targets, masks = [], [], [], [], []
     finish = None
     control_steps = round(.02/step)
     feedback_steps = round(.20/step)
     feedback_time = d.time
-    for i in range(round(130./step)):
+    for i in range(round((170. if prepare_front else 130.)/step)):
         if i % feedback_steps == 0:
             feedback = np.degrees(d.qpos[drive.qadr])
             feedback_time = d.time
@@ -60,6 +61,7 @@ def run(case, output):
         rows.append(dict(time_s=d.time, stage=core.stage, head_x_m=float(points[0,0]),
                          center_x_m=float(points[:,0].mean()), shift_m=getattr(core,'shift',0.),
                          receive_shift_m=getattr(core, 'receive_shift', 0.),
+                         front_relative_x_m=float(points[:2,0].mean()-points[core.window[0],0]),
                          turns=float(abs(angles[-1]-angles[0])/(2.*np.pi)),
                          max_radius_m=float(max(np.linalg.norm(yz,axis=1))),
                          main_links=truth['contact_links'], support_n=truth['normal_force_n'],
@@ -74,12 +76,16 @@ def run(case, output):
         if truth['ground_contact_force_n'] > 1. or core.stage == 'blocked' or (finish and d.time-finish >= 2.):
             break
     held = [r for r in rows if finish is not None and r['time_s'] >= finish]
+    front_contact = next((r for r in rows if r['stage']=='lead' and 0 in r['main_links']
+                          and r['front_relative_x_m'] >= .020), None)
     passed = bool(len(held)>=40 and all(r['turns'] >= 1.6 and r['max_radius_m'] <= .145 and
         any(k <= 6 for k in r['main_links']) and any(k >= 14 for k in r['main_links']) for r in held)
-        and not any(r['ground_force_n']>1. for r in rows))
+        and not any(r['ground_force_n']>1. for r in rows)
+        and (not prepare_front or front_contact is not None))
     summary = dict(case=case, initial_window=WINDOWS[case], initial_head_links=float(a),
                    initial_tail_links=float(params.joints+1-b), initial_arc_deg=core.arc_turn_deg,
                    initial_end_y_m=prepared[[0,-1], 1].tolist(),
+                   front_contact_before_receive_s=None if front_contact is None else front_contact['time_s'],
                    input='joint angles and feedback timestamp', finish_s=finish, passed=passed,
                    events=core.events, pipe_radius_m=float(pipe.size[0]), friction=float(pipe.friction[0]),
                    initial_settle_s=3., start_x_m=-.5, scene='straight',
@@ -98,5 +104,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case', choices=WINDOWS, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--prepare-front', action='store_true')
     args = parser.parse_args()
-    sys.exit(0 if run(args.case,args.output) else 1)
+    sys.exit(0 if run(args.case,args.output,prepare_front=args.prepare_front) else 1)

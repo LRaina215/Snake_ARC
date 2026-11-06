@@ -5,7 +5,7 @@ import math
 import numpy as np
 
 from .active_arc_transfer import ActiveArcTransfer, TransferOptions, ease
-from .curve_gait import CurveGait
+from .curve_gait import CurveGait, helix
 from .gravity_global_shift import ArcHelixShift
 from .section_geometry import forward, local_section
 
@@ -24,6 +24,8 @@ class ArcHelixOptions:
     staged_shift_m_s: float = .022
     staged_roll_rad_s: float = .14
     staged_target_rate_deg_s: float = 14.
+    prepare_front: bool = False
+    front_entry_max_links: float = 3.15
 
 
 class ArcHelixTransition:
@@ -45,9 +47,9 @@ class ArcHelixTransition:
         self.end_lengths_m = (head_length, tail_length)
         self.end_depths_m = (head_depth, tail_depth)
         near_equal = abs(head_length-tail_length) <= 2*self.l
-        self.staged = near_equal and min(head_length, tail_length) >= 3*self.l
+        self.staged = options.prepare_front or (near_equal and min(head_length, tail_length) >= 3*self.l)
         # Tail first for the near-equal mounting convention (tail on the left).
-        self.reversed = self.staged or head_length > tail_length+2*self.l
+        self.reversed = not options.prepare_front and (self.staged or head_length > tail_length+2*self.l)
         self.roll_direction = -direction if self.reversed else direction
         if self.reversed:
             self.lengths = self.lengths[::-1].copy()
@@ -69,7 +71,10 @@ class ArcHelixTransition:
         self.amplitude = float(np.linalg.norm(components))
         self.phase = math.atan2(components[1], components[0])
         leading_depth = tail_depth if self.reversed else head_depth
-        self._plan_entry(leading_depth)
+        if options.prepare_front:
+            self._check_front_entry()
+        else:
+            self._plan_entry(leading_depth)
 
     def _end_geometry(self, q, section, window):
         """Estimate arm lengths and end depths using a cut through the fitted ARC center."""
@@ -136,24 +141,43 @@ class ArcHelixTransition:
         else:
             self._prepare_shift()
 
+    def _check_front_entry(self):
+        section = local_section(self.measured, self.lengths, *self.window)
+        head_length, _, head_depth, _ = self._end_geometry(self.measured, section, self.window)
+        self.events.append(dict(stage='front_check', window=list(self.window),
+                                head_length_m=head_length, head_depth_m=head_depth))
+        if head_length <= self.options.front_entry_max_links*self.l:
+            self._prepare_shift()
+        elif self.window[0] > 2:
+            self._prepare_transfer(-1)
+        else:
+            self.stage = 'blocked'
+            self.pause()
+            self.events.append(dict(stage=self.stage, reason='front geometry unreachable at the transfer boundary'))
+
     def _prepare_transfer(self, direction):
         first, last = self.window
         self.stage = 'adjust'
         options = TransferOptions(first_joint=first, last_joint=last, hold_phase_rad=self.phase,
                                   amplitude_deg=math.degrees(self.amplitude), desired_direction=direction,
+                                  transfer_s=6. if self.options.prepare_front else 5.,
                                   loose_amplitude_deg=min(45., math.degrees(self.amplitude)))
         self.transfer = ActiveArcTransfer(self.lengths, 'transfer', options)
         self.transfer.phase = self.phase
         self.transfer.targets = self._targets.copy()
         self.transfer_clock = 0.
         self.transfer_feedback_sample = None
-        self.transfer.begin_transfer(direction, np.degrees(self.measured), 0., 'leave two receiving hinges')
+        reason = 'shorten the leading arm' if self.options.prepare_front else 'leave two receiving hinges'
+        self.transfer.begin_transfer(direction, np.degrees(self.measured), 0., reason)
         self.events.append(dict(stage='adjust', before=list(self.physical_window(self.window)),
                                 after=list(self.physical_window((first+direction,last+direction)))))
 
     def _prepare_shift(self):
         self.stage = 'lead' if self.staged else 'shift'
         self.shift = self.roll = self.shift_time = 0.
+        self.leading_extension = 0.
+        self.leading_pose = None
+        self.receive_start = 0.
         self.receive_shift = 0.
         self.accepted = self.window[1]
         self.confirmed = 0
@@ -176,7 +200,7 @@ class ArcHelixTransition:
         self.step_left = 0.
 
     def status(self):
-        accepted = None if self.staged else getattr(self, 'accepted', None)
+        accepted = None if self.staged and not self.options.prepare_front else getattr(self, 'accepted', None)
         if accepted is not None and self.reversed:
             accepted = self.n+1-accepted
         return dict(stage=self.stage, arc_window=list(self.physical_window(self.window)),
@@ -186,6 +210,7 @@ class ArcHelixTransition:
                     entry_end_lengths_m=self.end_lengths_m, entry_end_depths_m=self.end_depths_m,
                     shift_m=getattr(self, 'shift', 0.), step_remaining_s=self.step_left,
                     receive_shift_m=getattr(self, 'receive_shift', 0.),
+                    leading_pose=getattr(self, 'leading_pose', None),
                     transfer_stage=None if self.transfer is None or self.stage != 'adjust' else self.transfer.stage,
                     events=self.events.copy())
 
@@ -205,7 +230,13 @@ class ArcHelixTransition:
             self.step_left = 0.
         if self.stage == 'adjust':
             self._advance_transfer(dt)
-        elif self.staged:
+        elif self.stage == 'front_settle':
+            self.front_settle -= dt
+            if self.front_settle <= 0. and fresh:
+                self._check_front_entry()
+        elif self.options.prepare_front and self.stage == 'lead':
+            self._advance_prepared_lead(dt, fresh)
+        elif self.staged and not self.options.prepare_front:
             self._advance_staged(dt, fresh)
         else:
             self._advance_shift(dt, fresh)
@@ -226,11 +257,77 @@ class ArcHelixTransition:
             self.events.append(dict(stage=self.stage, reason=transfer.fault))
         elif transfer.stage == 'review':
             self.window = transfer.window
-            self._prepare_shift()
+            if self.options.prepare_front:
+                self.stage = 'front_settle'
+                self.front_settle = .4
+            else:
+                self._prepare_shift()
 
     def _tracking_pace(self):
         error = np.max(np.abs(self._targets[self._enabled]-self.measured[self._enabled]))
         return float(np.clip((math.radians(25.)-error)/math.radians(18.), .15, 1.))
+
+    def _advance_prepared_lead(self, dt, fresh):
+        opt, curve = self.options, self.curve
+        first, last = self.window
+        pace = self._tracking_pace()
+        distance = opt.staged_shift_m_s*pace*dt
+        self.shift_time += dt
+        self.roll += self.roll_direction*opt.staged_roll_rad_s*ease(self.shift_time/1.5)*pace*dt
+        phase = self.phase+self.roll
+        if self.leading_extension < curve.head_length:
+            self.leading_extension = min(curve.head_length, self.leading_extension+distance)
+            goal, _ = curve.targets(self.leading_extension, 0., curve.arc_length, phase)
+            coverage = np.clip(self.leading_extension/self.l+np.arange(1,self.n+1)-first+.999, 0., 1.)
+        else:
+            self.shift = min(1.7*self.l, self.shift+distance)
+            arc_length = curve.arc_length*(1.-ease(self.shift/.16))
+            goal, _, coverage = curve.shifted_window(self.shift, arc_length, phase, self.leading_extension,
+                                                    self._prepared_helix())
+        coverage[last:] = 0.
+        goal = self._apply_curve(goal, coverage, opt.staged_target_rate_deg_s, dt)
+        if not fresh:
+            return
+        self.leading_pose = self._leading_pose(goal)
+        error = np.max(abs(goal[:last]-self.measured[:last]))
+        ready = (self.leading_extension == curve.head_length and self.leading_pose['axial_m'] >= .022
+                 and -.024 <= self.leading_pose['radial_offset_m'] <= -.0135
+                 and self.leading_pose['axial_tangent'] >= .35
+                 and error <= math.radians(opt.intake_error_deg))
+        self.ready = self.ready+1 if ready else 0
+        if self.ready >= 3:
+            self.ready = 0
+            self.stage = 'receive'
+            self.receive_start = self.shift
+            self.events.append(dict(stage=self.stage, shift_m=self.shift, leading_pose=self.leading_pose.copy()))
+
+    def _leading_pose(self, goal):
+        first, last = self.window
+        section = local_section(self.measured, self.lengths, first, last)
+        points = section['projected'][1:-1]
+        system = np.column_stack((2.*points, np.ones(len(points))))
+        center = np.linalg.lstsq(system, np.sum(points**2, axis=1), rcond=None)[0][:2]
+        radius = np.median(np.linalg.norm(points-center, axis=1))
+        points = forward(self.measured, self.lengths)
+        head_link = (points[:2]-section['axis']['point'])@section['axis']['basis']
+        head = head_link.mean(axis=0)
+        shoulder = (points[first]-section['axis']['point'])@section['axis']['basis']
+        reference = forward(goal, self.lengths)
+        axis = section['axis']['basis'][:,2]
+        expected_axial = (reference[:2].mean(axis=0)-reference[first])@axis
+        forward_sign = math.copysign(1., expected_axial)
+        return dict(axial_m=float(forward_sign*(head[2]-shoulder[2])),
+                    radial_offset_m=float(np.linalg.norm(head[:2]-center)-radius),
+                    axial_tangent=float(forward_sign*(head_link[0,2]-head_link[1,2])/self.lengths[0]))
+
+    def _prepared_helix(self):
+        if not self.options.prepare_front:
+            return None
+        amount = ease(self.shift/.075)
+        if self.stage == 'receive':
+            amount *= 1.-ease((self.shift-self.receive_start)/.14)
+        opt = self.options
+        return helix(0., opt.radius_m-.012*amount, opt.pitch_m, -self.direction)
 
     def _advance_staged(self, dt, fresh):
         opt, curve = self.options, self.curve
@@ -273,10 +370,17 @@ class ArcHelixTransition:
         pace = self._tracking_pace()
         limit = (self.accepted-self.window[1]+1.5)*self.l if self.accepted < self.n else math.inf
         self.shift_time += dt
-        self.shift = min(limit, self.shift+opt.shift_m_s*pace*dt)
+        if opt.prepare_front:
+            self.shift += min(max(0., limit-self.shift), opt.shift_m_s*pace*dt)
+            self.receive_shift = self.shift-self.receive_start
+        else:
+            self.shift = min(limit, self.shift+opt.shift_m_s*pace*dt)
         self.roll += self.roll_direction*opt.roll_rad_s*ease(self.shift_time/1.5)*pace*dt
         arc_length = curve.arc_length*(1.-ease(self.shift/.16))
-        goal, _, coverage = curve.shifted_window(self.shift, arc_length, self.phase+self.roll)
+        goal, _, coverage = curve.shifted_window(self.shift, arc_length, self.phase+self.roll,
+                                                self.leading_extension, self._prepared_helix())
+        if self.options.prepare_front:
+            coverage[self.accepted+1:] = 0.
         goal = self._apply_curve(goal, coverage, opt.target_rate_deg_s, dt)
         if fresh and self.accepted < self.n:
             i = self.accepted
