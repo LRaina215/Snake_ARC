@@ -34,6 +34,7 @@ LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
                  'arc_capture_head': '保留 ARC 承载，头侧开始搭管',
                  'arc_form_helix': '前部形成承载螺旋', 'arc_finish_helix': '尾侧接入螺旋',
                  'arc_intake': '尾部沿主管逐节包绕',
+                 'arc_curve_shift': '曲线移位，头侧螺旋，尾侧接入',
                  'arc_align_helix': '支管前校准螺旋方位', 'arc_form_right_u': '尝试形成释放小 U'}
 W, H = 640, 480
 
@@ -109,7 +110,7 @@ def main():
             draw = ImageDraw.Draw(canvas)
             draw.text((12, 6), f'{args.title}    t = {times[index]:5.1f} s    {stage}', fill=(23, 53, 74), font=FONT)
             contact = sample.get('branch_links') or []
-            if raw in {'progressive_rewrap', 'arc_intake'}:
+            if raw in {'progressive_rewrap', 'arc_intake', 'arc_curve_shift'}:
                 control = f'全刚度 {int(np.sum(stiffness >= .99))}  接收 {int(np.sum(mask & (stiffness < .99)))}'
                 colors = '蓝=全刚度 绿=接收 紫=失能'
             else:

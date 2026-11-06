@@ -4,7 +4,32 @@ import math
 
 import numpy as np
 
-from .curve_gait import helix
+from .curve_gait import arc, helix, line
+
+
+class ArcHelixShift:
+    """Convert an ARC to a helix by moving the joins of a single body curve."""
+
+    def __init__(self, gait, window, amplitude, radius, pitch, handed):
+        self.gait = gait
+        first, last = window
+        self.head_length = (first-1)*gait.l
+        self.tail_length = gait.body_length-(last+1)*gait.l
+        self.arc_length = gait.body_length-self.head_length-self.tail_length
+        self.arc_curvature = amplitude/(2.*gait.l)
+        self.helix = helix(0., radius, pitch, handed)
+
+    def targets(self, head_shift, tail_shift, arc_length, anchor_phase):
+        """Keep the bending phase at the original ARC midpoint continuous."""
+        head_line = self.head_length-head_shift
+        tail_line = self.tail_length-tail_shift
+        converted = .5*(self.arc_length-arc_length)
+        head_helix = replace(self.helix, length=head_shift+converted)
+        tail_helix = replace(self.helix, length=tail_shift+converted)
+        phase = anchor_phase-self.helix.tau*head_helix.length
+        segments = (line(head_line), head_helix, arc(arc_length, self.arc_curvature),
+                    tail_helix, line(tail_line))
+        return self.gait.targets(segments, phase), phase
 
 
 class GravityGlobalShift:

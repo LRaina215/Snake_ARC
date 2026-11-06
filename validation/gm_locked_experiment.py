@@ -141,7 +141,8 @@ def fit_intake_window(trial, scratch, start_joint, accepted, end_joint, nominal,
     return result
 
 
-def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
+def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100., fit_local=True,
+                       tighten_before_speed=False):
     """Roll the supported helix and accept one adjacent hanging joint at a time."""
     g, d, m = trial.gait, trial.data, trial.model
     qadr = trial.sim.drive.qadr
@@ -154,7 +155,7 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
     curve = MeasuredGravityShift(g, radius, trial.phase, measured, initial_prefix,
                                  upstream_m=(initial_prefix+1)*g.l)
     stiffness = (np.arange(len(measured)) < support_count).astype(float)
-    scratch = mujoco.MjData(m)
+    scratch = mujoco.MjData(m) if fit_local else None
     command = measured.copy()
     local_guide = command.copy()
     fit_at = 0.
@@ -200,7 +201,7 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
         q[:accepted] += smooth(offset/g.turn_length(radius))*(nominal[:accepted]-q[:accepted])
         # If an already accepted link lifts off, move the fit back to the
         # section still connected to the pipe. Keep the free tail out of it.
-        if receiving:
+        if receiving and scratch is not None:
             window_first = max(1, min(accepted-1, attached+1))
             window_last = accepted+receiving
             if t >= fit_at:
@@ -229,15 +230,19 @@ def progressive_rewrap(trial, support_count, roll_rate, cycle=1, duration=100.):
         phase = trial.phase-curve.torsion*offset+roll
         residual = command-g.targets(phase, radius)[0]
         initial_rate = speed*(roll_rate/.05-curve.torsion)
+        tighten_start, speed_start = (0., 3.) if tighten_before_speed else (2., 0.)
+        tighten_duration = 3. if tighten_before_speed else 2.
 
         def recover(t):
-            ramp = min(t, 2.)
+            elapsed = max(0., t-speed_start)
+            ramp = min(elapsed, 2.)
             advance = initial_rate*ramp+(g.o.roll_rate-initial_rate)*ramp**2/4.
-            trial.phase = phase+advance+g.o.roll_rate*(t-ramp)
-            r = radius+(g.o.r_h1-radius)*smooth((t-2.)/2.)
+            trial.phase = phase+advance+g.o.roll_rate*(elapsed-ramp)+initial_rate*min(t, speed_start)
+            r = radius+(g.o.r_h1-radius)*smooth((t-tighten_start)/tighten_duration)
             return g.targets(trial.phase, r)[0]+(1.-smooth(t/2.))*residual
 
-        trial.phase_run(cycle, 'recover_roll', 4.+2.*math.pi/g.o.roll_rate, recover)
+        transition = max(tighten_start+tighten_duration, speed_start+2.)
+        trial.phase_run(cycle, 'recover_roll', transition+2.*math.pi/g.o.roll_rate, recover)
     return dict(cycle=cycle, method='progressive_intake', start_s=start,
                 initial_prefix=initial_prefix, accepted_joints=accepted, intake_events=events,
                 shift_m=offset, full_shift_m=curve.shift_limit_m, active_roll_rad=roll,
