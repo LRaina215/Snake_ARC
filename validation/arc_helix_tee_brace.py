@@ -136,10 +136,7 @@ def continuation(sim, core, split, feedback, feedback_time, branch_x, has_branch
     return summary
 
 
-def run(branch_x, duration, output, *, tee_only=False):
-    if duration < .05:
-        raise ValueError('Continuation must include at least one trace sample')
-    params = ArcParameters()
+def prepare_split(params):
     base = make_sim(params)
     m, d = base.model, base.data
     if m.opt.timestep != .001:
@@ -158,6 +155,15 @@ def run(branch_x, duration, output, *, tee_only=False):
         feedback, feedback_time = step(base, core, tick, feedback, feedback_time)
         if tick % 50 == 0:
             base.measure()
+    return base, core, split, feedback, feedback_time
+
+
+def run(branch_x, duration, output, *, tee_only=False):
+    if duration < .05:
+        raise ValueError('Continuation must include at least one trace sample')
+    params = ArcParameters()
+    base, core, split, feedback, feedback_time = prepare_split(params)
+    m, d = base.model, base.data
     checkpoint = np.empty(mujoco.mj_stateSize(m,STATE))
     mujoco.mj_getState(m,d,checkpoint,STATE)
     common = dict(branch_x_m=branch_x, branch_radius_m=BRANCH_RADIUS_M,
