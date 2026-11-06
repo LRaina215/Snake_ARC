@@ -35,7 +35,9 @@ LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
                  'arc_form_helix': '前部形成承载螺旋', 'arc_finish_helix': '尾侧接入螺旋',
                  'arc_intake': '尾部沿主管逐节包绕',
                  'arc_curve_shift': '曲线移位，头侧螺旋，尾侧接入',
-                 'arc_align_helix': '支管前校准螺旋方位', 'arc_form_right_u': '尝试形成释放小 U'}
+                 'arc_align_helix': '支管前校准螺旋方位', 'arc_form_right_u': '尝试形成释放小 U',
+                 'direct_shift': '整身采样区间向前移，尾部逐节接入',
+                 'direct_shift_cruise': '接入全螺旋后继续推进'}
 W, H = 640, 480
 
 
@@ -129,6 +131,11 @@ def main():
             draw.text((12, 76), '斜视', fill=(80, 80, 80), font=SMALL)
             if args.fixed_camera and 'head_x_m' in sample:
                 draw.text((12, 100), f'头端 x = {sample["head_x_m"] * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
+            if raw in {'direct_shift', 'direct_shift_cruise'}:
+                confirmed = max((event['joint'] for event in report['events'] if event['time_s'] <= times[index]),
+                                default=report['initial_accepted'])
+                draw.text((12, 124), f'已接入 J{confirmed}  |  全身最小 x = {sample["x_min_m"]*1000:.0f} mm',
+                          fill=(80, 80, 80), font=SMALL)
             if shift_times and times[index] >= shift_times[0]:
                 shifted = shift_samples[np.searchsorted(shift_times, times[index], side='right')-1]['window_shift_m']
                 draw.text((12, 124), f'采样区间前移 {shifted * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
