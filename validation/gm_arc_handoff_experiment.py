@@ -15,7 +15,8 @@ from snake_control.simulation import backbone
 from snake_control.tee_simulation import PIPE_HEIGHT, PIPE_RADIUS
 from validation.gm_experiment import BRANCH_X, angle, top_crossings
 from validation.gm_locked_experiment import (
-    APPROACH_SETUP, drop_and_rewrap, release_snapshot, rewrap, right_u_ready,
+    APPROACH_SETUP, attached_prefix, drop_and_rewrap, fit_intake_window,
+    intake_connections, release_snapshot, rewrap, right_u_ready, tail_engaged,
 )
 from validation.gm_replay_wrap_experiment import save
 from validation.gm_shift_cycle_experiment import CycleTrial
@@ -167,7 +168,79 @@ def guide_right_u(trial, stiffness, keep, reference, front_command):
     return target
 
 
-def enter_helix_then_unwind(trial, stiffness, mask, phase, release_radius, release_line):
+def receive_tail(trial, stiffness, phase, radius):
+    """Advance a small intake region only after the next real link wraps."""
+    m, d, g, sim = trial.model, trial.data, trial.gait, trial.sim
+    scratch = mujoco.MjData(m)
+    measured = d.qpos[sim.drive.qadr].copy()
+    command = measured.copy()
+    n = len(measured)
+    incoming = np.flatnonzero(stiffness > 0.)
+    held = int(incoming[-1])+1
+    limit = min(held, n-1)
+    initial = attached_prefix(intake_connections(backbone(m, d), radius, g.o.pitch), limit)
+    if initial < 4:
+        return dict(initial_prefix=initial, attached_prefix=initial, completed=False,
+                    events=[], reason='head helix has insufficient connected support')
+    accepted = initial
+    eligible_at = None
+    events = []
+    next_fit = 0.
+    started = d.time
+    nominal = g.targets(phase, radius)[0]
+    goal = measured.copy()
+    # Already powered ARC joints still hold their measured shape during entry;
+    # torque on the suspended suffix stays off until the intake reaches it.
+    retained = stiffness.copy()
+
+    def command_next(t):
+        nonlocal next_fit, eligible_at, accepted, goal
+        angles = d.qpos[sim.drive.qadr]
+        connections = intake_connections(backbone(m, d), radius, g.o.pitch)
+        attached = attached_prefix(connections, n)
+        previous_ready = attached >= accepted
+        next_connected = accepted < n and previous_ready and connections[accepted]
+        if next_connected:
+            eligible_at = t if eligible_at is None else eligible_at
+            if t-eligible_at >= .30:
+                accepted += 1
+                eligible_at = None
+                next_fit = t
+                events.append(dict(time_s=float(d.time), joint=accepted))
+        else:
+            eligible_at = None
+
+        desired_scale = np.zeros(n)
+        desired_scale[:accepted] = 1.
+        end = min(n, accepted+2)
+        desired_scale[accepted:end] = [.60, .35][:end-accepted]
+        # Retain the original ARC support initially, then let the receiving
+        # envelope decide which of those joints can still apply motor torque.
+        desired_scale = np.maximum(desired_scale, retained*(1.-smooth(t/1.25)))
+        stiffness[:] += np.clip(desired_scale-stiffness, -m.opt.timestep/.7, m.opt.timestep/.7)
+        if t >= next_fit:
+            goal = measured+smooth(t/2.)*(nominal-measured)
+            first = max(1, min(accepted-1, attached+1)) if attached else accepted-1
+            if accepted < n:
+                local = fit_intake_window(trial, scratch, first, accepted, end, nominal, radius)
+                goal[first-1:end] = local[first-1:end]
+            next_fit = t+.04
+        speed = math.radians(20.)*m.opt.timestep
+        command[:] += np.clip(goal-command, -speed, speed)
+        command[stiffness == 0.] = angles[stiffness == 0.]
+        return command
+
+    def wrapped(_):
+        return (accepted == n and len(trial.samples) >= 8 and
+                all(tail_engaged(row) for row in trial.samples[-8:]))
+
+    formed = trial.phase_run(1, 'arc_intake', 34., command_next, stiffness=lambda: stiffness,
+                             stop_when=wrapped)
+    return dict(initial_prefix=initial, attached_prefix=accepted, completed=bool(formed and not trial.stopped),
+                events=events, duration_s=float(d.time-started))
+
+
+def enter_helix_then_unwind(trial, stiffness, mask, phase, release_radius, release_line, progressive=False):
     """Join the verified unwind at its pre-unwind helix, using real contacts."""
     d, g, sim = trial.data, trial.gait, trial.sim
     start_q = d.qpos[sim.drive.qadr].copy()
@@ -186,9 +259,15 @@ def enter_helix_then_unwind(trial, stiffness, mask, phase, release_radius, relea
         command[:] = start_q+mix*(q-start_q)
         return command
 
-    trial.phase_run(1, 'arc_finish_helix', float(max(delays))+4., form, stiffness=lambda: stiffness)
+    intake = None
+    if progressive:
+        intake = receive_tail(trial, stiffness, phase, radius)
+    else:
+        trial.phase_run(1, 'arc_finish_helix', float(max(delays))+4., form, stiffness=lambda: stiffness)
     outcome = {'formed': entry_geometry(trial, mask)}
-    if trial.stopped:
+    if intake is not None:
+        outcome['intake'] = intake
+    if trial.stopped or (intake is not None and not intake['completed']):
         return None, outcome
     roll_start = d.time
 
@@ -234,7 +313,7 @@ def enter_helix_then_unwind(trial, stiffness, mask, phase, release_radius, relea
 
 
 def capture(trial, transfer, phase_offset, align=False, full_helix=False, keep_arc=False,
-            fit_support=False, spatial_reference=None):
+            fit_support=False, spatial_reference=None, progressive=False):
     """Keep the arc loaded while adding curvature ahead and then shaping the U."""
     g, d, sim = trial.gait, trial.data, trial.sim
     mask = np.arange(sim.p.joints) < 8
@@ -254,7 +333,12 @@ def capture(trial, transfer, phase_offset, align=False, full_helix=False, keep_a
         observed = d.qpos[sim.drive.qadr][transfer.enabled]
         weights, *_ = np.linalg.lstsq(basis, observed, rcond=None)
         trial.phase = math.atan2(weights[1], weights[0])+phase_offset
-    final, _ = g.targets(trial.phase, release_radius, ls=release_line, th1=math.pi)
+    if progressive:
+        # Form only the head-side helix here. The direct U template used to
+        # introduce tail curvature while the tail was still suspended.
+        final, _ = g.targets(trial.phase, release_radius)
+    else:
+        final, _ = g.targets(trial.phase, release_radius, ls=release_line, th1=math.pi)
     q = d.qpos[sim.drive.qadr].copy()
     start_q = q.copy()
     stiffness = transfer.enabled.astype(float)
@@ -286,8 +370,9 @@ def capture(trial, transfer, phase_offset, align=False, full_helix=False, keep_a
     if spatial_reference is not None:
         target = guide_right_u(trial, stiffness, mask, spatial_reference, final)
         return target, mask, after_head
-    if full_helix:
-        target, outcome = enter_helix_then_unwind(trial, stiffness, mask, trial.phase, release_radius, release_line)
+    if full_helix or progressive:
+        target, outcome = enter_helix_then_unwind(
+            trial, stiffness, mask, trial.phase, release_radius, release_line, progressive)
         after_head['full_helix'] = outcome
         return target, mask, after_head
     if align:
@@ -347,7 +432,7 @@ def capture(trial, transfer, phase_offset, align=False, full_helix=False, keep_a
 
 
 def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix, keep_arc, feed_direction,
-        fit_support, guide_tail):
+        fit_support, guide_tail, progressive):
     trial = CycleTrial(setup=APPROACH_SETUP)
     sim, d = trial.sim, trial.data
     p = replace(sim.p, first_joint=7, last_joint=12, initial_phase_rad=math.pi if mirrored else 0.)
@@ -376,6 +461,7 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
     summary = dict(arc_trigger_x_m=trigger_x, phase_offset_rad=phase_offset, align_before_u=align,
                    mirrored_arc=mirrored, feed_steps=feed_steps, feed_direction=feed_direction,
                    full_helix=full_helix, keep_arc=keep_arc, fit_support=fit_support, guide_tail=guide_tail,
+                   progressive_intake=progressive,
                    reached_approach=bool(reached), start_x_m=.12,
                    setup={k: APPROACH_SETUP[k] for k in ('scene', 'joints', 'friction', 'options')})
     if reached and not trial.stopped:
@@ -383,7 +469,7 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
         summary['feed'] = feed
         if feed['completed'] and not trial.stopped:
             target, mask, after_head = capture(trial, transfer, phase_offset, align, full_helix, keep_arc,
-                                               fit_support, reference)
+                                               fit_support, reference, progressive)
             summary['after_head'] = after_head
             summary['entry'] = entry_geometry(trial, mask)
             if target is not None and not trial.stopped:
@@ -395,7 +481,7 @@ def run(output, trigger_x, phase_offset, align, mirrored, feed_steps, full_helix
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--trigger-x', type=float, default=.270)
+    parser.add_argument('--trigger-x', type=float)
     parser.add_argument('--phase-offset', type=float, default=0.)
     parser.add_argument('--align-before-u', action='store_true')
     parser.add_argument('--mirrored-arc', action='store_true')
@@ -405,7 +491,13 @@ if __name__ == '__main__':
     parser.add_argument('--keep-arc-during-head-capture', action='store_true')
     parser.add_argument('--fit-retained-support', action='store_true')
     parser.add_argument('--guide-tail', action='store_true')
+    parser.add_argument('--legacy-entry', action='store_true',
+                        help='Reproduce the earlier direct-lift and comparison runs')
     args = parser.parse_args()
-    run(args.output, args.trigger_x, args.phase_offset, args.align_before_u, args.mirrored_arc, args.feed_steps,
+    if not args.legacy_entry and (args.guide_tail or args.fit_retained_support or
+                                  args.align_before_u or args.unwind_from_helix):
+        parser.error('the old entry variants require --legacy-entry')
+    trigger_x = args.trigger_x if args.trigger_x is not None else (.270 if args.legacy_entry else .195)
+    run(args.output, trigger_x, args.phase_offset, args.align_before_u, args.mirrored_arc, args.feed_steps,
         args.unwind_from_helix, args.keep_arc_during_head_capture, -1 if args.feed_direction == 'head' else 1,
-        args.fit_retained_support, args.guide_tail)
+        args.fit_retained_support, args.guide_tail, not args.legacy_entry)

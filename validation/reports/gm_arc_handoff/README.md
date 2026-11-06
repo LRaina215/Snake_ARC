@@ -24,6 +24,20 @@
 
 ```powershell
 conda activate mujoco
-python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/baseline
+python .\validation\gm_arc_handoff_experiment.py --legacy-entry --output validation/reports/gm_arc_handoff/baseline
 python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/baseline --label locked_gait --title "18 关节｜ARC 接近、调长与变形" --speed 2
+```
+
+## 尾部逐节包绕复核
+
+本轮检查提前变形能否让尾侧沿管接续包绕。模型、管径、摩擦及限矩沿用首轮。将 ARC 调长触发点从 270 mm 提前到 195 mm，给包绕留出主管上的距离。初始承载段留在管上，前部先成螺旋，尾部只在接续处拟合短螺旋。接收处向尾侧最多给后两关节部分刚度。相邻实测连杆位置、绕管方向和轴向次序连续满足条件 0.30 s 后，才接入一个关节。这个仿真入口用 MuJoCo 世界骨架和管轴定位接续处，并在接收结束时核对实际主管接触。
+
+- ARC 接近期间，实测 J7–J12 关节点绕主管轴的角跨度为 175.2–181.5°，保持开口。实际窗口移到 J6–J11，头、尾悬垂分别从 6.63、7.51 节变为 6.00、8.01 节。尾部接收从仿真 16.87 s 开始。J12 至 J18 依次在 18.74、21.18、24.39、26.36、27.95、29.78、30.65 s 确认接入，31.30 s 满足最终贴管判据。尾部到管轴的最大径向距离从约 546 mm 降至 102 mm，最终末端连杆和前部同时有主管接触。此段前部保持承载，待尾部贴管后才继续主动滚动。仿真 28 s 左右尾端有短暂上翘，随后贴回主管。
+- 全程约 45.30 s，每个记录采样都保有主管接触，无触地，失能关节的执行器力矩始终为零。全程实际角度最大 80.8°，最大跟踪误差 12.9°，111 个采样出现至少一个关节限矩。视频回放展示实际姿态和使能状态。
+- 后续校准时尾部仍贴管，但支管接触在报告连杆索引 7–8，结束时头部方位约 40°，离参考的 97–151° 区间还有差距。以较宽的支管接触条件提前开始解旋的诊断同样未形成右 U，尾端到了右侧时待释放段质心仍在轴线左侧。默认路径继续沿用原有对准和释放条件。验证通过的是尾部接收，失能下落和清障尚未执行。下一次验证应先核对支管进入前部哪两圈之间，以及进入时的真实绕管方位，再接同一解旋轨迹。
+
+```powershell
+conda activate mujoco
+python .\validation\gm_arc_handoff_experiment.py --output validation/reports/gm_arc_handoff/progressive_intake
+python .\validation\render_tee_video.py --input validation/reports/gm_arc_handoff/progressive_intake --label locked_gait --title "18 关节｜ARC 后尾部逐节包绕" --speed 2
 ```
