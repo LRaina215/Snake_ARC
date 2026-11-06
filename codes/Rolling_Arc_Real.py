@@ -8,7 +8,7 @@ Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动移窗
 失能时Ctrl+3按全身实测姿态选窗接管并进入顺应；Ctrl+U始终按配置窗口形成。
 模式4转3会按实测重新选窗并撤去送链缓冲，成功后Ctrl+G开始滚动。
 Ctrl+4 主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，Ctrl+Y 提前返回，Ctrl+L沿任务方向强制推进一步。
-Ctrl+B 从当前圆弧接入 Helix 调试；Ctrl+J 单步，Ctrl+G 连续/暂停。
+Ctrl+5 从当前圆弧接入 Helix 调试；Ctrl+J 单步，Ctrl+G 连续/暂停。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
 """
 import json
@@ -126,7 +126,7 @@ MAX_ANGLE_DEG = [90.0] * NUM_JOINTS
 HOTKEY_COMMANDS = {
     'U': 'apply', 'J': 'step', 'H': 'back', 'G': 'toggle', 'N': 'hold',
     'K': 'status', 'X': 'release', 'Q': 'quit', 'T': 'reverse', 'E': 'compliance',
-    'W': 'window_auto', 'Y': 'feed_return', 'L': 'feed_tick', 'B': 'gait_helix',
+    'W': 'window_auto', 'Y': 'feed_return', 'L': 'feed_tick',
     '-': 'delta-', '=': 'delta+',
 }
 HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响应）：
@@ -140,7 +140,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   模式4→3：按实测重新选窗接管，不继承送链缓冲使能；成功后Ctrl+G滚动
   Ctrl+4 主动送链：J/H各执行一段头侧增长/缩短，到位保持，-/=目标量减半/加倍
   送链中Ctrl+G暂停/继续；Ctrl+L沿任务方向强制推进一步，目标发完保持；Ctrl+Y提前返回起态
-  Ctrl+B 选择 ARC→Helix，选择时保持现状；Ctrl+J 单步，Ctrl+G 连续/暂停
+  Ctrl+5 选择 ARC→Helix，选择时保持现状；Ctrl+J 单步，Ctrl+G 连续/暂停
   Ctrl+W 自动移窗与扩缩开/关（仅滑动模式）；外侧扭矩关闭
   Ctrl+上/下 幅值±2°；Ctrl+右/左 角频率±0.05 rad/s
   Ctrl+X 全部失能（机器人会失去主动支撑）；Ctrl+Q 退出，接管后会失能
@@ -3931,8 +3931,10 @@ class ArcHelixTransition:
         self.arc_turn_deg = math.degrees(section['total_turn'])
         if not 125. <= self.arc_turn_deg <= 232. or section['fit_rms'] > .025:
             raise ValueError('当前使能区域没有可拟合的开放圆弧')
-        head_depth, tail_depth = self._end_depth(q, section)
-        self.reversed = bool(head_depth > tail_depth+2*self.l)
+        head_length, tail_length, head_depth, tail_depth = self._end_geometry(q, section, window)
+        self.end_lengths_m = (head_length, tail_length)
+        self.end_depths_m = (head_depth, tail_depth)
+        self.reversed = head_length > tail_length+2*self.l
         self.roll_direction = -direction if self.reversed else direction
         if self.reversed:
             self.lengths = self.lengths[::-1].copy()
@@ -3943,27 +3945,46 @@ class ArcHelixTransition:
         self.feedback_time = None
         self.stage = 'shift'
         self.running = False
+        self.started = False
         self.step_left = 0.
         self.events = [dict(stage='entry', reversed_intake=self.reversed, window=list(window),
-                            head_depth_m=float(head_depth), tail_depth_m=float(tail_depth))]
+                            head_length_m=head_length, tail_length_m=tail_length,
+                            head_depth_m=head_depth, tail_depth_m=tail_depth)]
         self.transfer = None
         odd = np.arange(self.n)%2 == 0
         components = [np.mean(self.measured[self._enabled & parity]) for parity in (odd, ~odd)]
         self.amplitude = float(np.linalg.norm(components))
         self.phase = math.atan2(components[1], components[0])
-        short_depth = tail_depth if self.reversed else head_depth
-        self._plan_entry(short_depth)
+        leading_depth = tail_depth if self.reversed else head_depth
+        self._plan_entry(leading_depth)
 
-    def _end_depth(self, q, section):
-        """End distance below the fitted ARC center along its crown direction."""
+    def _end_geometry(self, q, section, window):
+        """Estimate arm lengths and end depths using a cut through the fitted ARC center."""
         points = section['projected'][1:-1]
         system = np.column_stack((2.*points, np.ones(len(points))))
         center = np.linalg.lstsq(system, np.sum(points**2, axis=1), rcond=None)[0][:2]
         crown = points.mean(axis=0)-center
         direction = crown/np.linalg.norm(crown)
-        ends = forward(q, self.lengths)[[0,-1]]
-        projected = (ends-section['axis']['point'])@section['axis']['basis'][:,:2]
-        return -(projected-center)@direction
+        backbone = forward(q, self.lengths)
+        projected = (backbone-section['axis']['point'])@section['axis']['basis'][:,:2]
+        height = (projected-center)@direction
+        first, last = window
+        top = first+int(np.argmax(height[first:last+2]))
+        material = np.r_[0., np.cumsum(self.lengths)]
+        head = self._length_after_cut(height[top::-1], material[top]-material[top::-1])
+        tail = self._length_after_cut(height[top:], material[top:]-material[top])
+        return head, tail, -float(height[0]), -float(height[-1])
+
+    @staticmethod
+    def _length_after_cut(height, material):
+        below = np.flatnonzero(height <= 0.)
+        if not len(below):
+            return 0.
+        i = below[0]
+        if i == 0:
+            return float(material[-1])
+        crossing = material[i-1]+(material[i]-material[i-1])*height[i-1]/(height[i-1]-height[i])
+        return float(material[-1]-crossing)
 
     def _mask(self, window):
         j = np.arange(1, self.n+1)
@@ -3991,11 +4012,11 @@ class ArcHelixTransition:
     def enabled(self):
         return self._enabled[::-1].copy() if self.reversed else self._enabled.copy()
 
-    def _plan_entry(self, short_depth):
+    def _plan_entry(self, leading_depth):
         first, last = self.window
         # Add a hinge at the leading end if its measured section has little
         # room for the first helical shoulder.
-        if short_depth < self.options.min_end_depth_links*self.l and last < self.n-1:
+        if leading_depth < self.options.min_end_depth_links*self.l and last < self.n-1:
             self._prepare_transfer(1)
         elif last == self.n-1 and first > 2:
             self._prepare_transfer(-1)
@@ -4045,8 +4066,10 @@ class ArcHelixTransition:
         if accepted is not None and self.reversed:
             accepted = self.n+1-accepted
         return dict(stage=self.stage, arc_window=list(self.physical_window(self.window)),
+                    leading_end='tail' if self.reversed else 'head',
                     intake_end='head' if self.reversed else 'tail',
                     accepted_joint=accepted,
+                    entry_end_lengths_m=self.end_lengths_m, entry_end_depths_m=self.end_depths_m,
                     shift_m=getattr(self, 'shift', 0.), step_remaining_s=self.step_left,
                     transfer_stage=None if self.transfer is None or self.stage != 'adjust' else self.transfer.stage,
                     events=self.events.copy())
@@ -4060,6 +4083,7 @@ class ArcHelixTransition:
         if (self.stage in ('complete','blocked') or (not self.running and self.step_left <= 0.) or
                 now-feedback_time > max_age):
             return False
+        self.started = True
         dt = dt if self.running else min(dt,self.step_left)
         self.step_left = max(0., self.step_left-dt)
         if self.step_left < 1e-9:
@@ -4279,23 +4303,26 @@ class RollingArcController:
         self.feeding_last_diagnostic_s = None
         self.helix_transition = None
 
-    def select_helix(self):
-        """从当前使能的连续 ARC 读取一次实际角度，接管时保持已有目标。"""
-        if self.helix_transition is not None:
-            self.helix_transition.pause()
-            self.mode = 'hold'
-            return
-        if self.mode == 'released' or self.forming or self.settle_remaining > 0:
-            raise ValueError('请先形成并稳定搭管圆弧，再按Ctrl+B')
+    def read_helix_entry(self):
+        """用同一帧全身舵机角重建当前搭管姿态并规划切换。"""
         active = np.flatnonzero(self.enabled)+1
         if len(active) < 3 or np.any(np.diff(active) != 1):
             raise ValueError('ARC→Helix 需要一个连续使能的圆弧')
         self.refresh_compliance_feedback()
         options = ArcHelixOptions(radius_m=HELIX_RADIUS_M, pitch_m=HELIX_PITCH_M,
                                   min_end_depth_links=HELIX_MIN_END_DEPTH_LINKS, step_s=HELIX_STEP_S)
-        core = ArcHelixTransition(LINK_LENGTHS_M, (int(active[0]), int(active[-1])),
+        return ArcHelixTransition(LINK_LENGTHS_M, (int(active[0]), int(active[-1])),
                                   self.measured_angles(), self.direction, options)
-        self.helix_transition = core
+
+    def select_helix(self):
+        """接管时保持已有目标，第一次推进时按最新角度重新规划。"""
+        if self.helix_transition is not None and self.helix_transition.started:
+            self.helix_transition.pause()
+            self.mode, self.freeze_targets = 'hold', True
+            return
+        if self.mode == 'released' or self.forming or self.settle_remaining > 0:
+            raise ValueError('请先形成并稳定搭管圆弧，再按Ctrl+5')
+        self.helix_transition = self.read_helix_entry()
         self.sliding, self.compliance, self.pending_gait = None, None, None
         self.feeding_selected, self.feeding = False, None
         self.feeding_inputs = None
@@ -4312,6 +4339,9 @@ class RollingArcController:
         elif command in ('step', 'run', 'toggle'):
             if core.stage in ('complete', 'blocked'):
                 raise ValueError('查看Ctrl+K的切换结果；重新形成圆弧前先按Ctrl+X')
+            if not core.started and self.mode == 'hold':
+                core = self.read_helix_entry()
+                self.helix_transition = core
             if command == 'step':
                 if self.mode != 'step':
                     core.step_once()
@@ -5213,7 +5243,11 @@ class RollingArcController:
               f'omega={self.omega:g}rad/s | phase={self.phase:.4f}rad | delta={self.phase_step:g}rad', flush=True)
         if self.helix_transition is not None:
             h = self.helix_transition.status()
-            print(f"阶段={h['stage']} | 接收端={h['intake_end']} | 已接收边界={h['accepted_joint']} | "
+            head, tail = h['entry_end_lengths_m']
+            head_depth, tail_depth = h['entry_end_depths_m']
+            print(f'起态头/尾侧长度估计 {1000*head:.0f}/{1000*tail:.0f} mm | '
+                  f'端点距截面圆心深度 {1000*head_depth:.0f}/{1000*tail_depth:.0f} mm', flush=True)
+            print(f"阶段={h['stage']} | 起卷端={h['leading_end']} | 已接收边界={h['accepted_joint']} | "
                   f"曲线移位={h['shift_m']*1000:.1f} mm | 调长阶段={h['transfer_stage']}", flush=True)
             if h['stage'] == 'blocked':
                 print(f"停在当前目标：{h['events'][-1]['reason']}", flush=True)
@@ -5785,8 +5819,8 @@ def decode_hotkey(vk, control_down):
         return None
     special = {32: 'pause', 38: 'amplitude_up', 40: 'amplitude_down',
                39: 'omega_up', 37: 'omega_down', 189: 'delta-', 187: 'delta+',
-               49: 'gait_basic', 50: 'gait_fixed', 51: 'gait_sliding', 52: 'gait_feeding',
-               97: 'gait_basic', 98: 'gait_fixed', 99: 'gait_sliding', 100: 'gait_feeding'}
+               49: 'gait_basic', 50: 'gait_fixed', 51: 'gait_sliding', 52: 'gait_feeding', 53: 'gait_helix',
+               97: 'gait_basic', 98: 'gait_fixed', 99: 'gait_sliding', 100: 'gait_feeding', 101: 'gait_helix'}
     return special.get(vk) or HOTKEY_COMMANDS.get(chr(vk) if vk is not None and 65 <= vk <= 90 else '')
 
 

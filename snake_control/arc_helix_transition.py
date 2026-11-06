@@ -38,8 +38,10 @@ class ArcHelixTransition:
         self.arc_turn_deg = math.degrees(section['total_turn'])
         if not 125. <= self.arc_turn_deg <= 232. or section['fit_rms'] > .025:
             raise ValueError('当前使能区域没有可拟合的开放圆弧')
-        head_depth, tail_depth = self._end_depth(q, section)
-        self.reversed = bool(head_depth > tail_depth+2*self.l)
+        head_length, tail_length, head_depth, tail_depth = self._end_geometry(q, section, window)
+        self.end_lengths_m = (head_length, tail_length)
+        self.end_depths_m = (head_depth, tail_depth)
+        self.reversed = head_length > tail_length+2*self.l
         self.roll_direction = -direction if self.reversed else direction
         if self.reversed:
             self.lengths = self.lengths[::-1].copy()
@@ -50,27 +52,46 @@ class ArcHelixTransition:
         self.feedback_time = None
         self.stage = 'shift'
         self.running = False
+        self.started = False
         self.step_left = 0.
         self.events = [dict(stage='entry', reversed_intake=self.reversed, window=list(window),
-                            head_depth_m=float(head_depth), tail_depth_m=float(tail_depth))]
+                            head_length_m=head_length, tail_length_m=tail_length,
+                            head_depth_m=head_depth, tail_depth_m=tail_depth)]
         self.transfer = None
         odd = np.arange(self.n)%2 == 0
         components = [np.mean(self.measured[self._enabled & parity]) for parity in (odd, ~odd)]
         self.amplitude = float(np.linalg.norm(components))
         self.phase = math.atan2(components[1], components[0])
-        short_depth = tail_depth if self.reversed else head_depth
-        self._plan_entry(short_depth)
+        leading_depth = tail_depth if self.reversed else head_depth
+        self._plan_entry(leading_depth)
 
-    def _end_depth(self, q, section):
-        """End distance below the fitted ARC center along its crown direction."""
+    def _end_geometry(self, q, section, window):
+        """Estimate arm lengths and end depths using a cut through the fitted ARC center."""
         points = section['projected'][1:-1]
         system = np.column_stack((2.*points, np.ones(len(points))))
         center = np.linalg.lstsq(system, np.sum(points**2, axis=1), rcond=None)[0][:2]
         crown = points.mean(axis=0)-center
         direction = crown/np.linalg.norm(crown)
-        ends = forward(q, self.lengths)[[0,-1]]
-        projected = (ends-section['axis']['point'])@section['axis']['basis'][:,:2]
-        return -(projected-center)@direction
+        backbone = forward(q, self.lengths)
+        projected = (backbone-section['axis']['point'])@section['axis']['basis'][:,:2]
+        height = (projected-center)@direction
+        first, last = window
+        top = first+int(np.argmax(height[first:last+2]))
+        material = np.r_[0., np.cumsum(self.lengths)]
+        head = self._length_after_cut(height[top::-1], material[top]-material[top::-1])
+        tail = self._length_after_cut(height[top:], material[top:]-material[top])
+        return head, tail, -float(height[0]), -float(height[-1])
+
+    @staticmethod
+    def _length_after_cut(height, material):
+        below = np.flatnonzero(height <= 0.)
+        if not len(below):
+            return 0.
+        i = below[0]
+        if i == 0:
+            return float(material[-1])
+        crossing = material[i-1]+(material[i]-material[i-1])*height[i-1]/(height[i-1]-height[i])
+        return float(material[-1]-crossing)
 
     def _mask(self, window):
         j = np.arange(1, self.n+1)
@@ -98,11 +119,11 @@ class ArcHelixTransition:
     def enabled(self):
         return self._enabled[::-1].copy() if self.reversed else self._enabled.copy()
 
-    def _plan_entry(self, short_depth):
+    def _plan_entry(self, leading_depth):
         first, last = self.window
         # Add a hinge at the leading end if its measured section has little
         # room for the first helical shoulder.
-        if short_depth < self.options.min_end_depth_links*self.l and last < self.n-1:
+        if leading_depth < self.options.min_end_depth_links*self.l and last < self.n-1:
             self._prepare_transfer(1)
         elif last == self.n-1 and first > 2:
             self._prepare_transfer(-1)
@@ -152,8 +173,10 @@ class ArcHelixTransition:
         if accepted is not None and self.reversed:
             accepted = self.n+1-accepted
         return dict(stage=self.stage, arc_window=list(self.physical_window(self.window)),
+                    leading_end='tail' if self.reversed else 'head',
                     intake_end='head' if self.reversed else 'tail',
                     accepted_joint=accepted,
+                    entry_end_lengths_m=self.end_lengths_m, entry_end_depths_m=self.end_depths_m,
                     shift_m=getattr(self, 'shift', 0.), step_remaining_s=self.step_left,
                     transfer_stage=None if self.transfer is None or self.stage != 'adjust' else self.transfer.stage,
                     events=self.events.copy())
@@ -167,6 +190,7 @@ class ArcHelixTransition:
         if (self.stage in ('complete','blocked') or (not self.running and self.step_left <= 0.) or
                 now-feedback_time > max_age):
             return False
+        self.started = True
         dt = dt if self.running else min(dt,self.step_left)
         self.step_left = max(0., self.step_left-dt)
         if self.step_left < 1e-9:
