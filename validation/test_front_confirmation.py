@@ -117,6 +117,21 @@ class FrontConfirmationTests(unittest.TestCase):
         self.assertEqual(events[1]['stage_after'], 'first_shift')
         self.assertEqual(events[-1]['mode_after'], 'step')
 
+    def test_repeated_j_reports_in_progress_and_g_runs_then_pauses(self):
+        c = recorded_controller()
+        commands = queue.Queue()
+        for key in ('L', 'J', 'J', 'G', 'G'):
+            commands.put(real.decode_hotkey(ord(key), True))
+        with contextlib.redirect_stdout(io.StringIO()), patch.object(c, 'refresh_compliance_feedback'), \
+                patch.object(c, 'motor_sample_clock', return_value=(1., 1.)):
+            real.process_control_commands(c, commands, 1.)
+        events = c.snapshot()['control_commands']
+        self.assertEqual(events[2]['result'], 'in_progress')
+        self.assertEqual(events[3]['mode_after'], 'run')
+        self.assertEqual(events[4]['mode_after'], 'hold')
+        self.assertEqual(c.mode, 'hold')
+        self.assertFalse(c.helix_transition.running)
+
     def test_other_confirmations_keep_the_gravity_sequence_and_name_unavailable_stage(self):
         for stage, after in (('align', 'unwind'), ('right_u_hold', 'drop'),
                              ('drop_hold', 'return_seat')):

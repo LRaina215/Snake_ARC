@@ -98,7 +98,7 @@ HELIX_RADIUS_M = .094
 HELIX_PITCH_M = .13
 HELIX_MIN_FRONT_TURNS = 1.     # 先形成前部承载螺旋再送尾，所需两侧材料由程序自动分配
 HELIX_FRONT_SEAT_RAD = .14    # 前部形成后单独小幅滚动就位，后段仍失能
-HELIX_STEP_S = 1.0             # Ctrl+J 单次最多推进的控制时间；等待新反馈时不消耗
+HELIX_STEP_S = 1.0             # Ctrl+J单次控制时间；执行中重复按不追加。Ctrl+G按一次连续执行
 
 # T 管重力矩越障，初值来自 18 关节、主管/支管 110/60 mm 的仿真。
 # J1 在前。调这些参数时，以实物的右侧小 U 仍搭在主管、尾段可落向轴下为准。
@@ -156,6 +156,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   送链中Ctrl+G暂停/继续；Ctrl+L沿任务方向强制推进一步，目标发完保持；Ctrl+Y提前返回起态
   Ctrl+5 自动识别ARC并调整两侧余长；J/G先成前部，L确认搭稳后J/G逐节送尾
   Ctrl+6 选择 T 管重力矩越障（J1 为前端）；Ctrl+J/G 推进，Ctrl+L 确认实物姿态
+  模式5/6：Ctrl+J每次最多1秒；Ctrl+G按一次连续到确认点/完成，再按暂停；不必反复按J
   T 管模式对准支管时 Ctrl+J/H 正反单步；Ctrl+空格暂停，Ctrl+X 全部失能
   Ctrl+W 自动移窗与扩缩开/关（仅滑动模式）；外侧扭矩关闭
   Ctrl+上/下 幅值±2°；Ctrl+右/左 角频率±0.05 rad/s
@@ -5241,6 +5242,9 @@ class RollingArcController:
             if command in ('step', 'back'):
                 if self.mode != 'step':
                     core.step_once()
+                else:
+                    print(f'Ctrl+J单步仍在执行，剩余{core.step_left:.2f}s；本次不追加。连续执行按Ctrl+G，再按G或空格暂停。', flush=True)
+                    return 'in_progress'
                 self.mode = 'step'
             else:
                 core.pause()
@@ -5981,8 +5985,10 @@ class RollingArcController:
                 raise ValueError('当前为 T 管越障，结束时用 Ctrl+X')
             self.select_helix()
             return
-        if self.helix_transition is not None and self.command_helix(command):
-            return
+        if self.helix_transition is not None:
+            result = self.command_helix(command)
+            if result:
+                return result
         if self.feeding_selected and self.command_feeding(command):
             return
         if not DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and (command in ('reverse', 'back') or
@@ -6159,7 +6165,7 @@ class RollingArcController:
                 'front_finish': '尾部失能，前部形成螺旋；实物已搭稳可直接Ctrl+L确认送尾',
                 'front_hold': '前部目标保持、尾部未接入；实物搭稳后Ctrl+L确认，再Ctrl+J/G送尾',
                 'front_seat': '仅前部小幅就位；实物已搭稳可直接Ctrl+L确认送尾',
-                'first_shift': '前部支撑已确认；Ctrl+J/G逐节送尾，重复L不重置进度',
+                'first_shift': '逐段送尾：Ctrl+G按一次连续至完成，再按G/空格暂停；J只推进1秒，重复L不重置',
                 'align': 'Ctrl+J/H 微调。确认前部过支管、螺旋已对准后按 Ctrl+L',
                 'unwind': '形成右侧小 U；从尾朝头观察，确认 U 搭稳后暂停并按 Ctrl+L',
                 'right_u_hold': '确认小 U 搭在主管右侧，前部贴稳后按 Ctrl+L，再用 Ctrl+J/G 释放尾段',
@@ -6878,7 +6884,9 @@ def process_control_commands(controller, commands, elapsed):
             if command.strip().lower() == 'help':
                 print(getattr(controller, 'help_text', HELP), flush=True)
                 continue
-            controller.command(command)
+            result = controller.command(command)
+            if result == 'in_progress':
+                event.update(result='in_progress', reason='当前单步仍在执行，本次不追加；Ctrl+G连续执行')
             if command.strip().lower() == 'status':
                 controller.feedback_time_s = elapsed
             controller.show_status(include_feedback=command.strip().lower() == 'status')
