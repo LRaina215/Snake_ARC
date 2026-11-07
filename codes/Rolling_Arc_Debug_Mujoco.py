@@ -15,6 +15,7 @@ import json
 import queue
 import threading
 import time
+import xml.etree.ElementTree as ET
 import numpy as np
 import mujoco
 from codes import Rolling_Arc_Real as real
@@ -404,6 +405,35 @@ class ManualArcParameters(ArcParameters):
                           self.last_joint, length_normalized=self.last_joint-self.first_joint+1 != 6))
 
 
+def load_manual_arc_model(scene, joints):
+    """按实机关节数加载；旧20关节场景仅裁掉多出的尾模块，保留原管道。"""
+    directory = ROOT/'mujoco_model'
+    path = directory/f'Snake_Robot_o{joints}_Rolling_Arc_{scene}.xml'
+    if path.exists():
+        return mujoco.MjModel.from_xml_path(str(path))
+    template = directory/f'Snake_Robot_o20_Rolling_Arc_{scene}.xml'
+    if not 1 <= joints < 20:
+        raise ValueError(f'未找到{joints}关节的手调场景：{path.name}')
+    root = ET.parse(template).getroot()
+    world = root.find('worldbody')
+    tail = next(body for body in world.iter('body') if body.find(f"joint[@name='joint{joints}']") is not None)
+    for child in list(tail):
+        if child.tag == 'body':
+            tail.remove(child)
+    tail.set('name', 'tail')
+    ET.SubElement(tail, 'site', name='s_tail', pos='0 0 0')
+    actuator = root.find('actuator')
+    for motor in list(actuator):
+        if int(motor.get('joint').removeprefix('joint')) > joints:
+            actuator.remove(motor)
+    # from_xml_string没有原XML目录，资源路径显式指向原场景的资产。
+    for element in root.iter():
+        filename = element.get('file')
+        if filename:
+            element.set('file', str((directory/filename).resolve()))
+    return mujoco.MjModel.from_xml_string(ET.tostring(root, encoding='unicode'))
+
+
 def make_manual_simulation(scene, start_x):
     p = replace(ManualArcParameters.load(ROOT/'configs/step1.json'),
                 joints=real.NUM_JOINTS, first_joint=SIM_FIRST_JOINT, last_joint=SIM_LAST_JOINT,
@@ -413,7 +443,7 @@ def make_manual_simulation(scene, start_x):
         from snake_control.tee_simulation import TeeSimulation
         sim = TeeSimulation(scene.removeprefix('tee_'), p, start_x)
     else:
-        sim = ArcSimulation(scene, p, start_x)
+        sim = ArcSimulation(scene, p, start_x, model=load_manual_arc_model(scene, p.joints))
     if scene in ('length_taper_return', 'elbow90_taper110_210'):
         route = sim.model.numeric('pipe_centerline').data.reshape(-1, 4)
         radius = .055 if scene == 'elbow90_taper110_210' else float(np.interp(start_x, route[:, 0], route[:, 3]))

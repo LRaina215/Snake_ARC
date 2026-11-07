@@ -44,14 +44,43 @@ def prepared_controller():
 
 
 class RealControllerTests(unittest.TestCase):
+    def test_default_eighteen_joint_setup_and_table_diagnostics(self):
+        real.validate_setup()
+        self.assertEqual(real.NUM_JOINTS, 18)
+        self.assertEqual(real.SERVO_IDS, list(range(1, 19)))
+        self.assertEqual(len(real.LINK_LENGTHS_M), 19)
+        with patch.object(real, 'ZERO_RAW', real.ZERO_RAW+[2057, 2070]):
+            with self.assertRaisesRegex(ValueError, 'NUM_JOINTS=18.*ZERO_RAW=20'):
+                real.validate_setup()
+        with patch.object(real, 'SERVO_IDS', [1]+real.SERVO_IDS[:-1]):
+            with self.assertRaisesRegex(ValueError, 'SERVO_IDS.*重复ID'):
+                real.validate_setup()
+
+    def test_eighteen_joint_mode_entries_keep_motor_dimensions(self):
+        for mode in ('gait_sliding', 'gait_feeding', 'gait_helix', 'gait_gravity'):
+            with self.subTest(mode=mode), redirect_stdout(io.StringIO()):
+                controller, port = prepared_controller()
+                controller.command(mode)
+                controller.refresh_compliance_feedback()
+                self.assertEqual(len(controller.targets), 18)
+                self.assertEqual(len(controller.enabled), 18)
+                self.assertEqual(len(controller.measured_angles()), 18)
+                self.assertEqual(set(port.registers), set(range(1, 19)))
+                controller.command('step')
+                for _ in range(5):
+                    controller.refresh_compliance_feedback()
+                    controller.tick(real.CONTROL_PERIOD_S)
+                self.assertEqual(len(controller.targets), 18)
+                self.assertEqual(len(controller.enabled), 18)
+
     def test_calibration_and_wave_agree_with_validated_simulation(self):
         profile = json.loads((ROOT / 'configs/hardware_20j_reference.json').read_text(encoding='utf-8'))
-        joints = sorted(profile['Joints'], key=lambda j: j['Index'])
+        joints = sorted(profile['Joints'], key=lambda j: j['Index'])[:real.NUM_JOINTS]
         self.assertEqual(real.ZERO_RAW, [j['Zero'] for j in joints])
         self.assertEqual(real.SERVO_IDS, [j['ServoId'] for j in joints])
         self.assertEqual(real.SERVO_DIRECTION, [j['Direction'] for j in joints])
         for phase in (0., .7, math.pi / 2, math.pi):
-            expected = [math.degrees(x) for x in ArcParameters().targets(phase)]
+            expected = [math.degrees(x) for x in ArcParameters(joints=real.NUM_JOINTS).targets(phase)]
             actual = real.joint_angles_deg(phase, 60., 8, 13)
             for a, b in zip(actual, expected):
                 self.assertAlmostEqual(a, b)
@@ -64,7 +93,7 @@ class RealControllerTests(unittest.TestCase):
         controller = real.RollingArcController(real.FeetechBus(port))
         controller.command('apply')
         self.assertEqual([port.registers[sid][0x28] for sid in real.SERVO_IDS],
-                         [int(8 <= j <= 13) for j in range(1, 21)])
+                         [int(8 <= j <= 13) for j in range(1, real.NUM_JOINTS+1)])
         writes = [p for p in port.packets if p[4] == 0x83]
         self.assertEqual([p[5] for p in writes], [0x2A, 0x30, 0x29, 0x28])
         first_target = writes[0]

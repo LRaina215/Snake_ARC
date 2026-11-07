@@ -34,7 +34,7 @@ SAVE_LOG = True                # 自动保存实测角、目标、使能与模�
 SHOW_PREVIEW = True            # 随实机脚本启动全身构型窗口；关闭窗口不停止控制
 PREVIEW_PERIOD_S = .2          # 独立进程刷新，绘图不占用串口控制循环
 LOG_DIRECTORY = Path(__file__).resolve().parent / 'logs'  # 不依赖终端/IDE工作目录
-NUM_JOINTS = 20
+NUM_JOINTS = 18                # 当前实机为18关节；下方表按此数量取对应的已校准关节
 FIRST_JOINT = 8                 # 关节从 1 开始编号，包含两个端点
 LAST_JOINT = 13                 # 窗口外明确关闭舵机扭矩，不发送零角位置目标
 AMPLITUDE_DEG = 60.0            # 圆弧幅值，单位：度
@@ -65,7 +65,7 @@ SECTION_MIN_ACTUAL_TURN_DEG = 150.0
 SECTION_MAX_ACTUAL_TURN_DEG = 218.0
 SECTION_MAX_PLANE_RMS_M = .015
 LINK_LENGTHS_M = [.0645] * (NUM_JOINTS + 1)  # 仿真骨架尺寸，按实机铰链中心距修改
-COMPLIANCE_FEEDBACK_PERIOD_S = .20  # 全20舵机读角；不把重复计算当20 Hz新实测
+COMPLIANCE_FEEDBACK_PERIOD_S = .20  # 全关节读角；不把重复计算当20 Hz新实测
 MAX_FEEDBACK_AGE_S = .8
 
 # 自动移窗与数量自适应：同步 phase_normalized_count_v3，真实设备效果待用户验证。
@@ -124,11 +124,12 @@ SUPPORT_CURVATURE_THRESHOLD_DEG = 20.0
 # 不可靠时输入 support=9:11，人工指定实际承担支撑的关节区间；与使能窗口不同。
 DEFAULT_MANUAL_SUPPORT = None
 
-# 从 configs/hardware_20j_reference.json 复制，顺序是 J1..J20。
-# 单文件即可运行。改变实机校准时修改本表，不要再用统一的 2048 零位。
-SERVO_IDS = list(range(1, 21))
+# 零位沿用 configs/hardware_20j_reference.json 的原校准，当前使用其中J1..J18。
+# 默认ID为1..NUM_JOINTS。若硬件ID不连续，按关节顺序改SERVO_IDS与对应零位。
+# 保留历史20项零位供数量切换时取用；修改数量不生成或猜测新的零位。
+SERVO_IDS = list(range(1, NUM_JOINTS + 1))
 ZERO_RAW = [2027, 1953, 2013, 2088, 2057, 1985, 2022, 2111, 2068, 2027,
-            2089, 2103, 1990, 2031, 2073, 2021, 2095, 2062, 2057, 2070]
+            2089, 2103, 1990, 2031, 2073, 2021, 2095, 2062, 2057, 2070][:NUM_JOINTS]
 SERVO_DIRECTION = [1] * NUM_JOINTS
 # 原项目控制器角 -> 舵机协议角：奇数同号，偶数反号。与零位方向是两层换算。
 MODEL_TO_SERVO_SIGN = [1 if j % 2 else -1 for j in range(1, NUM_JOINTS + 1)]
@@ -209,7 +210,7 @@ def raw_to_angle(index, raw):
 
 def validate_parameters(amplitude, omega, first, last):
     if type(first) is not int or type(last) is not int or not 1 <= first <= last <= NUM_JOINTS:
-        raise ValueError('使能窗口必须满足 1 <= first <= last <= 20')
+        raise ValueError(f'使能窗口必须满足 1 <= first <= last <= {NUM_JOINTS}')
     if not math.isfinite(amplitude) or amplitude < 0:
         raise ValueError('幅值必须为有限非负数')
     if not math.isfinite(omega) or omega < 0:
@@ -226,9 +227,13 @@ def validate_parameters(amplitude, omega, first, last):
 
 
 def validate_setup():
-    tables = (SERVO_IDS, ZERO_RAW, SERVO_DIRECTION, MODEL_TO_SERVO_SIGN, MIN_ANGLE_DEG, MAX_ANGLE_DEG)
-    if any(len(table) != NUM_JOINTS for table in tables) or len(set(SERVO_IDS)) != NUM_JOINTS:
-        raise ValueError('舵机表长度或 ID 唯一性错误')
+    tables = dict(SERVO_IDS=SERVO_IDS, ZERO_RAW=ZERO_RAW, SERVO_DIRECTION=SERVO_DIRECTION,
+                  MODEL_TO_SERVO_SIGN=MODEL_TO_SERVO_SIGN, MIN_ANGLE_DEG=MIN_ANGLE_DEG, MAX_ANGLE_DEG=MAX_ANGLE_DEG)
+    mismatch = [f'{name}={len(values)}项' for name, values in tables.items() if len(values) != NUM_JOINTS]
+    if mismatch:
+        raise ValueError(f'关节配置数量不一致：NUM_JOINTS={NUM_JOINTS}，'+ '，'.join(mismatch))
+    if len(set(SERVO_IDS)) != NUM_JOINTS:
+        raise ValueError('SERVO_IDS存在重复ID，请按实际关节顺序配置唯一ID')
     if any(type(v) is not int or not 1 <= v <= 253 for v in SERVO_IDS):
         raise ValueError('舵机 ID 必须为 1..253 的整数')
     if any(v not in (-1, 1) for v in SERVO_DIRECTION + MODEL_TO_SERVO_SIGN):
@@ -245,7 +250,7 @@ def validate_setup():
         raise ValueError('反馈过期时间必须大于全量反馈周期')
     make_section_options()  # 打开串口前检查当前固定截面参数
     if len(LINK_LENGTHS_M) != NUM_JOINTS+1 or not all(math.isfinite(v) and v>0 for v in LINK_LENGTHS_M):
-        raise ValueError('LINK_LENGTHS_M须为21个有限正的铰链中心/端点距离')
+        raise ValueError(f'LINK_LENGTHS_M须为{NUM_JOINTS+1}个有限正的铰链中心/端点距离')
     if not 0 < SECTION_MIN_ACTUAL_TURN_DEG < SECTION_MAX_ACTUAL_TURN_DEG < 360 or SECTION_MAX_PLANE_RMS_M <= 0:
         raise ValueError('实际截面有效范围或平面误差门槛错误')
     validate_parameters(AMPLITUDE_DEG, OMEGA_RAD_S, FIRST_JOINT, LAST_JOINT)
@@ -6048,7 +6053,7 @@ class RollingArcController:
                     step_finished = True
         goal = self.basic_targets()
         if len(goal) != NUM_JOINTS or any(not math.isfinite(angle) for angle in goal):
-            raise ValueError('步态公式必须返回 20 个有限角度值（单位：度）')
+            raise ValueError(f'步态公式必须返回 {NUM_JOINTS} 个有限角度值（单位：度）')
         for i, active in enumerate(self.enabled):
             if active:
                 angle_to_raw(i, goal[i])  # 修改公式后也先检查最终目标，不能靠截断掩盖越界
@@ -6590,7 +6595,7 @@ class JointPreviewFigure:
             self.section_basis = basis
             self.body_points = points = (full-origin)@basis
             self.target_points = targets = (forward(np.radians(row['target_deg']), row['lengths'])-origin)@basis
-            # 22个节点 = 头端点、J1..J20、尾端点；不再按使能窗口裁剪。
+            # NUM_JOINTS+2个节点 = 头端点、全部关节、尾端点。
             for i in range(len(points)-1):
                 self.body.plot(*points[i:i+2].T, color=colours[max(0, i-1)], lw=1.5, alpha=.35 if stale else .7)
             self.body.plot([], [], color='#147bb5', lw=2, label='使能实测')

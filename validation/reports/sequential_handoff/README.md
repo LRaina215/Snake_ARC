@@ -59,7 +59,7 @@ Ctrl+5 应完成一个任务：从当前实测 ARC 识别承载特征与两侧�
 
 ## 启动与视频
 
-沿用已有 `mujoco` 环境。实机直接运行 `python .\codes\Rolling_Arc_Real.py`。手动仿真直接运行 `python .\codes\Rolling_Arc_Debug_Mujoco.py`；T管设顶部 `SCENE='tee_up60'`、`START_X_M=.2`。手调入口导入同一个实机控制器，Ctrl+R重置仍保留T场景；另检查了当前20路配置下场景加载与重置，未把这项初始化检查写成20关节运动验证。
+沿用已有 `mujoco` 环境。实机直接运行 `python .\codes\Rolling_Arc_Real.py`。手动仿真直接运行 `python .\codes\Rolling_Arc_Debug_Mujoco.py`；T管设顶部 `SCENE='tee_up60'`、`START_X_M=.2`。手调入口导入同一个实机控制器，Ctrl+R重置仍保留T场景。此前的20路场景初始化检查是历史记录；现默认18关节，数量表和手调模型已统一，见[18关节启动修复检查](../hardware18_startup/README.md)。
 
 Ctrl+5后用J/G自动完成两侧调长、前部成形与就位，暂停后由现场L确认实际搭稳，再J/G送尾。无需先切4准备长度。J/G/L均按住Ctrl。自动部分只用角度与时间；L确认的真实接触由操作者观察。Ctrl+6复用此入口，然后继续支管对准、右U、失能和重力矩回卷。Ctrl+空格暂停，Ctrl+X失能。
 
