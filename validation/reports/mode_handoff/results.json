@@ -2,7 +2,7 @@
   {
     "case": "basic5",
     "round": "round6",
-    "passed": true,
+    "passed": false,
     "time_s": 183.1990000005228,
     "front_s": 18.92000000000014,
     "tail_s": 18.92000000000014,
@@ -12,12 +12,14 @@
     "saturated_frames": 2109,
     "frames": 3715,
     "max_joint_deg": 90.03403120851365,
-    "release": null
+    "release": null,
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   },
   {
     "case": "feed_j5",
     "round": "round7",
-    "passed": true,
+    "passed": false,
     "time_s": 320.19899999928117,
     "front_s": 45.119999999985545,
     "tail_s": 45.119999999985545,
@@ -27,12 +29,14 @@
     "saturated_frames": 2057,
     "frames": 6455,
     "max_joint_deg": 90.03805348703912,
-    "release": null
+    "release": null,
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   },
   {
     "case": "feed_h5",
     "round": "round6",
-    "passed": true,
+    "passed": false,
     "time_s": 224.59900000072048,
     "front_s": 43.71999999998881,
     "tail_s": 43.71999999998881,
@@ -42,12 +46,14 @@
     "saturated_frames": 1750,
     "frames": 4543,
     "max_joint_deg": 90.03434485509075,
-    "release": null
+    "release": null,
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   },
   {
     "case": "head_short5",
     "round": "round6",
-    "passed": true,
+    "passed": false,
     "time_s": 211.79900000065936,
     "front_s": 41.219999999994634,
     "tail_s": 41.219999999994634,
@@ -57,12 +63,14 @@
     "saturated_frames": 3238,
     "frames": 4287,
     "max_joint_deg": 90.07798871147088,
-    "release": null
+    "release": null,
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   },
   {
     "case": "tail_short5",
     "round": "round8",
-    "passed": true,
+    "passed": false,
     "time_s": 92.5990000000902,
     "front_s": 45.51999999998461,
     "tail_s": 45.51999999998461,
@@ -72,12 +80,14 @@
     "saturated_frames": 190,
     "frames": 1903,
     "max_joint_deg": 90.00813077960865,
-    "release": null
+    "release": null,
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   },
   {
     "case": "buffer6",
     "round": "round6",
-    "passed": true,
+    "passed": false,
     "time_s": 277.5490000003487,
     "front_s": 9.819999999999997,
     "tail_s": 9.819999999999997,
@@ -92,12 +102,14 @@
       "tail_com_y_end_m": -0.021845853036413343,
       "front_rotation_deg": 65.93005544485906,
       "head_advance_m": 0.011987051663035153
-    }
+    },
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   },
   {
     "case": "five_then6",
     "round": "round8",
-    "passed": true,
+    "passed": false,
     "time_s": 275.34900000040074,
     "front_s": 9.819999999999997,
     "tail_s": 9.819999999999997,
@@ -112,12 +124,14 @@
       "tail_com_y_end_m": -0.018360742041280003,
       "front_rotation_deg": 66.27546606273813,
       "head_advance_m": 0.012062635548436007
-    }
+    },
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   },
   {
     "case": "phase6",
     "round": "round8",
-    "passed": true,
+    "passed": false,
     "time_s": 228.54900000073445,
     "front_s": 11.319999999999165,
     "tail_s": 11.319999999999165,
@@ -132,12 +146,14 @@
       "tail_com_y_end_m": -0.010298487622617888,
       "front_rotation_deg": 70.88994560311188,
       "head_advance_m": 0.009827531570362424
-    }
+    },
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   },
   {
     "case": "feed_h6",
     "round": "round8",
-    "passed": true,
+    "passed": false,
     "time_s": 438.7499999965368,
     "front_s": 40.4199999999965,
     "tail_s": 40.4199999999965,
@@ -152,6 +168,8 @@
       "tail_com_y_end_m": 0.011252178880218844,
       "front_rotation_deg": 53.80492727295443,
       "head_advance_m": 0.013655930478069456
-    }
+    },
+    "previous_passed": true,
+    "acceptance_status": "withdrawn_pending_sequential_support_and_self_contact_review"
   }
 ]

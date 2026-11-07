@@ -4,7 +4,7 @@ World geometry in this file represents the operator's Ctrl+L confirmations and
 evaluation. It is never passed to the real controller.
 """
 import argparse
-from dataclasses import replace
+from dataclasses import asdict, replace
 import json
 from pathlib import Path
 import sys
@@ -35,6 +35,7 @@ CASES = {
     'head_short5': dict(window=(2, 7)),
     'tail_short5': dict(window=(11, 16)),
     'feed_h6': dict(tee=True, feed=-1),
+    'feed_j6': dict(tee=True, feed=1),
 }
 
 
@@ -62,15 +63,11 @@ def run(case, output):
     real.SERVO_IDS, real.ZERO_RAW = real.SERVO_IDS[:n], real.ZERO_RAW[:n]
     real.MODEL_TO_SERVO_SIGN, real.SERVO_DIRECTION = real.MODEL_TO_SERVO_SIGN[:n], real.SERVO_DIRECTION[:n]
     if config.get('tee'):
-        source = Path('artifacts/gm_arc_shift_rolling/gravity_continuous')
-        previous = json.loads((source/'locked_gait.json').read_text(encoding='utf-8'))
-        trace = np.load(source/'locked_gait_trace.npz')
-        index = next(i for i, r in enumerate(previous['samples']) if r['stage'] == 'front_only_coil')
-        data.qpos[:], data.qvel[:] = trace['qpos'][index], trace['qvel'][index]
-        window = (6, 11)
-        mask = trace['masks'][index].copy() if config.get('buffered') else trace['stiffness_scale'][index] >= .999
-        initial = trace['targets'][index].copy()
-        phase = previous['samples'][index]['reference_roll_rad']
+        fixture = json.loads((Path(__file__).parent/'fixtures/arc_tee_initial18.json').read_text(encoding='utf-8'))
+        data.qpos[:], data.qvel[:] = fixture['qpos'], fixture['qvel']
+        window = tuple(fixture['window'])
+        mask = np.asarray(fixture['buffered_mask'] if config.get('buffered') else fixture['arc_mask'], bool)
+        initial, phase = np.asarray(fixture['targets']), fixture['phase']
         mujoco.mj_forward(model, data)
     else:
         window, phase = config['window'], 0.
@@ -103,9 +100,15 @@ def run(case, output):
     last_control = last_feedback = -1.
     first_tail_on = None
     front_confirmed_at = None
-    front_ready_roll = None
     terminal_at = None
     failure = None
+    self_contact_events = []
+    locked_front = None
+    held_front_count = None
+    front_target_change = 0.
+    front_hold_started = None
+    next_progress = float(data.time)+30.
+    clear_since = None
 
     def command(key):
         controller.command(real.decode_hotkey(ord(key), True))
@@ -121,7 +124,7 @@ def run(case, output):
         command('L')
         command('G')
         confirmations.append(dict(stage=stage, time_s=float(data.time)))
-        if stage == 'front':
+        if stage == 'front_hold':
             front_confirmed_at = float(data.time)
 
     if config.get('feed'):
@@ -133,24 +136,41 @@ def run(case, output):
 
     def actual_front_ready(core):
         nonlocal support_since
-        last = core.front.window[1]
+        last = core.front_count
         points = backbone(model, data)
-        yz = points[:last+1, 1:]-[0., PIPE_HEIGHT]
+        yz = points[:last+2, 1:]-[0., PIPE_HEIGHT]
         turn = np.ptp(np.unwrap(np.arctan2(yz[:, 1], yz[:, 0])))
         main, _, _ = pipe_contacts(sim)
-        attached = (turn >= .65*2*np.pi and max(np.linalg.norm(yz, axis=1)) <= .148 and
-                    any(j <= 1 for j in main) and any(3 <= j <= last for j in main))
+        supported = [j for j in main if j <= last]
+        attached = (turn >= .9*2*np.pi and max(np.linalg.norm(yz, axis=1)) <= .115 and
+                    len(supported) >= 2 and max(supported)-min(supported) >= 3)
         support_since = (data.time if support_since is None else support_since) if attached else None
-        return support_since is not None and data.time-support_since >= .4
+        return support_since is not None and data.time-support_since >= .8
 
     def control(_):
-        nonlocal last_control, last_feedback, first_tail_on, terminal_at, failure, front_ready_roll
+        nonlocal last_control, last_feedback, first_tail_on, terminal_at, failure
+        nonlocal locked_front, held_front_count, front_target_change, front_hold_started
+        nonlocal support_since
+        nonlocal next_progress
+        for contact in data.contact:
+            a, b = model.geom_bodyid[[contact.geom1, contact.geom2]]-model.body('head').id
+            if min(a, b) >= 0 and abs(a-b) > 2 and contact.dist <= 0.:
+                if not self_contact_events:
+                    self_contact_events.append(dict(time_s=float(data.time), links=[int(a), int(b)],
+                        stage=current_stage(), penetration_m=float(-contact.dist), qpos=data.qpos.tolist(),
+                        targets=controller.targets.copy(), enabled=controller.enabled.copy()))
+                failure = 'nonadjacent robot links touched'
         if data.time-last_control < .02-1e-8:
             return np.radians(controller.bus.targets_deg)
         if data.time-last_feedback >= .2-1e-8:
             controller.refresh_compliance_feedback()
             last_feedback = data.time
         core = controller.helix_transition
+        if data.time >= next_progress:
+            print(json.dumps(dict(time_s=round(float(data.time), 2), stage=current_stage(),
+                accepted=None if core is None else core.accepted,
+                operator_mode=controller.mode)), flush=True)
+            next_progress += 30.
         if controller.feeding_selected:
             if controller.feeding.completed:
                 command('6' if config.get('tee') else '5')
@@ -159,13 +179,15 @@ def run(case, output):
             elif controller.feeding.fault:
                 failure = controller.feeding.fault
         if core is not None:
-            front_attached = (actual_front_ready(core) if core.stage == 'front' and core.front.stage == 'lead' else False)
-            if core.stage == 'front' and core.front_extended:
-                front_ready_roll = core.front.roll if front_ready_roll is None else front_ready_roll
-                if core.front.roll-front_ready_roll > 2.*np.pi:
-                    failure = 'front support not established within one complete roll'
-            if core.stage == 'front' and core.front_extended and front_attached:
-                confirm('front')
+            front_attached = actual_front_ready(core) if core.stage == 'front_hold' and controller.mode == 'hold' else False
+            if core.stage == 'front_hold' and controller.mode != 'hold':
+                support_since = None
+            if core.stage == 'front_hold':
+                front_hold_started = data.time if front_hold_started is None else front_hold_started
+            if core.stage == 'front_hold' and front_attached and controller.mode == 'hold':
+                confirm('front_hold')
+                held_front_count = core.front_count
+                locked_front = np.radians(controller.targets[:held_front_count])
             elif core.stage == 'align' and helix_alignment_ready(trial, (90., 130.), 1.035, .10):
                 confirm('align')
             elif (core.stage == 'right_u_hold' or core.stage == 'unwind' and core.elapsed >= 3.) and right_u_ready(trial, np.arange(n)<8):
@@ -184,12 +206,15 @@ def run(case, output):
                     terminal_at = float(data.time)
             elif core.stage == 'blocked':
                 failure = core.status()
-            elif controller.mode == 'hold' and core.stage == 'front' and core.front_extended:
-                command('G')
+            elif controller.mode == 'hold' and core.stage == 'front_hold' and data.time-front_hold_started >= 1.5:
+                command('J')
             elif controller.mode == 'hold' and core.stage == 'align':
                 command('G')
+        previous_mode = controller.mode
         controller.tick(.02)
         core = controller.helix_transition
+        if core is not None and core.stage == 'front_hold' and controller.mode == 'hold' and previous_mode != 'hold':
+            front_hold_started = data.time
         trial.phase = controller.command_phase
         if (core is not None and core.front is not None and core.stage == 'front' and core.front.stage == 'lead'
                 and any(controller.enabled[core.front.window[1]:])):
@@ -197,25 +222,35 @@ def run(case, output):
         if (core is not None and core.front is not None and core.stage == 'first_shift' and
                 any(controller.enabled[core.front.window[1]:]) and first_tail_on is None):
             first_tail_on = float(data.time)
+        if core is not None and core.stage == 'first_shift' and locked_front is not None:
+            front_target_change = max(front_target_change,
+                float(np.max(abs(np.radians(controller.targets[:held_front_count])-locked_front))))
         last_control = data.time
         return np.radians(controller.bus.targets_deg)
 
     def stopped(_):
+        nonlocal clear_since
+        row = trial.samples[-1] if trial.samples else None
+        clear = bool(row and row['stage'] == 'roll' and row['x_min_m'] > .409 and not row['branch_links'])
+        clear_since = (data.time if clear_since is None else clear_since) if clear else None
         return (failure is not None or terminal_at is not None and data.time-terminal_at >= 3. or
-                sum(r['stage'] == 'roll' for r in trial.samples[-212:]) >= 211)
+                clear_since is not None and data.time-clear_since >= 10.5)
 
     def current_stage():
         return controller.helix_transition.stage if controller.helix_transition is not None else 'feeding'
 
     try:
-        trial.phase_run(1, current_stage, 480. if config.get('tee') else 350., control,
+        trial.phase_run(1, current_stage, 600. if config.get('tee') else 350., control,
                         stiffness=lambda: np.asarray(controller.enabled, float),
                         stop_when=stopped)
     except (ValueError, RuntimeError) as exc:
         failure = str(exc)
     rolling = [r for r in trial.samples if r['stage'] == 'roll']
+    if failure is None and trial.stopped:
+        failure = 'ground contact exceeded 1 N'
     held = [r for r in trial.samples if r['stage'] == 'complete']
-    recovery = recovery_metrics(rolling)
+    recovered = [row for row in rolling if clear_since is not None and row['time_s'] >= clear_since]
+    recovery = recovery_metrics(recovered)
     helix = (len(held) >= 50 and all(r['tail_max_radius_m'] < .145 and r['tail_span_deg'] >= 75. and
              bool(r['distal_contacts']) and any(j <= n//2 for j in r['main_links']) for r in held))
     ordered = first_tail_on is not None and front_confirmed_at is not None and first_tail_on >= front_confirmed_at
@@ -225,7 +260,12 @@ def run(case, output):
          entries=entries, recovery=recovery, helix_held=helix, first_tail_on_s=first_tail_on,
          front_confirmed_s=front_confirmed_at, front_before_tail=ordered,
          final_stage=current_stage(), hardware_run=False,
-         controller_status=None if controller.helix_transition is None else controller.helix_transition.status())
+         controller_status=None if controller.helix_transition is None else controller.helix_transition.status(),
+         self_contact_events=self_contact_events, front_target_change_rad=front_target_change,
+         front_freeze_count=held_front_count,
+         clear_since_s=clear_since, total_rolling_s=0. if not rolling else rolling[-1]['time_s']-rolling[0]['time_s'],
+         controller_options=None if controller.helix_transition is None else asdict(controller.helix_transition.options),
+         gait_options=None if controller.helix_transition is None else asdict(controller.helix_transition.gait.o))
     return passed
 
 

@@ -23,6 +23,8 @@ python .\codes\Rolling_Arc_Debug_Mujoco.py
 
 110→210→110 mm直管设`SCENE='length_taper_return'`、`START_X_M=-.35`；110→210 mm连续90°急弯设`SCENE='elbow90_taper110_210'`、`START_X_M=-.25`。
 
+手动测试T管切换设`SCENE='tee_up60'`、`START_X_M=.2`，主管/支管直径110/60 mm，仍使用同一套Ctrl+5/6操作。
+
 ## 实机测试
 
 直接运行一份Python文件控制舵机，无需填写启动参数或使用外部可视化程序。默认自动识别CH340，日志自动保存到`codes/logs/`：
@@ -37,7 +39,7 @@ python .\codes\Rolling_Arc_Real.py
 
 **主动送链调长**：形成完成后按**Ctrl+4**，每按一次**Ctrl+J/H**执行一段头侧增长/缩短，到位保持，不自动往返。默认请求64.5 mm，**Ctrl+-/=**减半/加倍；到可达边界停止同向推进，反向键可退出。**Ctrl+G**暂停/继续，**Ctrl+L**推进一帧，**Ctrl+Y**手动返回本步起态，**Ctrl+X**全部失能。仿真同键位；参数在实机文件顶部`FEED_*`修改。[完整操作说明](docs/主动送链实机验收说明.md)。
 
-**ARC→Helix**：搭管圆弧稳定后按 **Ctrl+5**，也可在模式4调长结束后接入。**Ctrl+J/G** 先形成前部螺旋，程序暂停后观察是否搭稳。搭稳按 **Ctrl+L** 确认，再用 **J/G** 逐节送尾；未搭稳继续 **J/G** 会逐级内扣再观察。**Ctrl+空格** 暂停，**Ctrl+K** 查看阶段。实机和仿真手调同键位，J1为前端。[切换验证记录](validation/reports/mode_handoff/README.md)
+**ARC→Helix**：搭管圆弧稳定后按 **Ctrl+5**。**Ctrl+J/G** 会按当前实测姿态自动调整两侧余长，再先形成前部螺旋，无需提前用模式4摆好长度。前部搭稳后按 **Ctrl+L** 确认，再用 **J/G** 逐节送尾；前部已发目标在送尾期间保持。尚未搭稳时 **J/G** 只滚动前部就位，后段仍失能。**Ctrl+空格** 暂停，**Ctrl+K** 查看阶段。实机和仿真手调同键位，J1为前端。[验证记录](validation/reports/sequential_handoff/README.md)
 
 **T 管重力矩越障（实机）**用 **Ctrl+6** 选择，保持 J1 为前端。**Ctrl+J/G** 单步或连续推进，暂停后用 **Ctrl+L** 确认当前姿态，**Ctrl+K** 查看下一步。[操作顺序与参数](validation/reports/gm_arc_handoff/README.md#实机操作)。
 

@@ -42,8 +42,11 @@ LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
 MOTOR_STAGES = {
     'feeding': '主动送链，调整左右长度',
     'arc_settle': '实测承载圆弧接入曲线参考',
-    'front': '保持尾部失能，先形成前部螺旋',
-    'first_shift': '首次 Shift Rolling，前进并逐节送尾',
+    'front': '自动调长并前卷，尾部失能',
+    'front_finish': '先成完整前部螺旋，尾部失能',
+    'front_seat': '仅前部滚动就位，后段保持失能',
+    'front_hold': '前部保持，确认搭稳后再接尾',
+    'first_shift': '前部保持，尾段沿曲线逐节上管',
     'first_recover': '全身螺旋成形，恢复滚动',
     'align': '滚动对准支管，等待现场确认',
     'unwind': '尾部解旋，形成主管右侧小 U',
@@ -51,6 +54,9 @@ MOTOR_STAGES = {
     'drop': '尾部关闭扭矩，靠重力落向轴下',
     'drop_hold': '尾部保持失能，等待确认下垂',
     'rewrap': 'Shift Rolling 回卷，前部同时推进',
+    'return_seat': '原实机曲线：按顺序接管切线弧与直尾',
+    'return_wind': '缩短直尾，后部沿螺旋逐节上管',
+    'return_finish': '消去切线圆弧，接回整身螺旋',
     'recover': '回卷完成，恢复常速',
     'roll': '整身清障后继续螺旋滚动',
     'complete': '完整 Helix 已形成，保持',
@@ -90,7 +96,11 @@ def main():
     main = model.geom('pipe_main').id
     full_pos, full_size = model.geom_pos[main].copy(), model.geom_size[main].copy()
     times = trace['time']
-    fixed_x = float(np.median(trace['qpos'][:, 0]))
+    qpos = trace['qpos']
+    masks = trace['masks'] if 'masks' in trace.files else None
+    scales = trace['stiffness_scale'] if 'stiffness_scale' in trace.files else None
+    all_targets = trace['targets'] if 'targets' in trace.files else None
+    fixed_x = float(np.median(qpos[:, 0]))
     shift_samples = [row for row in report.get('shift', {}).get('curve_samples', []) if 'window_shift_m' in row]
     shift_times = [row['time_s'] for row in shift_samples]
     step = max(1, int(round(args.speed / args.fps / np.median(np.diff(times)))))
@@ -108,9 +118,9 @@ def main():
         raise RuntimeError('could not open video writer')
     with mujoco.Renderer(model, height=H, width=W) as renderer:
         for index in indices:
-            d.qpos[:] = trace['qpos'][index]
-            mask = trace['masks'][index] if 'masks' in trace.files else sim.p.enabled
-            stiffness = trace['stiffness_scale'][index] if 'stiffness_scale' in trace.files else mask.astype(float)
+            d.qpos[:] = qpos[index]
+            mask = masks[index] if masks is not None else sim.p.enabled
+            stiffness = scales[index] if scales is not None else mask.astype(float)
             model.geom_rgba[model.geom_bodyid >= head] = [.50, .26, .70, 1]
             for j in np.flatnonzero(mask) + 1:
                 color = [.10, .48, .85, 1] if stiffness[j-1] >= .99 else [.10, .72, .65, 1]
@@ -178,10 +188,12 @@ def main():
             draw.text((W + 12, 76), '端视（沿管轴）', fill=(230, 230, 230), font=SMALL)
             if motor_commands:
                 y = H+74
-                held = raw in ('right_u_hold', 'drop_hold')
+                held = raw in ('front_hold', 'right_u_hold', 'drop_hold')
                 operation = '保持，Ctrl+L 确认后 Ctrl+J/G 执行下一段' if held else 'Ctrl+G 连续，可用 Ctrl+空格 暂停'
                 if raw == 'complete':
                     operation = '完整 Helix 保持，继续 T 管流程用 Ctrl+6'
+                if raw == 'first_shift' and report.get('front_freeze_count'):
+                    operation = f'前部 J1–J{report["front_freeze_count"]} 目标保持；J/G 只推进后段曲线'
                 if report.get('commands'):
                     sent = [e for e in report['commands'] if e['time_s'] <= times[index]]
                     if sent:
@@ -199,7 +211,7 @@ def main():
                 draw.text((12, y+93), '已发目标 (°)', fill=(62, 86, 102), font=SMALL)
                 draw.text((12, y+121), '仿真实测 (°)', fill=(62, 86, 102), font=SMALL)
                 measured = np.degrees(d.qpos[sim.drive.qadr])
-                targets = np.degrees(trace['targets'][index])
+                targets = np.degrees(all_targets[index])
                 cell = (2*W-170)/len(mask)
                 for j, enabled in enumerate(mask):
                     x = 165+j*cell

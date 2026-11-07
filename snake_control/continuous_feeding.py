@@ -252,8 +252,8 @@ class ContinuousFeeding:
         fraction = float(np.clip(position/2-cell, 0., 1.))
         old = tuple(j+2*cell for j in self.origin)
         new = tuple(j+2 for j in old)
-        left = self.helper.template(old, 0., self.options.amplitude_deg, bias)
-        right = self.helper.template(new, 0., self.options.amplitude_deg, bias)
+        left = self.helper.template(old, self.phase, self.options.amplitude_deg, bias)
+        right = self.helper.template(new, self.phase, self.options.amplitude_deg, bias)
         curved = np.flatnonzero(abs(left)+abs(right)>1e-10)+1
         focus = (int(curved[0]), int(curved[-1]))
         target = (1-fraction)*left+fraction*right
@@ -395,7 +395,7 @@ class ContinuousFeeding:
 
         desired = self.targets.copy()
         if self.stage == 'prepare':
-            desired = self.helper.template(self.origin, 0., opt.amplitude_deg)
+            desired = self.helper.template(self.origin, self.phase, opt.amplitude_deg)
             if control_time_s >= opt.preparation_s-1e-8 and fresh:
                 if not self.observation['valid']:
                     # A fresh sample at the nominal preparation boundary may
@@ -496,7 +496,7 @@ class ContinuousFeeding:
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
             acquisition_metrics=self.acquisition_metrics,
-            phase_rad=0., position_joints=self.position, bearing_bias=self.bias,
+            phase_rad=self.phase, position_joints=self.position, bearing_bias=self.bias,
             bearing_error_m=self.bearing_error_m, goal_m=self.goal_m, baseline_m=self.baseline,
             goal_delta_m=None if self.goal_m is None else self.goal_m-self.baseline,
             observation=self.observation, velocity_m_s=self.velocity_m_s, enabled=self.enabled.tolist(),

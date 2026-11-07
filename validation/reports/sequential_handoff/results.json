@@ -1,0 +1,1352 @@
+{
+  "date": "2026-11-07",
+  "hardware_validated": false,
+  "joints": 18,
+  "main_diameter_mm": 110,
+  "branch_diameter_mm": 60,
+  "controller_input": "sampled motor angles, enable state, time; operator confirms physical support",
+  "feedback_period_s": 0.2,
+  "control_period_s": 0.02,
+  "actual_state_record_period_s": 0.05,
+  "self_contact_check_period_s": 0.001,
+  "all_passed": true,
+  "results": [
+    {
+      "case": "basic5",
+      "record": "artifacts/sequential_handoff/round18/basic5",
+      "config": {
+        "window": [
+          7,
+          12
+        ]
+      },
+      "end_time_s": 151.52000000035943,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+5",
+          "stage": "front"
+        },
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+G",
+          "stage": "front"
+        },
+        {
+          "time_s": 94.12000000008535,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 94.12000000008535,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 94.12000000008535,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": false,
+        "reason": "recovery not reached"
+      },
+      "review": {
+        "case": "basic5",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 236.83672076879026,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9264128704965224,
+        "intake_max_front_radius_m": 0.11810134470656958,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 3031,
+        "final_shape_frames": 60,
+        "final_min_turns": 2.0055720098249887,
+        "final_max_radius_m": 0.10580029440409508,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.0715785223323,
+        "minimum_support_n": 21.087030191782663,
+        "low_support_frames": 0,
+        "floor_frames": 0,
+        "saturated_frames": 199,
+        "shared_target_step_max_deg": 1.3800000000000032,
+        "front_confirmed_s": 94.12000000008535,
+        "first_tail_on_s": 94.12000000008535,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 94.12000000008535
+          }
+        ],
+        "failure": null,
+        "gravity_release": null
+      }
+    },
+    {
+      "case": "feed_j5",
+      "record": "artifacts/sequential_handoff/round18/feed_j5",
+      "config": {
+        "window": [
+          7,
+          12
+        ],
+        "feed": 1
+      },
+      "end_time_s": 177.9200000004855,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+4",
+          "stage": null
+        },
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+J",
+          "stage": null
+        },
+        {
+          "time_s": 26.12000000000894,
+          "key": "Ctrl+5",
+          "stage": "arc_settle"
+        },
+        {
+          "time_s": 26.12000000000894,
+          "key": "Ctrl+G",
+          "stage": "arc_settle"
+        },
+        {
+          "time_s": 120.52000000021141,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 120.52000000021141,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 120.52000000021141,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": false,
+        "reason": "recovery not reached"
+      },
+      "review": {
+        "case": "feed_j5",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 237.1808382974149,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9267124776769069,
+        "intake_max_front_radius_m": 0.1180848905536753,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 3559,
+        "final_shape_frames": 60,
+        "final_min_turns": 2.0055774671028783,
+        "final_max_radius_m": 0.10579540317779473,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.073371017583,
+        "minimum_support_n": 0.0,
+        "low_support_frames": 2,
+        "floor_frames": 0,
+        "saturated_frames": 198,
+        "shared_target_step_max_deg": 2.7,
+        "front_confirmed_s": 120.52000000021141,
+        "first_tail_on_s": 120.52000000021141,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 120.52000000021141
+          }
+        ],
+        "failure": null,
+        "gravity_release": null
+      }
+    },
+    {
+      "case": "feed_h5",
+      "record": "artifacts/sequential_handoff/round17/feed_h5",
+      "config": {
+        "window": [
+          7,
+          12
+        ],
+        "feed": -1
+      },
+      "end_time_s": 155.72000000037949,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+4",
+          "stage": null
+        },
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+H",
+          "stage": null
+        },
+        {
+          "time_s": 24.72000000000723,
+          "key": "Ctrl+5",
+          "stage": "arc_settle"
+        },
+        {
+          "time_s": 24.72000000000723,
+          "key": "Ctrl+G",
+          "stage": "arc_settle"
+        },
+        {
+          "time_s": 98.32000000010541,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 98.32000000010541,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 98.32000000010541,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": false,
+        "reason": "recovery not reached"
+      },
+      "review": {
+        "case": "feed_h5",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 236.37701361652313,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9266077817495757,
+        "intake_max_front_radius_m": 0.11809084276347391,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 3115,
+        "final_shape_frames": 60,
+        "final_min_turns": 2.0055752633689052,
+        "final_max_radius_m": 0.10579712270835354,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.07173643648964,
+        "minimum_support_n": 0.0,
+        "low_support_frames": 2,
+        "floor_frames": 0,
+        "saturated_frames": 198,
+        "shared_target_step_max_deg": 1.8,
+        "front_confirmed_s": 98.32000000010541,
+        "first_tail_on_s": 98.32000000010541,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 98.32000000010541
+          }
+        ],
+        "failure": null,
+        "gravity_release": null
+      }
+    },
+    {
+      "case": "head_short5",
+      "record": "artifacts/sequential_handoff/round18/head_short5",
+      "config": {
+        "window": [
+          2,
+          7
+        ]
+      },
+      "end_time_s": 118.52000000020186,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+5",
+          "stage": "front"
+        },
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+G",
+          "stage": "front"
+        },
+        {
+          "time_s": 61.13999999994821,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 61.13999999994821,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 61.13999999994821,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": false,
+        "reason": "recovery not reached"
+      },
+      "review": {
+        "case": "head_short5",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 238.02017464268823,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9265930274999079,
+        "intake_max_front_radius_m": 0.11809718578180477,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 2371,
+        "final_shape_frames": 60,
+        "final_min_turns": 2.0055700601158697,
+        "final_max_radius_m": 0.10580920007075142,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.07034926724701,
+        "minimum_support_n": 19.673255626871374,
+        "low_support_frames": 0,
+        "floor_frames": 0,
+        "saturated_frames": 198,
+        "shared_target_step_max_deg": 1.3800000000000017,
+        "front_confirmed_s": 61.13999999994821,
+        "first_tail_on_s": 61.13999999994821,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 61.13999999994821
+          }
+        ],
+        "failure": null,
+        "gravity_release": null
+      }
+    },
+    {
+      "case": "tail_short5",
+      "record": "artifacts/sequential_handoff/round18/tail_short5",
+      "config": {
+        "window": [
+          11,
+          16
+        ]
+      },
+      "end_time_s": 192.9200000005571,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+5",
+          "stage": "front"
+        },
+        {
+          "time_s": 2.4999999999998357,
+          "key": "Ctrl+G",
+          "stage": "front"
+        },
+        {
+          "time_s": 135.52000000028303,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 135.52000000028303,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 135.52000000028303,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": false,
+        "reason": "recovery not reached"
+      },
+      "review": {
+        "case": "tail_short5",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 236.71509598484124,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9277683816128217,
+        "intake_max_front_radius_m": 0.11802189421123568,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 3859,
+        "final_shape_frames": 60,
+        "final_min_turns": 2.0056336621117157,
+        "final_max_radius_m": 0.10578114947615799,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.06695478767871,
+        "minimum_support_n": 0.0,
+        "low_support_frames": 3,
+        "floor_frames": 0,
+        "saturated_frames": 195,
+        "shared_target_step_max_deg": 2.7000000000000006,
+        "front_confirmed_s": 135.52000000028303,
+        "first_tail_on_s": 135.52000000028303,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 135.52000000028303
+          }
+        ],
+        "failure": null,
+        "gravity_release": null
+      }
+    },
+    {
+      "case": "buffer6",
+      "record": "artifacts/sequential_handoff/round19/buffer6",
+      "config": {
+        "tee": true,
+        "buffered": true
+      },
+      "end_time_s": 490.1529999953213,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 0.0,
+          "key": "Ctrl+6",
+          "stage": "front"
+        },
+        {
+          "time_s": 0.0,
+          "key": "Ctrl+G",
+          "stage": "front"
+        },
+        {
+          "time_s": 66.89999999995538,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 69.37999999996723,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 71.85999999997907,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 74.33999999999091,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 76.82000000000275,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 79.30000000001459,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 81.78000000002643,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 83.58000000003503,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 83.58000000003503,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 83.58000000003503,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 137.62000000029306,
+          "key": "Ctrl+G",
+          "stage": "align"
+        },
+        {
+          "time_s": 387.5799999977468,
+          "key": "Ctrl+N",
+          "stage": "align"
+        },
+        {
+          "time_s": 387.5799999977468,
+          "key": "Ctrl+L",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 387.5799999977468,
+          "key": "Ctrl+G",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 395.4599999975605,
+          "key": "Ctrl+N",
+          "stage": "right_u_hold"
+        },
+        {
+          "time_s": 395.4599999975605,
+          "key": "Ctrl+L",
+          "stage": "drop"
+        },
+        {
+          "time_s": 395.4599999975605,
+          "key": "Ctrl+G",
+          "stage": "drop"
+        },
+        {
+          "time_s": 396.45999999753684,
+          "key": "Ctrl+N",
+          "stage": "drop_hold"
+        },
+        {
+          "time_s": 396.45999999753684,
+          "key": "Ctrl+L",
+          "stage": "return_seat"
+        },
+        {
+          "time_s": 396.45999999753684,
+          "key": "Ctrl+G",
+          "stage": "return_seat"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": true,
+        "duration_s": 10.44999999975289,
+        "distal_engaged_samples": 210,
+        "samples": 210,
+        "clear_boundary_m": 0.40900000000000003,
+        "all_clear": true,
+        "supported": true,
+        "trailing_advance_m": 0.21495836718619477,
+        "min_x_end_m": 0.7489079494268788,
+        "max_tail_radius_m": 0.1060297377874342,
+        "min_tail_span_deg": 221.25069395701348
+      },
+      "review": {
+        "case": "buffer6",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 237.6563399095167,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9458414421282773,
+        "intake_max_front_radius_m": 0.11296008891463148,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 9804,
+        "final_shape_frames": 211,
+        "final_min_turns": 1.9730958273334784,
+        "final_max_radius_m": 0.10737916958998138,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.08976869332749,
+        "minimum_support_n": 0.0,
+        "low_support_frames": 3,
+        "floor_frames": 0,
+        "saturated_frames": 614,
+        "shared_target_step_max_deg": 2.7000000000000006,
+        "front_confirmed_s": 83.58000000003503,
+        "first_tail_on_s": 83.58000000003503,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 83.58000000003503
+          },
+          {
+            "stage": "align",
+            "time_s": 387.5799999977468
+          },
+          {
+            "stage": "right_u_hold",
+            "time_s": 395.4599999975605
+          },
+          {
+            "stage": "drop_hold",
+            "time_s": 396.45999999753684
+          }
+        ],
+        "failure": null,
+        "gravity_release": {
+          "tail_com_y_start_m": -0.08238890190648704,
+          "tail_com_y_end_m": 0.0008193821206956588,
+          "front_rotation_deg": 40.187524106810066,
+          "head_advance_m": 0.01621128616668388
+        }
+      }
+    },
+    {
+      "case": "five_then6",
+      "record": "artifacts/sequential_handoff/round19/five_then6",
+      "config": {
+        "tee": true,
+        "sequential": true
+      },
+      "end_time_s": 490.1029999953225,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 0.0,
+          "key": "Ctrl+5",
+          "stage": "front"
+        },
+        {
+          "time_s": 0.0,
+          "key": "Ctrl+G",
+          "stage": "front"
+        },
+        {
+          "time_s": 66.89999999995538,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 69.37999999996723,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 71.85999999997907,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 74.33999999999091,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 76.82000000000275,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 79.30000000001459,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 81.78000000002643,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 83.58000000003503,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 83.58000000003503,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 83.58000000003503,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 137.62000000029306,
+          "key": "Ctrl+6",
+          "stage": "align"
+        },
+        {
+          "time_s": 137.62000000029306,
+          "key": "Ctrl+G",
+          "stage": "align"
+        },
+        {
+          "time_s": 387.5799999977468,
+          "key": "Ctrl+N",
+          "stage": "align"
+        },
+        {
+          "time_s": 387.5799999977468,
+          "key": "Ctrl+L",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 387.5799999977468,
+          "key": "Ctrl+G",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 395.41999999756143,
+          "key": "Ctrl+N",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 395.41999999756143,
+          "key": "Ctrl+L",
+          "stage": "drop"
+        },
+        {
+          "time_s": 395.41999999756143,
+          "key": "Ctrl+G",
+          "stage": "drop"
+        },
+        {
+          "time_s": 396.4199999975378,
+          "key": "Ctrl+N",
+          "stage": "drop_hold"
+        },
+        {
+          "time_s": 396.4199999975378,
+          "key": "Ctrl+L",
+          "stage": "return_seat"
+        },
+        {
+          "time_s": 396.4199999975378,
+          "key": "Ctrl+G",
+          "stage": "return_seat"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": true,
+        "duration_s": 10.44999999975289,
+        "distal_engaged_samples": 210,
+        "samples": 210,
+        "clear_boundary_m": 0.40900000000000003,
+        "all_clear": true,
+        "supported": true,
+        "trailing_advance_m": 0.21489186332084687,
+        "min_x_end_m": 0.7484953592520801,
+        "max_tail_radius_m": 0.10601886482812804,
+        "min_tail_span_deg": 221.24262578782933
+      },
+      "review": {
+        "case": "five_then6",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 237.6563399095167,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9458414421282773,
+        "intake_max_front_radius_m": 0.11296008891463148,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 9803,
+        "final_shape_frames": 211,
+        "final_min_turns": 1.9730693647695507,
+        "final_max_radius_m": 0.10739163219850294,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.08976869332749,
+        "minimum_support_n": 0.0,
+        "low_support_frames": 3,
+        "floor_frames": 0,
+        "saturated_frames": 617,
+        "shared_target_step_max_deg": 2.7000000000000006,
+        "front_confirmed_s": 83.58000000003503,
+        "first_tail_on_s": 83.58000000003503,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 83.58000000003503
+          },
+          {
+            "stage": "align",
+            "time_s": 387.5799999977468
+          },
+          {
+            "stage": "right_u_hold",
+            "time_s": 395.41999999756143
+          },
+          {
+            "stage": "drop_hold",
+            "time_s": 396.4199999975378
+          }
+        ],
+        "failure": null,
+        "gravity_release": {
+          "tail_com_y_start_m": -0.053988294406517354,
+          "tail_com_y_end_m": 0.00758051376104998,
+          "front_rotation_deg": 46.7016046578977,
+          "head_advance_m": 0.019942561462583497
+        }
+      }
+    },
+    {
+      "case": "phase6",
+      "record": "artifacts/sequential_handoff/round19/phase6",
+      "config": {
+        "tee": true,
+        "phase_delta": 0.15
+      },
+      "end_time_s": 488.90299999535085,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 1.4999999999999456,
+          "key": "Ctrl+6",
+          "stage": "front"
+        },
+        {
+          "time_s": 1.4999999999999456,
+          "key": "Ctrl+G",
+          "stage": "front"
+        },
+        {
+          "time_s": 68.19999999996159,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 70.67999999997343,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 73.15999999998527,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 75.63999999999712,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 78.12000000000896,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 80.6000000000208,
+          "key": "Ctrl+J",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 82.4000000000294,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 82.4000000000294,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 82.4000000000294,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 136.5200000002878,
+          "key": "Ctrl+G",
+          "stage": "align"
+        },
+        {
+          "time_s": 386.3799999977752,
+          "key": "Ctrl+N",
+          "stage": "align"
+        },
+        {
+          "time_s": 386.3799999977752,
+          "key": "Ctrl+L",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 386.3799999977752,
+          "key": "Ctrl+G",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 394.1999999975903,
+          "key": "Ctrl+N",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 394.1999999975903,
+          "key": "Ctrl+L",
+          "stage": "drop"
+        },
+        {
+          "time_s": 394.1999999975903,
+          "key": "Ctrl+G",
+          "stage": "drop"
+        },
+        {
+          "time_s": 395.19999999756664,
+          "key": "Ctrl+N",
+          "stage": "drop_hold"
+        },
+        {
+          "time_s": 395.19999999756664,
+          "key": "Ctrl+L",
+          "stage": "return_seat"
+        },
+        {
+          "time_s": 395.19999999756664,
+          "key": "Ctrl+G",
+          "stage": "return_seat"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": true,
+        "duration_s": 10.44999999975289,
+        "distal_engaged_samples": 210,
+        "samples": 210,
+        "clear_boundary_m": 0.40900000000000003,
+        "all_clear": true,
+        "supported": true,
+        "trailing_advance_m": 0.21489779633093442,
+        "min_x_end_m": 0.7492069637320296,
+        "max_tail_radius_m": 0.1060272889132976,
+        "min_tail_span_deg": 221.24756356910368
+      },
+      "review": {
+        "case": "phase6",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 262.4746848826434,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9467121979915201,
+        "intake_max_front_radius_m": 0.11274963513951983,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 9779,
+        "final_shape_frames": 211,
+        "final_min_turns": 1.9730508642080409,
+        "final_max_radius_m": 0.1073899301900853,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.08762123435552,
+        "minimum_support_n": 10.30015224888954,
+        "low_support_frames": 0,
+        "floor_frames": 0,
+        "saturated_frames": 613,
+        "shared_target_step_max_deg": 2.7000000000000006,
+        "front_confirmed_s": 82.4000000000294,
+        "first_tail_on_s": 82.4000000000294,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 82.4000000000294
+          },
+          {
+            "stage": "align",
+            "time_s": 386.3799999977752
+          },
+          {
+            "stage": "right_u_hold",
+            "time_s": 394.1999999975903
+          },
+          {
+            "stage": "drop_hold",
+            "time_s": 395.19999999756664
+          }
+        ],
+        "failure": null,
+        "gravity_release": {
+          "tail_com_y_start_m": -0.0415002074177148,
+          "tail_com_y_end_m": 0.012339236806473674,
+          "front_rotation_deg": 50.6126933766496,
+          "head_advance_m": 0.018608687334716822
+        }
+      }
+    },
+    {
+      "case": "feed_h6",
+      "record": "artifacts/sequential_handoff/round19/feed_h6",
+      "config": {
+        "tee": true,
+        "feed": -1
+      },
+      "end_time_s": 435.1529999966219,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 0.0,
+          "key": "Ctrl+4",
+          "stage": null
+        },
+        {
+          "time_s": 0.0,
+          "key": "Ctrl+H",
+          "stage": null
+        },
+        {
+          "time_s": 21.420000000003196,
+          "key": "Ctrl+6",
+          "stage": "arc_settle"
+        },
+        {
+          "time_s": 21.420000000003196,
+          "key": "Ctrl+G",
+          "stage": "arc_settle"
+        },
+        {
+          "time_s": 95.02000000008965,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 95.02000000008965,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 95.02000000008965,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 149.4200000003494,
+          "key": "Ctrl+G",
+          "stage": "align"
+        },
+        {
+          "time_s": 332.5799999990474,
+          "key": "Ctrl+N",
+          "stage": "align"
+        },
+        {
+          "time_s": 332.5799999990474,
+          "key": "Ctrl+L",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 332.5799999990474,
+          "key": "Ctrl+G",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 340.45999999886106,
+          "key": "Ctrl+N",
+          "stage": "right_u_hold"
+        },
+        {
+          "time_s": 340.45999999886106,
+          "key": "Ctrl+L",
+          "stage": "drop"
+        },
+        {
+          "time_s": 340.45999999886106,
+          "key": "Ctrl+G",
+          "stage": "drop"
+        },
+        {
+          "time_s": 341.4599999988374,
+          "key": "Ctrl+N",
+          "stage": "drop_hold"
+        },
+        {
+          "time_s": 341.4599999988374,
+          "key": "Ctrl+L",
+          "stage": "return_seat"
+        },
+        {
+          "time_s": 341.4599999988374,
+          "key": "Ctrl+G",
+          "stage": "return_seat"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": true,
+        "duration_s": 10.44999999975289,
+        "distal_engaged_samples": 210,
+        "samples": 210,
+        "clear_boundary_m": 0.40900000000000003,
+        "all_clear": true,
+        "supported": true,
+        "trailing_advance_m": 0.2149693618761066,
+        "min_x_end_m": 0.7479538811385269,
+        "max_tail_radius_m": 0.10602967301129618,
+        "min_tail_span_deg": 221.25198002706233
+      },
+      "review": {
+        "case": "feed_h6",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 263.5866638299936,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.926729191062134,
+        "intake_max_front_radius_m": 0.1180843988854648,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 8704,
+        "final_shape_frames": 211,
+        "final_min_turns": 1.973099407442055,
+        "final_max_radius_m": 0.1073791964605121,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.07055414704553,
+        "minimum_support_n": 0.0,
+        "low_support_frames": 4,
+        "floor_frames": 0,
+        "saturated_frames": 894,
+        "shared_target_step_max_deg": 2.70000000000001,
+        "front_confirmed_s": 95.02000000008965,
+        "first_tail_on_s": 95.02000000008965,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 95.02000000008965
+          },
+          {
+            "stage": "align",
+            "time_s": 332.5799999990474
+          },
+          {
+            "stage": "right_u_hold",
+            "time_s": 340.45999999886106
+          },
+          {
+            "stage": "drop_hold",
+            "time_s": 341.4599999988374
+          }
+        ],
+        "failure": null,
+        "gravity_release": {
+          "tail_com_y_start_m": -0.08026003258249885,
+          "tail_com_y_end_m": 0.005044349386879979,
+          "front_rotation_deg": 47.985119250263175,
+          "head_advance_m": 0.013592953541153696
+        }
+      }
+    },
+    {
+      "case": "feed_j6",
+      "record": "artifacts/sequential_handoff/round19/feed_j6",
+      "config": {
+        "tee": true,
+        "feed": 1
+      },
+      "end_time_s": 458.90299999606026,
+      "passed": true,
+      "commands": [
+        {
+          "time_s": 0.0,
+          "key": "Ctrl+4",
+          "stage": null
+        },
+        {
+          "time_s": 0.0,
+          "key": "Ctrl+J",
+          "stage": null
+        },
+        {
+          "time_s": 24.020000000006373,
+          "key": "Ctrl+6",
+          "stage": "arc_settle"
+        },
+        {
+          "time_s": 24.020000000006373,
+          "key": "Ctrl+G",
+          "stage": "arc_settle"
+        },
+        {
+          "time_s": 118.8200000002033,
+          "key": "Ctrl+N",
+          "stage": "front_hold"
+        },
+        {
+          "time_s": 118.8200000002033,
+          "key": "Ctrl+L",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 118.8200000002033,
+          "key": "Ctrl+G",
+          "stage": "first_shift"
+        },
+        {
+          "time_s": 173.22000000046305,
+          "key": "Ctrl+G",
+          "stage": "align"
+        },
+        {
+          "time_s": 356.3799999984846,
+          "key": "Ctrl+N",
+          "stage": "align"
+        },
+        {
+          "time_s": 356.3799999984846,
+          "key": "Ctrl+L",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 356.3799999984846,
+          "key": "Ctrl+G",
+          "stage": "unwind"
+        },
+        {
+          "time_s": 364.23999999829874,
+          "key": "Ctrl+N",
+          "stage": "right_u_hold"
+        },
+        {
+          "time_s": 364.23999999829874,
+          "key": "Ctrl+L",
+          "stage": "drop"
+        },
+        {
+          "time_s": 364.23999999829874,
+          "key": "Ctrl+G",
+          "stage": "drop"
+        },
+        {
+          "time_s": 365.2399999982751,
+          "key": "Ctrl+N",
+          "stage": "drop_hold"
+        },
+        {
+          "time_s": 365.2399999982751,
+          "key": "Ctrl+L",
+          "stage": "return_seat"
+        },
+        {
+          "time_s": 365.2399999982751,
+          "key": "Ctrl+G",
+          "stage": "return_seat"
+        }
+      ],
+      "self_contact_events": [],
+      "front_target_change_rad": 0.0,
+      "front_freeze_count": 9,
+      "recovery": {
+        "passed": true,
+        "duration_s": 10.44999999975289,
+        "distal_engaged_samples": 210,
+        "samples": 210,
+        "clear_boundary_m": 0.40900000000000003,
+        "all_clear": true,
+        "supported": true,
+        "trailing_advance_m": 0.21486364384211776,
+        "min_x_end_m": 0.7470023322941601,
+        "max_tail_radius_m": 0.10602281878192532,
+        "min_tail_span_deg": 221.24619910949534
+      },
+      "review": {
+        "case": "feed_j6",
+        "controller_passed": true,
+        "shape_passed": true,
+        "passed": true,
+        "preparation_open_arc": true,
+        "preparation_max_near_pipe_coverage_deg": 263.5866638299936,
+        "front_targets_unchanged": true,
+        "front_supported_through_intake": true,
+        "intake_min_front_turns": 0.9267299317984211,
+        "intake_max_front_radius_m": 0.11808407971278972,
+        "self_contact_samples": 0,
+        "first_self_contact": null,
+        "maximum_self_penetration_m": 0.0,
+        "actual_review_frames": 9179,
+        "final_shape_frames": 211,
+        "final_min_turns": 1.9731052097492572,
+        "final_max_radius_m": 0.10739105946000502,
+        "passive_torque_max_nm": 0.0,
+        "maximum_actual_joint_deg": 90.07104647067663,
+        "minimum_support_n": 0.0,
+        "low_support_frames": 2,
+        "floor_frames": 0,
+        "saturated_frames": 889,
+        "shared_target_step_max_deg": 2.70000000000001,
+        "front_confirmed_s": 118.8200000002033,
+        "first_tail_on_s": 118.8200000002033,
+        "operator_events": [
+          {
+            "stage": "front_hold",
+            "time_s": 118.8200000002033
+          },
+          {
+            "stage": "align",
+            "time_s": 356.3799999984846
+          },
+          {
+            "stage": "right_u_hold",
+            "time_s": 364.23999999829874
+          },
+          {
+            "stage": "drop_hold",
+            "time_s": 365.2399999982751
+          }
+        ],
+        "failure": null,
+        "gravity_release": {
+          "tail_com_y_start_m": -0.06685698511061085,
+          "tail_com_y_end_m": 0.004999520402105493,
+          "front_rotation_deg": 53.92595282106869,
+          "head_advance_m": 0.01271570262419991
+        }
+      }
+    }
+  ]
+}

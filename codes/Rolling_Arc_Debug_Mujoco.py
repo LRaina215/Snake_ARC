@@ -26,7 +26,7 @@ MotorFeedbackSliding = real.MotorFeedbackSliding
 
 
 # ==================== 1. 手动测试参数 ====================
-SCENE = 'straight'              # straight / bend90 / elbow90 / taper_true90 / elbow90_taper110_210 / length_taper_return
+SCENE = 'straight'              # straight / bend90 / elbow90 / taper_true90 / elbow90_taper110_210 / length_taper_return / tee_up60
 START_X_M = -.5                 # 弯管常用-.35，急弯常用-.25
 SIM_FIRST_JOINT = real.FIRST_JOINT  # 本轮偏置搭管实验设5 / 10，不修改实机文件
 SIM_LAST_JOINT = real.LAST_JOINT
@@ -409,7 +409,11 @@ def make_manual_simulation(scene, start_x):
                 joints=real.NUM_JOINTS, first_joint=SIM_FIRST_JOINT, last_joint=SIM_LAST_JOINT,
                 amplitude_deg=SIM_AMPLITUDE_DEG, omega_rad_s=SIM_OMEGA_RAD_S,
                 initial_phase_rad=real.INITIAL_PHASE_RAD, settle_s=real.SETTLE_S)
-    sim = ArcSimulation(scene, p, start_x)
+    if scene.startswith('tee_'):
+        from snake_control.tee_simulation import TeeSimulation
+        sim = TeeSimulation(scene.removeprefix('tee_'), p, start_x)
+    else:
+        sim = ArcSimulation(scene, p, start_x)
     if scene in ('length_taper_return', 'elbow90_taper110_210'):
         route = sim.model.numeric('pipe_centerline').data.reshape(-1, 4)
         radius = .055 if scene == 'elbow90_taper110_210' else float(np.interp(start_x, route[:, 0], route[:, 3]))
@@ -422,6 +426,7 @@ class DebugSession:
     """共用基础/固定控制；仿真扩展滑动模式、物理扰动和实际状态记录。"""
     def __init__(self, scene=SCENE, start_x=START_X_M):
         self.start_x = start_x
+        self.scene_key = scene
         real.validate_setup()
         self.sim = make_manual_simulation(scene, start_x)
         lengths = np.linalg.norm(np.diff(backbone(self.sim.model, self.sim.data), axis=0), axis=1)
@@ -489,7 +494,7 @@ class DebugSession:
                       targets=self.controller.targets.copy(), enabled=self.controller.enabled.copy())
         self.record_event('reset_episode', previous_state=before)
         self.controller.release()
-        self.sim = make_manual_simulation(self.sim.scene, self.start_x)
+        self.sim = make_manual_simulation(self.scene_key, self.start_x)
         self.bus = MujocoMotorBus(self.sim)
         self._configure_perturbation()
         fresh = DebugArcController(self.bus, self)

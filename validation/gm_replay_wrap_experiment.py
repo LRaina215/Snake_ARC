@@ -26,10 +26,11 @@ def save(trial, output, label, source_time, **extra):
         clear_samples=sum(r['x_min_m'] > .409 for r in rows),
         aux_roll_started=any(r['stage']=='aux_roll' for r in rows), **extra)
     output.mkdir(parents=True, exist_ok=True)
-    (output/(label+'.json')).write_text(json.dumps(dict(summary=summary, samples=rows), indent=1), encoding='utf-8')
     np.savez_compressed(output/(label+'_trace.npz'), time=[r['time_s'] for r in rows], qpos=trial.states,
         qvel=trial.velocities, targets=trial.targets, masks=trial.masks, actuator_force=trial.forces,
         stiffness_scale=trial.stiffness_scales)
+    with (output/(label+'.json')).open('w', encoding='utf-8') as stream:
+        json.dump(dict(summary=summary, samples=rows), stream, indent=1)
     print(json.dumps(summary, indent=2))
 
 
