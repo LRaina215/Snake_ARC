@@ -2,6 +2,8 @@
 
 更新：2026-11-07。适用于 `codes/Rolling_Arc_Real.py` 和 `codes/Rolling_Arc_Debug_Mujoco.py`，两端共用控制器与Ctrl热键。实机动力学效果等待用户验收；已完成的18关节仿真范围见[实验报告](../validation/reports/sequential_handoff/README.md)。
 
+现场按[实机验收清单](ARC_Helix实机验收清单.md)逐项记录，首轮6项各1次。
+
 ## Ctrl+4、5、6各自做什么
 
 | 模式 | 完整任务 | 结束状态 |
