@@ -316,12 +316,13 @@ class GravityCrossing:
         # count 是已接受的前缀；当前新关节是相邻转轴的前瞻接管。
         # 先等当前关节完全到位才开放下一转轴，会把3D曲线退化成单轴掰尾。
         if count == self.front_count:
-            checking = slice(0, count)
+            # 前部由操作者确认并锁定，不能再要求它追踪另一条名义螺旋。
+            checking = slice(self.front_count, count)
         elif count < self.n:
             checking = slice(max(self.front_count, count-2), count)
         else:
-            checking = slice(None)
-        follows = np.max(abs(nominal[checking]-self.measured[checking])) <= math.radians(3.)
+            checking = slice(self.front_count, self.n)
+        follows = np.max(abs(nominal[checking]-self.measured[checking]), initial=0.) <= math.radians(3.)
         self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if follows else None
         if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
             self.tracking_since = None
@@ -342,13 +343,21 @@ class GravityCrossing:
 
 
     def confirm(self, feedback_time, measured_deg):
-        """Ctrl+L 标记操作者看到的几何事件，之后仍保持到 J/G。"""
-        if self.running or self.step_left > 0.:
-            raise ValueError('请先暂停，再按 Ctrl+L 确认实际姿态')
+        """Ctrl+L 确认实物支撑并保持，下一次 J/G 才运动；重复确认不重置送尾。"""
+        if self.stage == 'first_shift':
+            return False
+        front_ready = self.stage in ('front_finish', 'front_seat', 'front_hold')
+        release_ready = (self.stage == 'right_u_hold' or
+                         (self.stage == 'unwind' and self.elapsed >= 3.))
+        if not (front_ready or release_ready or self.stage in ('align', 'drop_hold')):
+            raise ValueError(f'当前阶段={self.stage}，尚无可确认的交接；Ctrl+J/G推进，Ctrl+K查看具体阶段')
+        before = self.stage
+        self.pause()
         self.measured = np.radians(measured_deg)
         self.feedback_time = feedback_time
         self.started = True
-        if self.stage == 'front_hold':
+        if front_ready:
+            # 不以名义目标跟踪误差代替实物支撑判断，也不在确认后继续旋转前部。
             self._start_tail_intake()
         elif self.stage == 'align':
             self.anchor = self._targets.copy()
@@ -358,8 +367,9 @@ class GravityCrossing:
             self._enter('drop')
         elif self.stage == 'drop_hold':
             self._start_source_return()
-        else:
-            raise ValueError('当前阶段用 Ctrl+J 单步或 Ctrl+G 连续推进')
+        self.events.append(dict(stage='operator_confirm', from_stage=before, to_stage=self.stage,
+                                feedback_time_s=feedback_time))
+        return True
 
     def _set_targets(self, goal, dt, rate=18.):
         limit = math.radians(rate)*dt
@@ -368,6 +378,9 @@ class GravityCrossing:
         self._targets[~self._enabled] = self.measured[~self._enabled]
 
     def advance(self, dt, now, feedback_time, measured_deg):
+        if self.stage == 'front_hold':
+            self.pause()
+            return False
         if (feedback_time is None or now-feedback_time > self.options.max_feedback_age_s or
                 (not self.running and self.step_left <= 0.)):
             return False
@@ -416,9 +429,6 @@ class GravityCrossing:
             self._advance_front_finish(dt, fresh)
         elif self.stage == 'front_seat':
             self._advance_front_seat(dt, fresh)
-        elif self.stage == 'front_hold':
-            self.phase += self.options.alignment_rate_rad_s*dt
-            self._set_targets(self._helix(self.phase, self.gait.o.r_h1), dt)
         elif self.stage == 'first_shift':
             self._advance_tail_intake(dt, fresh)
         elif self.stage in ('return_seat', 'return_wind', 'return_finish'):

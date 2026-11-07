@@ -9,7 +9,7 @@ Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动移窗
 模式4转3会按实测重新选窗并撤去送链缓冲，成功后Ctrl+G开始滚动。
 Ctrl+4 主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，Ctrl+Y 提前返回，Ctrl+L沿任务方向强制推进一步。
 Ctrl+5 按实测圆弧自动调长两侧、先卷前部；Ctrl+L 确认搭稳后，Ctrl+J/G 逐节送尾。
-Ctrl+6 接入 T 管重力矩越障；暂停时 Ctrl+L 确认实际姿态，Ctrl+J/G 再推进。
+Ctrl+6 接入 T 管重力矩越障；Ctrl+L 确认并保持实际姿态，Ctrl+J/G 再推进。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
 """
 import json
@@ -4781,12 +4781,13 @@ class GravityCrossing:
         # count 是已接受的前缀；当前新关节是相邻转轴的前瞻接管。
         # 先等当前关节完全到位才开放下一转轴，会把3D曲线退化成单轴掰尾。
         if count == self.front_count:
-            checking = slice(0, count)
+            # 前部由操作者确认并锁定，不能再要求它追踪另一条名义螺旋。
+            checking = slice(self.front_count, count)
         elif count < self.n:
             checking = slice(max(self.front_count, count-2), count)
         else:
-            checking = slice(None)
-        follows = np.max(abs(nominal[checking]-self.measured[checking])) <= math.radians(3.)
+            checking = slice(self.front_count, self.n)
+        follows = np.max(abs(nominal[checking]-self.measured[checking]), initial=0.) <= math.radians(3.)
         self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if follows else None
         if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
             self.tracking_since = None
@@ -4807,13 +4808,21 @@ class GravityCrossing:
 
 
     def confirm(self, feedback_time, measured_deg):
-        """Ctrl+L 标记操作者看到的几何事件，之后仍保持到 J/G。"""
-        if self.running or self.step_left > 0.:
-            raise ValueError('请先暂停，再按 Ctrl+L 确认实际姿态')
+        """Ctrl+L 确认实物支撑并保持，下一次 J/G 才运动；重复确认不重置送尾。"""
+        if self.stage == 'first_shift':
+            return False
+        front_ready = self.stage in ('front_finish', 'front_seat', 'front_hold')
+        release_ready = (self.stage == 'right_u_hold' or
+                         (self.stage == 'unwind' and self.elapsed >= 3.))
+        if not (front_ready or release_ready or self.stage in ('align', 'drop_hold')):
+            raise ValueError(f'当前阶段={self.stage}，尚无可确认的交接；Ctrl+J/G推进，Ctrl+K查看具体阶段')
+        before = self.stage
+        self.pause()
         self.measured = np.radians(measured_deg)
         self.feedback_time = feedback_time
         self.started = True
-        if self.stage == 'front_hold':
+        if front_ready:
+            # 不以名义目标跟踪误差代替实物支撑判断，也不在确认后继续旋转前部。
             self._start_tail_intake()
         elif self.stage == 'align':
             self.anchor = self._targets.copy()
@@ -4823,8 +4832,9 @@ class GravityCrossing:
             self._enter('drop')
         elif self.stage == 'drop_hold':
             self._start_source_return()
-        else:
-            raise ValueError('当前阶段用 Ctrl+J 单步或 Ctrl+G 连续推进')
+        self.events.append(dict(stage='operator_confirm', from_stage=before, to_stage=self.stage,
+                                feedback_time_s=feedback_time))
+        return True
 
     def _set_targets(self, goal, dt, rate=18.):
         limit = math.radians(rate)*dt
@@ -4833,6 +4843,9 @@ class GravityCrossing:
         self._targets[~self._enabled] = self.measured[~self._enabled]
 
     def advance(self, dt, now, feedback_time, measured_deg):
+        if self.stage == 'front_hold':
+            self.pause()
+            return False
         if (feedback_time is None or now-feedback_time > self.options.max_feedback_age_s or
                 (not self.running and self.step_left <= 0.)):
             return False
@@ -4881,9 +4894,6 @@ class GravityCrossing:
             self._advance_front_finish(dt, fresh)
         elif self.stage == 'front_seat':
             self._advance_front_seat(dt, fresh)
-        elif self.stage == 'front_hold':
-            self.phase += self.options.alignment_rate_rad_s*dt
-            self._set_targets(self._helix(self.phase, self.gait.o.r_h1), dt)
         elif self.stage == 'first_shift':
             self._advance_tail_intake(dt, fresh)
         elif self.stage in ('return_seat', 'return_wind', 'return_finish'):
@@ -5110,6 +5120,8 @@ class RollingArcController:
         self.last_feedback, self.states = {}, {}
         self.feedback_time_s = self.feedback_wall_s = None
         self.feedback_sequence = 0
+        self.control_command_sequence = 0
+        self.control_commands = []
         self.compliance, self.options = None, make_section_options()
         self.freeze_targets = False
         self.section_clock_s = 0.
@@ -5197,12 +5209,19 @@ class RollingArcController:
             return False
         gravity = isinstance(core, GravityCrossing)
         if gravity and command == 'feed_tick':
-            if self.mode != 'hold':
-                raise ValueError('请先暂停，再按 Ctrl+L 确认实际姿态')
             self.refresh_compliance_feedback()
             _, sample_time = self.motor_sample_clock()
-            core.confirm(sample_time, self.measured_angles())
+            changed = core.confirm(sample_time, self.measured_angles())
+            if changed:
+                self.mode, self.freeze_targets = 'hold', True
+                print(f'Ctrl+L确认成功：阶段={core.stage}；当前目标保持，Ctrl+J单步或Ctrl+G连续推进。', flush=True)
+            else:
+                print('Ctrl+L已确认：当前为first_shift送尾阶段，不重复初始化；Ctrl+J单步或Ctrl+G连续推进。', flush=True)
             return True
+        if gravity and core.stage == 'front_hold' and command in ('step', 'run', 'toggle'):
+            core.pause()
+            self.mode, self.freeze_targets = 'hold', True
+            raise ValueError('当前front_hold：前部目标保持、尾部未接入；搭稳后按Ctrl+L确认，再按Ctrl+J/G送尾')
         if gravity and core.stage == 'align' and command in ('step', 'back', 'run', 'toggle'):
             core.align_direction = -1 if command == 'back' else 1
         if command in ('pause', 'hold') or (command == 'toggle' and core.running):
@@ -6104,6 +6123,7 @@ class RollingArcController:
                     enable_state_known=self.touched_hardware,
                     feedback_time_s=self.feedback_time_s, feedback_age_s=age,
                     feedback_sequence=self.feedback_sequence, compliance=section,
+                    control_commands=copy.deepcopy(self.control_commands),
                     pending_gait=self.pending_gait,
                     helix_transition=None if self.helix_transition is None else self.helix_transition.status(),
                     feeding=None if self.feeding is None else copy.deepcopy(self.feeding.snapshot()),
@@ -6136,10 +6156,10 @@ class RollingArcController:
             instruction = {
                 'arc_settle': '将实测承载弧接入同半径的曲线参考，接好后再卷前部',
                 'front': '自动调长并前卷；尾部保持失能',
-                'front_finish': '尾部失能，继续将整个前部承载段形成螺旋',
-                'front_hold': '前部螺旋保持。搭稳后 L 确认；J/G 只微调前部就位',
-                'front_seat': '仅前部小幅滚动就位，后段保持失能',
-                'first_shift': '前部目标保持，后段沿曲线逐节上管',
+                'front_finish': '尾部失能，前部形成螺旋；实物已搭稳可直接Ctrl+L确认送尾',
+                'front_hold': '前部目标保持、尾部未接入；实物搭稳后Ctrl+L确认，再Ctrl+J/G送尾',
+                'front_seat': '仅前部小幅就位；实物已搭稳可直接Ctrl+L确认送尾',
+                'first_shift': '前部支撑已确认；Ctrl+J/G逐节送尾，重复L不重置进度',
                 'align': 'Ctrl+J/H 微调。确认前部过支管、螺旋已对准后按 Ctrl+L',
                 'unwind': '形成右侧小 U；从尾朝头观察，确认 U 搭稳后暂停并按 Ctrl+L',
                 'right_u_hold': '确认小 U 搭在主管右侧，前部贴稳后按 Ctrl+L，再用 Ctrl+J/G 释放尾段',
@@ -6851,6 +6871,9 @@ def process_control_commands(controller, commands, elapsed):
     """实机与MuJoCo手调共用同一命令分派和状态提示。"""
     for _ in range(commands.qsize()):
         command = commands.get_nowait()
+        core = controller.helix_transition
+        event = dict(time_s=elapsed, command=command, mode_before=controller.mode,
+                     stage_before=None if core is None else core.stage, result='accepted', reason=None)
         try:
             if command.strip().lower() == 'help':
                 print(getattr(controller, 'help_text', HELP), flush=True)
@@ -6860,7 +6883,15 @@ def process_control_commands(controller, commands, elapsed):
                 controller.feedback_time_s = elapsed
             controller.show_status(include_feedback=command.strip().lower() == 'status')
         except ValueError as exc:
+            event.update(result='rejected', reason=str(exc))
             print(f'参数/操作未执行: {exc}', flush=True)
+        finally:
+            core = controller.helix_transition
+            controller.control_command_sequence += 1
+            event.update(sequence=controller.control_command_sequence, mode_after=controller.mode,
+                         stage_after=None if core is None else core.stage)
+            controller.control_commands.append(event)
+            del controller.control_commands[:-16]
 
 
 def poll_control_feedback(controller, elapsed, next_feedback):
