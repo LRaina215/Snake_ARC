@@ -62,15 +62,21 @@ class HelixNormalizationTests(unittest.TestCase):
                 self.assertFalse(core.running)
                 np.testing.assert_allclose(core.targets, mathematical_helix(core.phase), atol=1e-12, rtol=0.)
 
-    def test_tail_completion_enters_normalization_instead_of_accepting_frozen_front(self):
+    def test_confirmed_front_enters_source_return_then_normalizes_before_completion(self):
         core = logged_core(real)
-        core.stage, core.accepted = 'first_shift', 18
-        core.locked_front = core.targets[:9].copy()
-        core.curve = real.MeasuredGravityShift(core.gait, .094, core.phase, core.measured, 9, upstream_m=10*.0645)
-        core.offset = core.curve.shift_limit_m
-        core.measured[9:] = mathematical_helix(core.phase)[9:]
-        core.elapsed, core.tracking_since, core.running = 1., 0., True
-        core._advance_tail_intake(.02, True)
+        core.stage='front_seat'
+        core.front_confirm_requested=True
+        core.seating_phase=core.phase
+        core.phase+=core.options.front_seat_rad
+        core._targets=core.measured=mathematical_helix(core.phase).copy()
+        core.elapsed,core.tracking_since,core.running=2.,0.,True
+        core._advance_front_seat(.02,True)
+        self.assertEqual(core.stage,'return_seat')
+        self.assertTrue(core.initial_source_return)
+        self.assertTrue(core.running)
+        core.stage='recover';core.elapsed=5.
+        core.recover_phase=core.phase;core.anchor=core.targets.copy()
+        core._advance_recover(.02)
         self.assertEqual(core.stage, 'helix_normalize')
         self.assertTrue(core.running)  # One G continues through normalization.
 

@@ -52,14 +52,16 @@ class FrontConfirmationTests(unittest.TestCase):
                     core.step_once()  # L must not depend on whether a one-second step just ended.
                     before = core.targets.copy()
                     self.assertTrue(core.confirm(1., np.degrees(core.measured)))
-                    self.assertEqual(core.stage, 'first_shift')
+                    self.assertEqual(core.stage, 'return_seat' if stage=='front_hold' else stage)
                     self.assertFalse(core.running)
                     self.assertEqual(core.step_left, 0.)
                     np.testing.assert_array_equal(core.targets, before)
-                    curve = core.curve
+                    if stage!='front_hold':
+                        self.assertTrue(core.front_confirm_requested)
+                    seating = getattr(core,'return_seating',None)
                     core.offset = .012
                     self.assertFalse(core.confirm(1.2, np.degrees(core.measured)))
-                    self.assertIs(core.curve, curve)
+                    self.assertIs(getattr(core,'return_seating',None), seating)
                     self.assertEqual(core.offset, .012)
 
     def test_j_cannot_keep_rotating_the_front_while_confirmation_is_missing(self):
@@ -73,8 +75,8 @@ class FrontConfirmationTests(unittest.TestCase):
         self.assertEqual(c.helix_transition.phase, phase)
         self.assertEqual(c.mode, 'hold')
 
-    def test_l_then_j_enables_one_tail_joint_and_holds_the_recorded_front(self):
-        c = recorded_controller('front_finish')
+    def test_l_then_g_reuses_source_return_and_the_front_keeps_advancing(self):
+        c = recorded_controller('front_hold')
         core = c.helix_transition
         # Confirm a supported measured pose which differs from the fixed nominal helix.
         core._targets[0] += np.radians(9.)
@@ -88,19 +90,22 @@ class FrontConfirmationTests(unittest.TestCase):
                 patch.object(c, 'motor_sample_clock', return_value=(1., 1.)):
             c.command(real.decode_hotkey(ord('L'), True))
         self.assertEqual(c.mode, 'hold')
-        self.assertEqual(core.stage, 'first_shift')
+        self.assertEqual(core.stage, 'return_seat')
         self.assertEqual(sum(c.enabled), 9)  # Confirmation alone never moves or enables the tail.
-        c.command(real.decode_hotkey(ord('J'), True))
+        c.command(real.decode_hotkey(ord('G'), True))
+        front_moved=False
         with contextlib.redirect_stdout(io.StringIO()):
-            for i in range(1, 26):
+            for i in range(1, 1301):
                 q = np.degrees(core.targets).tolist()  # An ideal follower only tests command handoff.
                 c.states = {j: {'angle_deg': angle} for j, angle in enumerate(q)}
                 with patch.object(c, 'motor_sample_clock', return_value=(1.+i*.02, 1.+i*.02)):
                     c.tick(.02)
-                np.testing.assert_array_equal(core.targets[:core.front_count], front)
+                if core.stage=='return_wind' and float(np.max(abs(core.targets[:core.front_count]-front)))>.1:
+                    front_moved=True
         self.assertTrue(c.enabled[9])
         self.assertGreater(core.offset, 0.)
-        self.assertGreaterEqual(core.accepted, 10)  # Never demand that the locked front fit another helix.
+        self.assertTrue(front_moved)
+        self.assertEqual(sum(c.enabled),18)
 
     def test_dispatch_records_the_actual_command_stage_and_rejection_reason(self):
         c = recorded_controller()
@@ -114,7 +119,7 @@ class FrontConfirmationTests(unittest.TestCase):
         self.assertEqual([e['command'] for e in events], ['step', 'feed_tick', 'feed_tick', 'step'])
         self.assertEqual(events[0]['result'], 'rejected')
         self.assertIn('Ctrl+L', events[0]['reason'])
-        self.assertEqual(events[1]['stage_after'], 'first_shift')
+        self.assertEqual(events[1]['stage_after'], 'return_seat')
         self.assertEqual(events[-1]['mode_after'], 'step')
 
     def test_repeated_j_reports_in_progress_and_g_runs_then_pauses(self):
@@ -165,10 +170,9 @@ class FrontConfirmationTests(unittest.TestCase):
                     c.command(debug.real.decode_hotkey(ord('L'), True))
                     c.command(debug.real.decode_hotkey(ord('J'), True))
                     c.tick(.02)
-                self.assertEqual(core.stage, 'first_shift')
-                self.assertEqual(sum(c.enabled), 10)
-                self.assertGreater(core.offset, 0.)
-                np.testing.assert_array_equal(core.targets[:9], np.radians(DATA['states']['front_hold']['target_controller_deg'][:9]))
+                self.assertEqual(core.stage, 'return_seat')
+                self.assertEqual(sum(c.enabled), 9)
+                np.testing.assert_array_equal(core.targets[:5], np.radians(DATA['states']['front_hold']['target_controller_deg'][:5]))
             finally:
                 session.close()
 

@@ -93,6 +93,12 @@ FEED_OPTIONS_OVERRIDE = {
 FEED_DIRECTION_OVERRIDE = {}   # 第3C段ManualFeedingDirectionOptions：选段/直线度/稳定时间
 FEED_DIAGNOSTIC_PERIOD_S = 2.0 # 自动显示两侧判断数值；Ctrl+K随时查看
 
+# Ctrl+U：ARC形成并静置后，两端临时使能到0，再失能。关闭此项可跳过。
+END_ZERO_ON_U = True
+END_ZERO_RATE_DEG_S = 60.
+END_ZERO_HOLD_S = .25
+END_ZERO_MAX_S = 2.
+
 # ARC→Helix。半径是蛇身中心线的半径，螺距为每圈沿主管的前进量。
 HELIX_RADIUS_M = .094
 HELIX_PITCH_M = .13
@@ -108,7 +114,7 @@ GRAVITY_RELEASE_RADIUS_M = .09554165
 GRAVITY_OPEN_RADIUS_M = .098    # 释放后保留的前部稍微放松，尾部自然下落
 GRAVITY_ALIGN_RATE_RAD_S = .14  # Ctrl+J/H 对准支管时的滚动速度
 GRAVITY_SHIFT_RATE_M_S = .012   # Shift Rolling 最大曲线进给速度
-GRAVITY_RETURN_ROLL_RAD_S = .084 # 重力释放后的回卷叠加前部滚动；初次ARC→Helix送尾不叠加
+GRAVITY_RETURN_ROLL_RAD_S = .084 # 原回卷及初次ARC接尾均推进前部相位，配合直尾缩短
 
 # 历史幅值/滑动窗口原型参数：只供旧仿真导入第3A段，当前实机入口不用。
 MIN_COMPLIANCE_AMPLITUDE_DEG = 25.0
@@ -144,7 +150,7 @@ HOTKEY_COMMANDS = {
     '-': 'delta-', '=': 'delta+',
 }
 HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响应）：
-  Ctrl+U 读取当前位置，使能局部并缓慢形成圆弧；默认完成后保持
+  Ctrl+U 形成圆弧后，两端短时使能归零再失能；归零时空格可终止并释放两端
   Ctrl+J / Ctrl+H 正向 / 反向单步；Ctrl+-/= 相位步长减半/加倍
   Ctrl+G 连续滚动/暂停；Ctrl+空格 暂停；Ctrl+N 保持并重发当前目标
   Ctrl+T 反转连续滚动方向；Ctrl+K 读取所有关节位置
@@ -154,7 +160,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   模式4→3：按实测重新选窗接管，不继承送链缓冲使能；成功后Ctrl+G滚动
   Ctrl+4 主动送链：J/H各执行一段头侧增长/缩短，到位保持，-/=目标量减半/加倍
   送链中Ctrl+G暂停/继续；Ctrl+L沿任务方向强制推进一步，目标发完保持；Ctrl+Y提前返回起态
-  Ctrl+5 自动识别ARC并调整两侧余长；J/G先成前部，L确认搭稳后J/G逐节送尾
+  Ctrl+5 自动调长并先成前部；L确认，J/G复用原回卷，前部推进、直尾逐段入螺旋
   Ctrl+6 选择 T 管重力矩越障（J1 为前端）；Ctrl+J/G 推进，Ctrl+L 确认实物姿态
   模式5/6：Ctrl+J每次最多1秒；Ctrl+G按一次连续到确认点/完成，再按暂停；不必反复按J
   全身已使能时再Ctrl+5选择统一Helix归形，再Ctrl+J/G；尾段仍失能时先完成逐段接管
@@ -167,7 +173,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
                   feed_return / feed_tick；feed_mm=258设置送链量（不立即运动）
                   release / status / help / quit
 参数：amplitude=60 omega=0.6 delta=0.1 window=8:13 gain=0.02 filter=0.15
-window只在release后修改；自动滑窗只用全20关节角、采样时间和已知相位。
+window只在release后修改；自动滑窗只用全身关节角、采样时间和已知相位。
 DIY_PARAMETERS=True时三模式均可调幅值/频率，滑窗采用当前参数几何参考。
 关闭DIY才使用60度/0.6/正向冻结标定；移窗不等于已观测到支撑或卸载。
 顺应性下pause冻结相位、继续形状反馈；hold冻结全部目标。
@@ -4618,6 +4624,8 @@ class GravityCrossing:
         self.front_extended = False
         self.front_ready_since = None
         self.front_tracking_error_deg = None
+        self.front_confirm_requested = False
+        self.initial_source_return = False
         self.align_direction = 1
         self.events = []
         if from_helix:
@@ -4632,12 +4640,13 @@ class GravityCrossing:
             active = np.flatnonzero(self._enabled)+1
             if len(active) < 3 or np.any(np.diff(active) != 1):
                 raise ValueError('T 管模式需要先形成连续的局部承载圆弧')
-            arc_options = ArcHelixOptions(radius_m=gait_options.r_h1, pitch_m=gait_options.pitch,
-                                         prepare_front=True)
-            self.front = GravityFrontTransition(lengths, (int(active[0]), int(active[-1])),
-                                                measured_deg, options=arc_options,
-                                                minimum_front_turns=options.min_front_turns)
+            self.front = self._make_front(lengths, (int(active[0]), int(active[-1])))
             self._plan_arc_reference(lengths)
+
+    def _make_front(self, lengths, window):
+        return GravityFrontTransition(lengths, window, np.degrees(self.measured),
+            options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
+            minimum_front_turns=self.options.min_front_turns)
 
     @staticmethod
     def _section_radius(q, lengths, window):
@@ -4687,9 +4696,7 @@ class GravityCrossing:
                                               self.arc_reference_ready_since) if ready else None
             if self.arc_reference_ready_since is not None and self.elapsed-self.arc_reference_ready_since >= .4:
                 self._enabled = reference['mask'].copy()
-                self.front = GravityFrontTransition(reference['lengths'], reference['window'], np.degrees(self.measured),
-                    options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
-                    minimum_front_turns=self.options.min_front_turns)
+                self.front = self._make_front(reference['lengths'], reference['window'])
                 self._enter('front')
 
     @property
@@ -4749,55 +4756,18 @@ class GravityCrossing:
             follows = np.max(abs(self._targets[self._enabled]-self.measured[self._enabled])) <= math.radians(5.)
             self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if follows else None
             if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
-                self._enter('front_hold')
-                self.pause()
+                if self.front_confirm_requested:
+                    self._start_tail_intake()
+                else:
+                    self._enter('front_hold')
+                    self.pause()
 
     def _start_tail_intake(self):
-        self.accepted = self.initial_prefix = self.front_count
-        # 用已经下发并搭稳的前部相位，不再用受载角偏差重新拟合它。
-        self.curve = MeasuredGravityShift(self.gait, self.gait.o.r_h1, self.phase, self.measured, self.front_count,
-                                         upstream_m=(self.front_count+1)*self.l)
-        self.locked_front = self._targets[:self.front_count].copy()
-        self.offset = 0.
-        self.tracking_since = None
-        self._enter('first_shift')
-
-    def _advance_tail_intake(self, dt, fresh):
-        """相位补偿保持前部目标，只把后段实测曲线逐节接入螺旋。"""
-        count = self.accepted
-        if count < self.n and not self._enabled[count]:
-            self._enabled[count] = True
-            self._targets[count] = self.measured[count]
-        stop = min(self.n, count+1)
-        error = np.max(abs(self._targets[self._enabled]-self.measured[self._enabled]), initial=0.)
-        pace = float(np.clip((math.radians(23.)-error)/math.radians(17.), .1, 1.))
-        self.offset = min(self.curve.shift_limit_m, self.offset+self.options.shift_rate_m_s*pace*dt)
-        goal = self.curve.targets(self.offset, self.curve.torsion*self.offset)
-        goal[:self.front_count] = self.locked_front
-        self._set_targets(goal, dt)
-        # 送尾期间前部已发目标逐帧保持完全相同。
-        self._targets[:self.front_count] = self.locked_front
-        if not fresh:
-            return
-        nominal = self.curve.helical_targets(self.offset, self.curve.torsion*self.offset)
-        # count 是已接受的前缀；当前新关节是相邻转轴的前瞻接管。
-        # 先等当前关节完全到位才开放下一转轴，会把3D曲线退化成单轴掰尾。
-        if count == self.front_count:
-            # 前部由操作者确认并锁定，不能再要求它追踪另一条名义螺旋。
-            checking = slice(self.front_count, count)
-        elif count < self.n:
-            checking = slice(max(self.front_count, count-2), count)
-        else:
-            checking = slice(self.front_count, self.n)
-        follows = np.max(abs(nominal[checking]-self.measured[checking]), initial=0.) <= math.radians(3.)
-        self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if follows else None
-        if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
-            self.tracking_since = None
-            if count < self.n:
-                self.accepted += 1
-                self.events.append(dict(stage='intake', joint=self.accepted, shift_m=self.offset))
-            else:
-                self._start_helix_normalize()
+        """Directly reuse the original gravity return once the front is ready."""
+        self._start_source_return(retain_joints=self.front_count, initial=True)
+        self.events.append(dict(stage='direct_source_return', retained=self.front_count,
+            straight_m=self.return_straight, radius_m=self.gait.o.r_h2,
+            rolling_rate_rad_s=self.options.return_roll_rad_s))
 
     def _start_helix_normalize(self):
         """拼接曲线退场，全身逐渐归到同一半径、螺距、绕向和相位的Helix。"""
@@ -4839,7 +4809,8 @@ class GravityCrossing:
 
     def confirm(self, feedback_time, measured_deg):
         """Ctrl+L 确认实物支撑并保持，下一次 J/G 才运动；重复确认不重置送尾。"""
-        if self.stage == 'first_shift':
+        if self.stage in ('return_seat','return_wind','return_finish','recover') or (
+                self.front_confirm_requested and self.stage in ('front_finish','front_seat')):
             return False
         front_ready = self.stage in ('front_finish', 'front_seat', 'front_hold')
         release_ready = (self.stage == 'right_u_hold' or
@@ -4852,8 +4823,12 @@ class GravityCrossing:
         self.feedback_time = feedback_time
         self.started = True
         if front_ready:
-            # 不以名义目标跟踪误差代替实物支撑判断，也不在确认后继续旋转前部。
-            self._start_tail_intake()
+            self.front_confirm_requested = True
+            if self.stage == 'front_hold':
+                self._start_tail_intake()
+            # Earlier physical confirmation is remembered, not mistaken for a
+            # completed geometric transition. J/G finishes front preparation
+            # before entering the same source return automatically.
         elif self.stage == 'align':
             self.anchor = self._targets.copy()
             self._enter('unwind')
@@ -4902,9 +4877,7 @@ class GravityCrossing:
                     material_shift_joints=self.front.transfer.position,
                     requested_start=self.front.desired_start))
                 lengths = self.arc_reference['lengths']
-                self.front = GravityFrontTransition(lengths, self.front.window, np.degrees(self.measured),
-                    options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
-                    minimum_front_turns=self.options.min_front_turns)
+                self.front = self._make_front(lengths, self.front.window)
                 self._plan_arc_reference(lengths)
             elif self.front.stage == 'blocked':
                 self.pause()
@@ -4924,8 +4897,6 @@ class GravityCrossing:
             self._advance_front_finish(dt, fresh)
         elif self.stage == 'front_seat':
             self._advance_front_seat(dt, fresh)
-        elif self.stage == 'first_shift':
-            self._advance_tail_intake(dt, fresh)
         elif self.stage == 'helix_normalize':
             self._advance_helix_normalize(dt, fresh)
         elif self.stage in ('return_seat', 'return_wind', 'return_finish'):
@@ -4961,24 +4932,28 @@ class GravityCrossing:
             self._enter('right_u_hold')
             self.pause()
 
-    def _start_source_return(self):
+    def _start_source_return(self, retain_joints=None, initial=False):
         """原实机版2：逐个接管直尾，再缩短直线段，补偿前部螺旋相位。"""
-        self.return_straight = (self.n-self.options.retain_joints+1)*self.l
+        self.return_retain = self.options.retain_joints if retain_joints is None else retain_joints
+        self.initial_source_return = initial
+        self.return_straight = (self.n-self.return_retain+1)*self.l
         self.return_lead = self.gait.lead_angle(self.gait.o.r_h2)
         self.return_seating = self.gait.targets(self.phase, self.gait.o.r_h2,
             ls=self.return_straight, th2=self.return_lead)[0]
-        self.return_fixed = self._targets[:self.options.retain_joints-4].copy()
+        self.return_fixed = self._targets[:self.return_retain-4].copy()
+        self.accepted = int(self._enabled.sum())
         self.offset = 0.
         self._enter('return_seat')
 
     def _advance_source_return(self, dt):
-        keep = self.options.retain_joints-4
+        keep = self.return_retain-4
         gait, radius = self.gait, self.gait.o.r_h2
         if self.stage == 'return_seat':
             end = min(self.n, keep+int(self.elapsed)+1)
             entering = ~self._enabled[:end]
             self._targets[:end][entering] = self.measured[:end][entering]
             self._enabled[:end] = True
+            self.accepted = int(self._enabled.sum())
             goal = self._targets.copy()
             goal[keep:end] = self.return_seating[keep:end]
             goal[:keep] = self.return_fixed
@@ -4988,7 +4963,7 @@ class GravityCrossing:
         elif self.stage == 'return_wind':
             self.offset = min(self.return_straight, self.options.shift_rate_m_s*self.elapsed)
             straight = self.return_straight-self.offset
-            # 初次ARC接尾时前部锁定；重力矩回卷时前部随曲线继续滚动推进。
+            # 初次ARC接尾和重力矩回卷均推进前部相位，直尾材料逐渐进入螺旋。
             self.phase += self.options.return_roll_rad_s*dt
             self._set_targets(gait.targets(self.phase, radius, ls=straight, th2=self.return_lead)[0], dt)
             if self.elapsed >= self.return_straight/self.options.shift_rate_m_s+2.:
@@ -5008,7 +4983,11 @@ class GravityCrossing:
         residual = self.anchor-self._helix(self.recover_phase, gait.o.r_h2)
         self._set_targets(self._helix(self.phase, radius)+(1.-smooth(t/2.))*residual, dt, rate=45.)
         if t >= 5.:
-            self._enter('roll')
+            if self.initial_source_return:
+                self.initial_source_return = False
+                self._start_helix_normalize()
+            else:
+                self._enter('roll')
 
     def status(self):
         front = None if self.front is None else self.front.status()
@@ -5018,8 +4997,43 @@ class GravityCrossing:
                     front_count=getattr(self, 'front_count', None),
                     helix_only=self.helix_only, front_tracking_error_deg=self.front_tracking_error_deg,
                     accepted_joint=self.accepted, shift_m=self.offset, step_remaining_s=self.step_left,
+                    initial_source_return=self.initial_source_return,
+                    return_retain_joints=getattr(self, 'return_retain', None),
                     front=front, events=self.events.copy())
 # END ARC_HELIX_CORE
+
+# BEGIN PASSIVE_END_RESET_CORE
+class PassiveEndReset:
+    def __init__(self, measured_deg, bearing_targets_deg, bearing_mask, *, rate_deg_s=60., hold_s=.25, max_s=2.):
+        self.bearing = np.asarray(bearing_mask, bool).copy()
+        self.targets = np.asarray(measured_deg, float).copy()
+        self.targets[self.bearing] = np.asarray(bearing_targets_deg)[self.bearing]
+        self.enabled = np.ones(len(self.bearing), bool)
+        self.rate, self.hold_s, self.max_s = rate_deg_s, hold_s, max_s
+        self.elapsed = self.zero_hold = 0.
+        self.done = False
+        self.reason = None
+        self.actual_max_deg = None
+
+    def advance(self, dt, measured_deg):
+        if self.done:
+            return
+        self.elapsed += dt
+        passive = ~self.bearing
+        self.targets[passive] += np.clip(-self.targets[passive], -self.rate*dt, self.rate*dt)
+        self.actual_max_deg = float(np.max(abs(np.asarray(measured_deg)[passive]), initial=0.))
+        target_zero = np.max(abs(self.targets[passive]), initial=0.) < 1e-8
+        self.zero_hold = self.zero_hold+dt if target_zero else 0.
+        ready = self.zero_hold >= self.hold_s and self.actual_max_deg <= 5.
+        if ready or self.elapsed >= self.max_s:
+            self.enabled = self.bearing.copy()
+            self.done = True
+            self.reason = 'zero_then_disabled' if ready else 'timeout_then_disabled'
+
+    def status(self):
+        return dict(elapsed_s=self.elapsed, done=self.done, actual_max_deg=self.actual_max_deg,
+                    reason=self.reason, temporary_enabled=self.enabled.tolist())
+# END PASSIVE_END_RESET_CORE
 
 # ==================== 4. 飞特串口协议（只有主循环操作串口） ====================
 def instruction_packet(servo_id, instruction, parameters):
@@ -5174,6 +5188,9 @@ class RollingArcController:
         self.feeding_inputs, self.feeding_last_stage = None, None
         self.feeding_last_diagnostic_s = None
         self.helix_transition = None
+        self.end_reset = None
+        self.end_reset_pending = False
+        self.end_reset_last = None
 
     def read_helix_entry(self):
         """用同一帧全身舵机角重建当前搭管姿态并规划切换。"""
@@ -5277,9 +5294,12 @@ class RollingArcController:
             changed = core.confirm(sample_time, self.measured_angles())
             if changed:
                 self.mode, self.freeze_targets = 'hold', True
-                print(f'Ctrl+L确认成功：阶段={core.stage}；当前目标保持，Ctrl+J单步或Ctrl+G连续推进。', flush=True)
+                if core.stage in ('front_finish','front_seat'):
+                    print(f'已收到前部支撑确认，阶段={core.stage}；J/G完成前部曲线衔接后自动接入原回卷。', flush=True)
+                else:
+                    print(f'Ctrl+L确认成功：阶段={core.stage}；当前目标保持，Ctrl+J单步或Ctrl+G连续推进。', flush=True)
             else:
-                print('Ctrl+L已确认：当前为first_shift送尾阶段，不重复初始化；Ctrl+J单步或Ctrl+G连续推进。', flush=True)
+                print(f'Ctrl+L已确认：当前阶段={core.stage}，不重置进度；Ctrl+J单步或Ctrl+G连续推进。', flush=True)
             return True
         if gravity and core.stage == 'front_hold' and command in ('step', 'run', 'toggle'):
             core.pause()
@@ -5950,8 +5970,43 @@ class RollingArcController:
         self.phase = INITIAL_PHASE_RAD
         self.forming, self.settle_remaining = True, SETTLE_S
         self.pending_phase, self.mode = 0.0, 'hold'
+        self.end_reset_pending = END_ZERO_ON_U and window_override is None
+
+    def cancel_end_reset(self):
+        self.end_reset_pending = False
+        if self.end_reset is not None:
+            self.enabled = self.end_reset.bearing.tolist()
+            self.bus.set_enabled(self.enabled)
+            self.end_reset = None
+
+    def tick_end_reset(self, dt):
+        if self.end_reset is None:
+            measured = self.bus.read_angles(range(NUM_JOINTS))
+            angles = [measured[i] for i in range(NUM_JOINTS)]
+            self.end_reset = PassiveEndReset(angles, self.targets, self.enabled,
+                rate_deg_s=END_ZERO_RATE_DEG_S, hold_s=END_ZERO_HOLD_S, max_s=END_ZERO_MAX_S)
+            entering = (~self.end_reset.bearing).tolist()
+            self.bus.prepare_enabled(angles, self.end_reset.enabled.tolist(), configure_mask=entering)
+            self.enabled = self.end_reset.enabled.tolist()
+            print('两端临时使能到零位，承载ARC目标保持；随后自动失能两端。', flush=True)
+        now, feedback = self.motor_sample_clock()
+        if len(self.states)!=NUM_JOINTS or feedback is None or now-feedback >= COMPLIANCE_FEEDBACK_PERIOD_S:
+            self.refresh_compliance_feedback()
+        self.end_reset.advance(dt, self.measured_angles())
+        self.targets = self.end_reset.targets.tolist()
+        self.bus.send_targets(self.targets, self.enabled)
+        if self.end_reset.done:
+            self.enabled = self.end_reset.bearing.tolist()
+            self.bus.set_enabled(self.enabled)
+            self.end_reset_last = self.end_reset.status()
+            self.end_reset = None
+            self.end_reset_pending = False
+            print(f"两端归零尝试结束并已失能：{self.end_reset_last['reason']}，"
+                  f"实测最大角={self.end_reset_last['actual_max_deg']:.1f}°；触地端不直接作为重力参考。", flush=True)
 
     def release(self, verify=True):
+        self.end_reset = None
+        self.end_reset_pending = False
         self.helix_transition = None
         self.feeding_selected, self.feeding = False, None
         self.feeding_inputs = None
@@ -6039,6 +6094,11 @@ class RollingArcController:
 
     def command(self, command):
         command = command.strip().lower()
+        if command.startswith('gait_'):
+            self.cancel_end_reset()
+        if self.end_reset is not None and command in ('pause', 'hold', 'toggle', 'run', 'step', 'back'):
+            # 人工运动/暂停立即结束本次归零，恢复两端失能，再按原热键处理。
+            self.cancel_end_reset()
         if command == 'gait_gravity':
             self.select_gravity()
             return
@@ -6116,6 +6176,9 @@ class RollingArcController:
         step_finished = False
         # 不追赶阻塞期间漏发的帧，防止串口延迟后突然跳过一大段相位。
         dt = min(dt, CONTROL_PERIOD_S)
+        if self.end_reset is not None or (self.end_reset_pending and not self.forming and self.settle_remaining<=0):
+            self.tick_end_reset(dt)
+            return
         if self.helix_transition is not None:
             self.tick_helix(dt)
             return
@@ -6180,6 +6243,8 @@ class RollingArcController:
                 'basic_arc' if self.compliance is None else 'fixed_section_compliance')
         return dict(mode=self.mode, gait=gait,
                     targets_frozen=self.freeze_targets,
+                    end_reset=None if self.end_reset is None else self.end_reset.status(),
+                    end_reset_pending=self.end_reset_pending, end_reset_last=self.end_reset_last,
                     forming=self.forming, phase_rad=self.phase, command_phase_rad=self.command_phase,
                     amplitude_deg=self.amplitude, omega_rad_s=self.omega, direction=self.direction,
                     phase_step_rad=self.phase_step, pending_phase_rad=self.pending_phase,
@@ -6217,23 +6282,24 @@ class RollingArcController:
         amplitude = (FEED_AMPLITUDE_DEG if self.feeding is None else self.feeding.options.amplitude_deg) if self.feeding_selected else self.amplitude
         print(f'{gait} | {label} | J{self.first}–J{self.last} | A={amplitude:g}° '
               f'omega={self.omega:g}rad/s | phase={self.phase:.4f}rad | delta={self.phase_step:g}rad', flush=True)
+        if self.end_reset is not None:
+            print('两端归零：当前临时使能全身，承载段目标保持；结束恢复两端失能，空格可终止。', flush=True)
         if gravity:
             h = self.helix_transition.status()
             instruction = {
                 'arc_settle': '将实测承载弧接入同半径的曲线参考，接好后再卷前部',
                 'front': '自动调长并前卷；尾部保持失能',
-                'front_finish': '尾部失能，前部形成螺旋；实物已搭稳可直接Ctrl+L确认送尾',
+                'front_finish': '尾部失能，前部形成螺旋；L记录搭稳确认，J/G完成衔接后接原回卷',
                 'front_hold': '前部目标保持、尾部未接入；实物搭稳后Ctrl+L确认，再Ctrl+J/G送尾',
-                'front_seat': '仅前部小幅就位；实物已搭稳可直接Ctrl+L确认送尾',
-                'first_shift': '逐段送尾：Ctrl+G按一次连续至完成，再按G/空格暂停；J只推进1秒，重复L不重置',
+                'front_seat': '仅前部小幅就位；L记录搭稳确认，J/G完成衔接后接原回卷',
                 'helix_normalize': '全身归到同一条Helix；Ctrl+J单步/Ctrl+G连续，结束后保持；空格暂停',
                 'align': 'Ctrl+J/H 微调。确认前部过支管、螺旋已对准后按 Ctrl+L',
                 'unwind': '形成右侧小 U；从尾朝头观察，确认 U 搭稳后暂停并按 Ctrl+L',
                 'right_u_hold': '确认小 U 搭在主管右侧，前部贴稳后按 Ctrl+L，再用 Ctrl+J/G 释放尾段',
                 'drop': '尾段关闭扭矩，自然下落',
                 'drop_hold': '观察尾段是否落向轴线下方。确认后 Ctrl+L，再用 Ctrl+J/G 回卷',
-                'return_seat': '原实机曲线：按顺序接管切线弧和直尾',
-                'return_wind': '保持前部螺旋相位，缩短直线段逐节卷尾',
+                'return_seat': '复用原回卷：按顺序接管过渡弧和直尾；G连续执行',
+                'return_wind': '前部持续螺旋推进，缩短尾部直线段，按同一曲线逐段上管',
                 'return_finish': '消去切线圆弧，接回完整螺旋',
                 'recover': '回卷接收完成，恢复常速滚动',
                 'roll': '继续滚动，现场观察是否整身清障',
@@ -6965,7 +7031,7 @@ def process_control_commands(controller, commands, elapsed):
 
 def poll_control_feedback(controller, elapsed, next_feedback):
     """顺应或构型预览都读全关节；预览读角也可在未接管/失能时进行。"""
-    full_feedback = (controller.compliance is not None or controller.feeding_selected or
+    full_feedback = (controller.end_reset is not None or controller.compliance is not None or controller.feeding_selected or
                      controller.helix_transition is not None or controller.preview_feedback)
     compliance_due = (full_feedback and
                       (controller.feedback_time_s is None or

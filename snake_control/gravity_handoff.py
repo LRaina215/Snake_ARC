@@ -151,6 +151,8 @@ class GravityCrossing:
         self.front_extended = False
         self.front_ready_since = None
         self.front_tracking_error_deg = None
+        self.front_confirm_requested = False
+        self.initial_source_return = False
         self.align_direction = 1
         self.events = []
         if from_helix:
@@ -165,12 +167,13 @@ class GravityCrossing:
             active = np.flatnonzero(self._enabled)+1
             if len(active) < 3 or np.any(np.diff(active) != 1):
                 raise ValueError('T 管模式需要先形成连续的局部承载圆弧')
-            arc_options = ArcHelixOptions(radius_m=gait_options.r_h1, pitch_m=gait_options.pitch,
-                                         prepare_front=True)
-            self.front = GravityFrontTransition(lengths, (int(active[0]), int(active[-1])),
-                                                measured_deg, options=arc_options,
-                                                minimum_front_turns=options.min_front_turns)
+            self.front = self._make_front(lengths, (int(active[0]), int(active[-1])))
             self._plan_arc_reference(lengths)
+
+    def _make_front(self, lengths, window):
+        return GravityFrontTransition(lengths, window, np.degrees(self.measured),
+            options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
+            minimum_front_turns=self.options.min_front_turns)
 
     @staticmethod
     def _section_radius(q, lengths, window):
@@ -220,9 +223,7 @@ class GravityCrossing:
                                               self.arc_reference_ready_since) if ready else None
             if self.arc_reference_ready_since is not None and self.elapsed-self.arc_reference_ready_since >= .4:
                 self._enabled = reference['mask'].copy()
-                self.front = GravityFrontTransition(reference['lengths'], reference['window'], np.degrees(self.measured),
-                    options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
-                    minimum_front_turns=self.options.min_front_turns)
+                self.front = self._make_front(reference['lengths'], reference['window'])
                 self._enter('front')
 
     @property
@@ -282,55 +283,18 @@ class GravityCrossing:
             follows = np.max(abs(self._targets[self._enabled]-self.measured[self._enabled])) <= math.radians(5.)
             self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if follows else None
             if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
-                self._enter('front_hold')
-                self.pause()
+                if self.front_confirm_requested:
+                    self._start_tail_intake()
+                else:
+                    self._enter('front_hold')
+                    self.pause()
 
     def _start_tail_intake(self):
-        self.accepted = self.initial_prefix = self.front_count
-        # 用已经下发并搭稳的前部相位，不再用受载角偏差重新拟合它。
-        self.curve = MeasuredGravityShift(self.gait, self.gait.o.r_h1, self.phase, self.measured, self.front_count,
-                                         upstream_m=(self.front_count+1)*self.l)
-        self.locked_front = self._targets[:self.front_count].copy()
-        self.offset = 0.
-        self.tracking_since = None
-        self._enter('first_shift')
-
-    def _advance_tail_intake(self, dt, fresh):
-        """相位补偿保持前部目标，只把后段实测曲线逐节接入螺旋。"""
-        count = self.accepted
-        if count < self.n and not self._enabled[count]:
-            self._enabled[count] = True
-            self._targets[count] = self.measured[count]
-        stop = min(self.n, count+1)
-        error = np.max(abs(self._targets[self._enabled]-self.measured[self._enabled]), initial=0.)
-        pace = float(np.clip((math.radians(23.)-error)/math.radians(17.), .1, 1.))
-        self.offset = min(self.curve.shift_limit_m, self.offset+self.options.shift_rate_m_s*pace*dt)
-        goal = self.curve.targets(self.offset, self.curve.torsion*self.offset)
-        goal[:self.front_count] = self.locked_front
-        self._set_targets(goal, dt)
-        # 送尾期间前部已发目标逐帧保持完全相同。
-        self._targets[:self.front_count] = self.locked_front
-        if not fresh:
-            return
-        nominal = self.curve.helical_targets(self.offset, self.curve.torsion*self.offset)
-        # count 是已接受的前缀；当前新关节是相邻转轴的前瞻接管。
-        # 先等当前关节完全到位才开放下一转轴，会把3D曲线退化成单轴掰尾。
-        if count == self.front_count:
-            # 前部由操作者确认并锁定，不能再要求它追踪另一条名义螺旋。
-            checking = slice(self.front_count, count)
-        elif count < self.n:
-            checking = slice(max(self.front_count, count-2), count)
-        else:
-            checking = slice(self.front_count, self.n)
-        follows = np.max(abs(nominal[checking]-self.measured[checking]), initial=0.) <= math.radians(3.)
-        self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if follows else None
-        if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
-            self.tracking_since = None
-            if count < self.n:
-                self.accepted += 1
-                self.events.append(dict(stage='intake', joint=self.accepted, shift_m=self.offset))
-            else:
-                self._start_helix_normalize()
+        """Directly reuse the original gravity return once the front is ready."""
+        self._start_source_return(retain_joints=self.front_count, initial=True)
+        self.events.append(dict(stage='direct_source_return', retained=self.front_count,
+            straight_m=self.return_straight, radius_m=self.gait.o.r_h2,
+            rolling_rate_rad_s=self.options.return_roll_rad_s))
 
     def _start_helix_normalize(self):
         """拼接曲线退场，全身逐渐归到同一半径、螺距、绕向和相位的Helix。"""
@@ -372,7 +336,8 @@ class GravityCrossing:
 
     def confirm(self, feedback_time, measured_deg):
         """Ctrl+L 确认实物支撑并保持，下一次 J/G 才运动；重复确认不重置送尾。"""
-        if self.stage == 'first_shift':
+        if self.stage in ('return_seat','return_wind','return_finish','recover') or (
+                self.front_confirm_requested and self.stage in ('front_finish','front_seat')):
             return False
         front_ready = self.stage in ('front_finish', 'front_seat', 'front_hold')
         release_ready = (self.stage == 'right_u_hold' or
@@ -385,8 +350,12 @@ class GravityCrossing:
         self.feedback_time = feedback_time
         self.started = True
         if front_ready:
-            # 不以名义目标跟踪误差代替实物支撑判断，也不在确认后继续旋转前部。
-            self._start_tail_intake()
+            self.front_confirm_requested = True
+            if self.stage == 'front_hold':
+                self._start_tail_intake()
+            # Earlier physical confirmation is remembered, not mistaken for a
+            # completed geometric transition. J/G finishes front preparation
+            # before entering the same source return automatically.
         elif self.stage == 'align':
             self.anchor = self._targets.copy()
             self._enter('unwind')
@@ -435,9 +404,7 @@ class GravityCrossing:
                     material_shift_joints=self.front.transfer.position,
                     requested_start=self.front.desired_start))
                 lengths = self.arc_reference['lengths']
-                self.front = GravityFrontTransition(lengths, self.front.window, np.degrees(self.measured),
-                    options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
-                    minimum_front_turns=self.options.min_front_turns)
+                self.front = self._make_front(lengths, self.front.window)
                 self._plan_arc_reference(lengths)
             elif self.front.stage == 'blocked':
                 self.pause()
@@ -457,8 +424,6 @@ class GravityCrossing:
             self._advance_front_finish(dt, fresh)
         elif self.stage == 'front_seat':
             self._advance_front_seat(dt, fresh)
-        elif self.stage == 'first_shift':
-            self._advance_tail_intake(dt, fresh)
         elif self.stage == 'helix_normalize':
             self._advance_helix_normalize(dt, fresh)
         elif self.stage in ('return_seat', 'return_wind', 'return_finish'):
@@ -494,24 +459,28 @@ class GravityCrossing:
             self._enter('right_u_hold')
             self.pause()
 
-    def _start_source_return(self):
+    def _start_source_return(self, retain_joints=None, initial=False):
         """原实机版2：逐个接管直尾，再缩短直线段，补偿前部螺旋相位。"""
-        self.return_straight = (self.n-self.options.retain_joints+1)*self.l
+        self.return_retain = self.options.retain_joints if retain_joints is None else retain_joints
+        self.initial_source_return = initial
+        self.return_straight = (self.n-self.return_retain+1)*self.l
         self.return_lead = self.gait.lead_angle(self.gait.o.r_h2)
         self.return_seating = self.gait.targets(self.phase, self.gait.o.r_h2,
             ls=self.return_straight, th2=self.return_lead)[0]
-        self.return_fixed = self._targets[:self.options.retain_joints-4].copy()
+        self.return_fixed = self._targets[:self.return_retain-4].copy()
+        self.accepted = int(self._enabled.sum())
         self.offset = 0.
         self._enter('return_seat')
 
     def _advance_source_return(self, dt):
-        keep = self.options.retain_joints-4
+        keep = self.return_retain-4
         gait, radius = self.gait, self.gait.o.r_h2
         if self.stage == 'return_seat':
             end = min(self.n, keep+int(self.elapsed)+1)
             entering = ~self._enabled[:end]
             self._targets[:end][entering] = self.measured[:end][entering]
             self._enabled[:end] = True
+            self.accepted = int(self._enabled.sum())
             goal = self._targets.copy()
             goal[keep:end] = self.return_seating[keep:end]
             goal[:keep] = self.return_fixed
@@ -521,7 +490,7 @@ class GravityCrossing:
         elif self.stage == 'return_wind':
             self.offset = min(self.return_straight, self.options.shift_rate_m_s*self.elapsed)
             straight = self.return_straight-self.offset
-            # 初次ARC接尾时前部锁定；重力矩回卷时前部随曲线继续滚动推进。
+            # 初次ARC接尾和重力矩回卷均推进前部相位，直尾材料逐渐进入螺旋。
             self.phase += self.options.return_roll_rad_s*dt
             self._set_targets(gait.targets(self.phase, radius, ls=straight, th2=self.return_lead)[0], dt)
             if self.elapsed >= self.return_straight/self.options.shift_rate_m_s+2.:
@@ -541,7 +510,11 @@ class GravityCrossing:
         residual = self.anchor-self._helix(self.recover_phase, gait.o.r_h2)
         self._set_targets(self._helix(self.phase, radius)+(1.-smooth(t/2.))*residual, dt, rate=45.)
         if t >= 5.:
-            self._enter('roll')
+            if self.initial_source_return:
+                self.initial_source_return = False
+                self._start_helix_normalize()
+            else:
+                self._enter('roll')
 
     def status(self):
         front = None if self.front is None else self.front.status()
@@ -551,4 +524,6 @@ class GravityCrossing:
                     front_count=getattr(self, 'front_count', None),
                     helix_only=self.helix_only, front_tracking_error_deg=self.front_tracking_error_deg,
                     accepted_joint=self.accepted, shift_m=self.offset, step_remaining_s=self.step_left,
+                    initial_source_return=self.initial_source_return,
+                    return_retain_joints=getattr(self, 'return_retain', None),
                     front=front, events=self.events.copy())

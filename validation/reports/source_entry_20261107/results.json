@@ -1,0 +1,505 @@
+{
+  "hardware_run": false,
+  "model_joint_spacing_m": 0.0645,
+  "main_pipe_diameter_m": 0.11,
+  "simulation_controls": {
+    "control_period_s": 0.02,
+    "full_feedback_period_s": 0.2,
+    "torque_limit_nm": 2.355,
+    "passive_damping": 1.5,
+    "friction": 0.5
+  },
+  "straight_entry": [
+    {
+      "record": "artifacts\\source_entry_20261107\\final\\basic5",
+      "summary": {
+        "case": "basic5",
+        "passed": true,
+        "failure": null,
+        "dynamics_s": 174.3200000004683,
+        "front_before_tail": true,
+        "front_confirmed_s": 93.9200000000844,
+        "first_tail_on_s": 97.9000000001034
+      },
+      "review": {
+        "case": "basic5",
+        "controller_passed": true,
+        "actual_final_shape_passed": true,
+        "frames": 3487,
+        "final_min_turns": 1.9779377043997035,
+        "final_max_radius_m": 0.10682014923471356,
+        "preparation_max_near_pipe_coverage_deg": 236.83672076879026,
+        "source_front_target_change_rad": 1.742371842004819,
+        "source_head_advance_m": 0.18211268213021448,
+        "source_intake_supported": true,
+        "passive_force_max_nm": 0.0,
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "floor_frames": 0,
+        "saturated_frames": 84,
+        "max_joint_deg": 74.69704613816135,
+        "failure": null,
+        "passed": true
+      }
+    },
+    {
+      "record": "artifacts\\source_entry_20261107\\final\\head_short5",
+      "summary": {
+        "case": "head_short5",
+        "passed": true,
+        "failure": null,
+        "dynamics_s": 141.32000000031073,
+        "front_before_tail": true,
+        "front_confirmed_s": 60.939999999948675,
+        "first_tail_on_s": 64.91999999994593
+      },
+      "review": {
+        "case": "head_short5",
+        "controller_passed": true,
+        "actual_final_shape_passed": true,
+        "frames": 2827,
+        "final_min_turns": 1.977522141809077,
+        "final_max_radius_m": 0.10685799194356303,
+        "preparation_max_near_pipe_coverage_deg": 213.57028158301355,
+        "source_front_target_change_rad": 1.7396872190458268,
+        "source_head_advance_m": 0.18196820627276283,
+        "source_intake_supported": true,
+        "passive_force_max_nm": 0.0,
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "floor_frames": 0,
+        "saturated_frames": 77,
+        "max_joint_deg": 74.69718452871543,
+        "failure": null,
+        "passed": true
+      }
+    },
+    {
+      "record": "artifacts\\source_entry_20261107\\final\\tail_short5",
+      "summary": {
+        "case": "tail_short5",
+        "passed": true,
+        "failure": null,
+        "dynamics_s": 215.72000000066598,
+        "front_before_tail": true,
+        "front_confirmed_s": 135.32000000028208,
+        "first_tail_on_s": 139.30000000030108
+      },
+      "review": {
+        "case": "tail_short5",
+        "controller_passed": true,
+        "actual_final_shape_passed": true,
+        "frames": 4315,
+        "final_min_turns": 1.9779381974730577,
+        "final_max_radius_m": 0.1068200265875177,
+        "preparation_max_near_pipe_coverage_deg": 236.71509598484124,
+        "source_front_target_change_rad": 1.7423774834666517,
+        "source_head_advance_m": 0.18203175262495763,
+        "source_intake_supported": true,
+        "passive_force_max_nm": 0.0,
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "floor_frames": 0,
+        "saturated_frames": 85,
+        "max_joint_deg": 74.69708303638937,
+        "failure": null,
+        "passed": true
+      }
+    }
+  ],
+  "embedded_core_review": {
+    "case": "basic5",
+    "controller_passed": true,
+    "actual_final_shape_passed": true,
+    "frames": 3487,
+    "final_min_turns": 1.9779377043997035,
+    "final_max_radius_m": 0.10682014923471356,
+    "preparation_max_near_pipe_coverage_deg": 236.83672076879026,
+    "source_front_target_change_rad": 1.742371842004819,
+    "source_head_advance_m": 0.18211268213021448,
+    "source_intake_supported": true,
+    "passive_force_max_nm": 0.0,
+    "self_contact_frames": 0,
+    "first_self_contact": [],
+    "floor_frames": 0,
+    "saturated_frames": 84,
+    "max_joint_deg": 74.69704613816135,
+    "failure": null,
+    "passed": true
+  },
+  "continuation": {
+    "checkpoint": "artifacts\\source_entry_20261107\\embedded\\basic5",
+    "duration_s": 9.998999999999898,
+    "min_turns": 1.9781457554341488,
+    "max_radius_m": 0.10678357338206473,
+    "self_contact_events": [],
+    "no_support_frames": 0,
+    "floor_frames": 0,
+    "head_advance_m": 0.04244733703665815,
+    "max_tracking_deg": 0.5372138379459107,
+    "saturated_frames": 0,
+    "passed": true
+  },
+  "radius_comparison": [
+    {
+      "amplitude_deg": 50,
+      "direction": 1,
+      "model_arc_radius_m": 0.14906662575462398,
+      "completed_control": true,
+      "feed_duration_s": 21.200000000009478,
+      "actual_material_delta_m": 0.11854357829113507,
+      "actual_mean_speed_m_s": 0.0055916782212774565,
+      "max_coverage_deg": 202.12150479973258,
+      "axial_center_range_m": 0.0001879138246662082,
+      "no_support_frames": 0,
+      "max_tracking_deg": 1.4886296667807584,
+      "self_contacts": [],
+      "passive_force_max_nm": 0.0,
+      "failure": null,
+      "passed": true
+    },
+    {
+      "amplitude_deg": 50,
+      "direction": -1,
+      "model_arc_radius_m": 0.14906662575462398,
+      "completed_control": true,
+      "feed_duration_s": 21.200000000009478,
+      "actual_material_delta_m": -0.16479166917839969,
+      "actual_mean_speed_m_s": 0.007773191942373869,
+      "max_coverage_deg": 202.15788880832878,
+      "axial_center_range_m": 0.000506637011818481,
+      "no_support_frames": 3,
+      "max_tracking_deg": 1.5089341836710572,
+      "self_contacts": [],
+      "passive_force_max_nm": 0.0,
+      "failure": null,
+      "passed": false
+    },
+    {
+      "amplitude_deg": 60,
+      "direction": 1,
+      "model_arc_radius_m": 0.12393335104166656,
+      "completed_control": true,
+      "feed_duration_s": 21.000000000009234,
+      "actual_material_delta_m": 0.13391654443978707,
+      "actual_mean_speed_m_s": 0.006376978306653723,
+      "max_coverage_deg": 238.73722785979908,
+      "axial_center_range_m": 0.00025106395929469505,
+      "no_support_frames": 1,
+      "max_tracking_deg": 1.3625241590882022,
+      "self_contacts": [],
+      "passive_force_max_nm": 0.0,
+      "failure": null,
+      "passed": false
+    },
+    {
+      "amplitude_deg": 60,
+      "direction": -1,
+      "model_arc_radius_m": 0.12393335104166656,
+      "completed_control": true,
+      "feed_duration_s": 20.80000000000899,
+      "actual_material_delta_m": -0.13310299824073313,
+      "actual_mean_speed_m_s": 0.006399182607724789,
+      "max_coverage_deg": 237.35086938712715,
+      "axial_center_range_m": 0.0006447598571352603,
+      "no_support_frames": 0,
+      "max_tracking_deg": 0.8946651939240671,
+      "self_contacts": [],
+      "passive_force_max_nm": 0.0,
+      "failure": null,
+      "passed": true
+    },
+    {
+      "amplitude_deg": 70,
+      "direction": 1,
+      "model_arc_radius_m": 0.10592627202501406,
+      "completed_control": false,
+      "feed_duration_s": null,
+      "actual_material_delta_m": 0.0002119891254041273,
+      "actual_mean_speed_m_s": null,
+      "max_coverage_deg": 288.1584629732303,
+      "axial_center_range_m": 5.466487688964017e-05,
+      "no_support_frames": 0,
+      "max_tracking_deg": 1.5124473230344044,
+      "self_contacts": [
+        [
+          5.7190000000002446,
+          0,
+          17
+        ]
+      ],
+      "passive_force_max_nm": 0.0,
+      "failure": "self_contact",
+      "passed": false
+    },
+    {
+      "amplitude_deg": 70,
+      "direction": -1,
+      "model_arc_radius_m": 0.10592627202501406,
+      "completed_control": false,
+      "feed_duration_s": null,
+      "actual_material_delta_m": 0.0005388706626247852,
+      "actual_mean_speed_m_s": null,
+      "max_coverage_deg": 288.1584629732303,
+      "axial_center_range_m": 5.4980509798505106e-05,
+      "no_support_frames": 0,
+      "max_tracking_deg": 1.6435016507296147,
+      "self_contacts": [
+        [
+          5.684000000000233,
+          0,
+          17
+        ]
+      ],
+      "passive_force_max_nm": 0.0,
+      "failure": "self_contact",
+      "passed": false
+    }
+  ],
+  "end_reset": [
+    {
+      "record": "artifacts\\source_entry_20261107\\end_reset_round2\\floor_passive.json",
+      "floor": true,
+      "reset": false,
+      "pipe_axis_height_m": 0.5506696341182085,
+      "result": null,
+      "final_passive_max_deg": 26.88290346534757,
+      "max_arc_displacement_m": 0.00466717301787396,
+      "min_arc_center_above_axis_m": 0.014154375257065727,
+      "min_arc_sweep_deg": 238.3293859720074,
+      "max_arc_sweep_deg": 238.84319679793168,
+      "no_contact_frames": 0,
+      "floor_contact_frames": 248,
+      "passive_force_after_release_nm": 0.0,
+      "passed": true
+    },
+    {
+      "record": "artifacts\\source_entry_20261107\\end_reset_round2\\floor_reset.json",
+      "floor": true,
+      "reset": true,
+      "pipe_axis_height_m": 0.5506696341182085,
+      "result": {
+        "time_s": 0.9800000000000008,
+        "elapsed_s": 1.0000000000000004,
+        "done": true,
+        "actual_max_deg": 0.06968941265234412,
+        "reason": "zero_then_disabled",
+        "temporary_enabled": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      "final_passive_max_deg": 3.8962818071122816,
+      "max_arc_displacement_m": 0.013374142577445024,
+      "min_arc_center_above_axis_m": 0.01424034259165001,
+      "min_arc_sweep_deg": 238.30520242025153,
+      "max_arc_sweep_deg": 238.83986024906903,
+      "no_contact_frames": 0,
+      "floor_contact_frames": 242,
+      "passive_force_after_release_nm": 0.0,
+      "passed": true
+    },
+    {
+      "record": "artifacts\\source_entry_20261107\\end_reset_round2\\hanging_passive.json",
+      "floor": false,
+      "reset": false,
+      "pipe_axis_height_m": 1.2,
+      "result": null,
+      "final_passive_max_deg": 26.023209007603814,
+      "max_arc_displacement_m": 0.020156523232744736,
+      "min_arc_center_above_axis_m": 0.012676370723608138,
+      "min_arc_sweep_deg": 238.3293859720074,
+      "max_arc_sweep_deg": 239.09279409056228,
+      "no_contact_frames": 0,
+      "floor_contact_frames": 0,
+      "passive_force_after_release_nm": 0.0,
+      "passed": true
+    },
+    {
+      "record": "artifacts\\source_entry_20261107\\end_reset_round2\\hanging_reset.json",
+      "floor": false,
+      "reset": true,
+      "pipe_axis_height_m": 1.2,
+      "result": {
+        "time_s": 0.9800000000000008,
+        "elapsed_s": 1.0000000000000004,
+        "done": true,
+        "actual_max_deg": 0.05575879891544262,
+        "reason": "zero_then_disabled",
+        "temporary_enabled": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      "final_passive_max_deg": 5.962505178034417,
+      "max_arc_displacement_m": 0.020666049983848727,
+      "min_arc_center_above_axis_m": 0.012626489262110102,
+      "min_arc_sweep_deg": 238.3293859720074,
+      "max_arc_sweep_deg": 239.1665988766327,
+      "no_contact_frames": 0,
+      "floor_contact_frames": 0,
+      "passive_force_after_release_nm": 0.0,
+      "passed": true
+    }
+  ],
+  "supplementary_review": {
+    "radius": [
+      {
+        "case": "A50_head",
+        "strict_original_passed": true,
+        "longest_sampled_below_contact_force_cutoff_s": 0.0,
+        "below_force_cutoff_max_contact_distance_m": null,
+        "crown_height_range_m": 0.01696681916963172,
+        "self_contact_frames": 0,
+        "saturated_frames": 3,
+        "actual_material_error_m": -0.010456421708864932
+      },
+      {
+        "case": "A50_tail",
+        "strict_original_passed": false,
+        "longest_sampled_below_contact_force_cutoff_s": 0.1,
+        "below_force_cutoff_max_contact_distance_m": -6.50414146213232e-06,
+        "crown_height_range_m": 0.02387870846253115,
+        "self_contact_frames": 0,
+        "saturated_frames": 3,
+        "actual_material_error_m": -0.03579166917839968
+      },
+      {
+        "case": "A60_head",
+        "strict_original_passed": false,
+        "longest_sampled_below_contact_force_cutoff_s": 0.05,
+        "below_force_cutoff_max_contact_distance_m": -1.0437440546914297e-05,
+        "crown_height_range_m": 0.019405119496564982,
+        "self_contact_frames": 0,
+        "saturated_frames": 2,
+        "actual_material_error_m": 0.004916544439787063
+      },
+      {
+        "case": "A60_tail",
+        "strict_original_passed": true,
+        "longest_sampled_below_contact_force_cutoff_s": 0.0,
+        "below_force_cutoff_max_contact_distance_m": null,
+        "crown_height_range_m": 0.020772233081388425,
+        "self_contact_frames": 0,
+        "saturated_frames": 0,
+        "actual_material_error_m": -0.0041029982407331245
+      },
+      {
+        "case": "A70_head",
+        "strict_original_passed": false,
+        "longest_sampled_below_contact_force_cutoff_s": 0.0,
+        "below_force_cutoff_max_contact_distance_m": null,
+        "crown_height_range_m": 0.00012109513514046988,
+        "self_contact_frames": 0,
+        "saturated_frames": 2,
+        "actual_material_error_m": -0.12878801087459588
+      },
+      {
+        "case": "A70_tail",
+        "strict_original_passed": false,
+        "longest_sampled_below_contact_force_cutoff_s": 0.0,
+        "below_force_cutoff_max_contact_distance_m": null,
+        "crown_height_range_m": 0.00010359030276640979,
+        "self_contact_frames": 0,
+        "saturated_frames": 1,
+        "actual_material_error_m": 0.1295388706626248
+      }
+    ],
+    "end_reset": [
+      {
+        "case": "floor_passive",
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "saturated_frames": 0,
+        "frames": 250
+      },
+      {
+        "case": "floor_reset",
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "saturated_frames": 37,
+        "frames": 250
+      },
+      {
+        "case": "hanging_passive",
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "saturated_frames": 0,
+        "frames": 250
+      },
+      {
+        "case": "hanging_reset",
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "saturated_frames": 37,
+        "frames": 250
+      }
+    ],
+    "tee": {
+      "source_entry_front_before_tail": true,
+      "wind_front_always_supported": true,
+      "wind_head_advance_m": 0.046314581822492595,
+      "min_sampled_turns_in_align": 1.9621414356452074,
+      "self_contact_events": [],
+      "final_stage": "align",
+      "full_crossing_passed": false
+    }
+  },
+  "source_return_equivalence": [
+    {
+      "retained_joints": 8,
+      "steps": 4159,
+      "max_target_difference_rad": 0.0,
+      "masks_equal": true,
+      "stages_equal": true,
+      "final_stage": "roll"
+    },
+    {
+      "retained_joints": 9,
+      "steps": 3840,
+      "max_target_difference_rad": 0.0,
+      "masks_equal": true,
+      "stages_equal": true,
+      "final_stage": "roll"
+    }
+  ],
+  "software_tests_passed": 28,
+  "limitations": [
+    "old mechanical geometry only",
+    "full updated T crossing not completed",
+    "no universal optimal-radius or automatic-radius optimizer demonstrated",
+    "hardware acceptance pending"
+  ]
+}

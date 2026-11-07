@@ -1,6 +1,6 @@
 # ARC→Helix与重力矩越障操作说明
 
-更新：2026-11-07。适用于 `codes/Rolling_Arc_Real.py` 和 `codes/Rolling_Arc_Debug_Mujoco.py`，两端共用控制器与Ctrl热键。实机动力学效果等待用户验收；已完成的18关节仿真范围见[实验报告](../validation/reports/sequential_handoff/README.md)。
+更新：2026-11-07晚间。适用于 `codes/Rolling_Arc_Real.py` 和 `codes/Rolling_Arc_Debug_Mujoco.py`，两端共用控制器与Ctrl热键。首次送尾已改为原重力矩回卷；当前版本通过三种直管起态验证，实机等待用户验收，见[本轮报告](../validation/reports/source_entry_20261107/README.md)。历史10类入口结果保留，不自动视为修改后版本的回归结果。
 
 现场按[实机验收清单](ARC_Helix实机验收清单.md)逐项记录，首轮6项各1次。
 
@@ -35,16 +35,18 @@ python .\codes\Rolling_Arc_Debug_Mujoco.py
 
 先按原流程接管并稳定搭管ARC：Ctrl+U按配置形成，或Ctrl+3按当前搭管形状选窗接管，形成完成后再选5/6。已经由本程序使能、稳定搭管的ARC可直接选5/6。实机和手调入口都用全局热键，操作时运行一个控制入口即可。
 
+Ctrl+U在ARC形成、静置结束后，默认还会执行一次两端归零：承载段目标保持，非承载关节按当前实测角预置后临时使能，以60°/s发到0，短暂保持后恢复失能。一般约1 s，最多2 s；未到位也会释放并明确显示超时。空格可以立即终止并释放两端，Ctrl+X全部失能；切换模式也会撤掉临时使能。顶部 `END_ZERO_ON_U=False` 可关闭，速度／保持／最长时间为 `END_ZERO_RATE_DEG_S / END_ZERO_HOLD_S / END_ZERO_MAX_S`。它消除弯折，不证明触地端已经成为重力参考；Ctrl+3按姿态接管不执行此归零。
+
 ## 三条操作路线
 
 ### 直接ARC→Helix
 
 1. 在稳定ARC上按Ctrl+5。选择模式后保持原状态。
 2. Ctrl+J逐步推进，或Ctrl+G连续推进：程序自行识别承载弧、需要时调节两侧长度，形成前部螺旋并小幅滚动就位。
-3. 前部实物搭稳后按Ctrl+L确认。`front_finish`、`front_seat`、`front_hold` 都接受确认，不必先暂停，也不必等名义螺旋的角度门槛；确认会保持当前前部目标，显示 `阶段=first_shift`。重复L不会重置进度。到 `front_hold` 尚未确认时，J/G保持原目标并明确提示先L，不再继续旋转前部。
-4. 按一次Ctrl+G连续执行 `first_shift`，不用反复按J；G再次按下或空格可暂停。当前实现保持前部目标、逐节接管尾部；尾段接管后进入 `helix_normalize`，逐渐将前后部统一到同一条Helix后才报 `complete`。该送尾方法已有实机失败反馈，尚未验收，不能把程序报完成当作实物已贴管。需要停顿观察时改用J，每次最多1秒，执行中重复按不追加。
+3. 前部实物搭稳后按Ctrl+L确认。`front_finish`、`front_seat`、`front_hold` 都接受确认，不必先暂停。提前确认时显示“已收到前部支撑确认”，保持当前目标；下一次J/G继续完成前部曲线衔接，再自动进入 `return_seat`。已到 `front_hold` 时，L直接选择 `return_seat`，仍由下一次J/G动作。重复L不会重置进度。到 `front_hold` 尚未确认时，J/G会提示先L。
+4. 按一次Ctrl+G连续执行 `return_seat → return_wind → return_finish → recover → helix_normalize`，不用反复按J。先顺序接管过渡弧和直尾，再缩短直尾、推进前部螺旋相位，让尾段材料逐步进入螺旋；前部持续推进，不再冻结整段前部去单独掰尾。最后统一到一条Helix后报 `complete` 并保持。G再次按下或空格可暂停；J每次最多1秒，执行中重复按不追加。
 
-前部目标保持不表示世界位置完全不动，整身受力仍可能使其发生实际位移。现场应对照实际支撑和角度反馈观察。
+L确认时保持目标；继续回卷后前部目标随曲线变化。现场对照支撑、前部前进与尾部逐段接入观察，不能以程序阶段或目标跟踪代替实物贴管。
 
 ### 恢复统一全身Helix
 
@@ -87,7 +89,7 @@ python .\codes\Rolling_Arc_Debug_Mujoco.py
 | --- | --- | --- |
 | Ctrl+J | 发起一段头侧增长任务 | 当前阶段最多推进 `HELIX_STEP_S` 秒控制动作，默认1 s，然后保持 |
 | Ctrl+H | 发起一段头侧缩短任务 | 仅在 `align` 阶段用于反向微调；其他阶段用J推进 |
-| Ctrl+L | 沿当前调长任务方向强制推进一小步 | 确认实物姿态并保持；前部已搭稳可直接接尾，重复L不重置送尾 |
+| Ctrl+L | 沿当前调长任务方向强制推进一小步 | 确认实物支撑并保持；早按会记住，完成前部衔接后接尾，重复L不重置 |
 | Ctrl+G | 当前调长任务暂停／继续 | 当前切换阶段连续推进／暂停；遇到姿态确认点会停下 |
 | Ctrl+空格 | 暂停 | 暂停并保持当前目标 |
 | Ctrl+K | 显示调长状态 | 显示当前阶段、计划窗口、进给、接管边界与下一步提示 |
@@ -114,8 +116,8 @@ python .\codes\Rolling_Arc_Debug_Mujoco.py
 | `HELIX_STEP_S` | 模式5/6的J单步控制时间预算 |
 | `GRAVITY_ALIGN_RATE_RAD_S` | 对准阶段滚动速度 |
 | `GRAVITY_RETAIN_JOINTS / GRAVITY_RELEASE_*` | 释放时保留前部数量、解旋直线长度与半径 |
-| `GRAVITY_SHIFT_RATE_M_S / GRAVITY_RETURN_ROLL_RAD_S` | 重力矩回卷时的曲线进给速度／前部滚动速度；首次ARC送尾阶段前部目标保持 |
+| `GRAVITY_SHIFT_RATE_M_S / GRAVITY_RETURN_ROLL_RAD_S` | 首次ARC接尾与重力矩回卷共用的直尾缩短速度／前部相位推进速度 |
 
-18关节、主管／支管110/60 mm条件下的10类仿真已通过完整过程复盘，涵盖直接5、4后5、两端极短、直接6、5后6、初相位变化与4正反调长后6。详见[验证报告与范围](../validation/reports/sequential_handoff/README.md)及[汇总数据](../validation/reports/sequential_handoff/results.json)。实机尚未验证，本次说明更新未新增运动实验。
+历史版本18关节、主管／支管110/60 mm的10类仿真见[旧报告](../validation/reports/sequential_handoff/README.md)。晚间替换首次送尾后，已验证近等长、头短、尾短三种直管起态，并续跑10 s；T管代表例完成前部支撑和原回卷接入，但停在自动操作者的对准判据，未完成完整T管回归。新连接件的实机与准确几何尚未验收，不继承旧版本的全场景通过结论。
 
 本机演示在 `artifacts/sequential_handoff/demos/`：`basic5_4x.mp4`、`tail_short5_4x.mp4`、`feed_h5_4x.mp4`、`direct6_4x.mp4`、`five_then6_4x.mp4`、`feed_h6_4x.mp4`。录像含阶段、最近热键、使能、已发目标角与实测角；MP4按仓库规则保留在本地，不随git push上传。

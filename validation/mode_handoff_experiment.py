@@ -4,8 +4,10 @@ World geometry in this file represents the operator's Ctrl+L confirmations and
 evaluation. It is never passed to the real controller.
 """
 import argparse
+import contextlib
 from dataclasses import asdict, replace
 import json
+import io
 from pathlib import Path
 import sys
 
@@ -37,6 +39,14 @@ CASES = {
     'feed_h6': dict(tee=True, feed=-1),
     'feed_j6': dict(tee=True, feed=1),
 }
+
+MIN_FRONT_ATTACHED_TURNS = .8
+MAX_FRONT_ATTACHED_RADIUS_M = .120
+FRONT_SUPPORT_SETTLE_S = .6
+FRONT_MIN_CONTACT_SPAN = 0
+FRONT_UNSUPPORTED_TIMEOUT_S = 5.
+INTAKE_STAGES = ('return_seat', 'return_wind', 'return_finish')
+ASSERT_FRONT_FROZEN = False
 
 
 class ExperimentController(real.RollingArcController):
@@ -142,10 +152,10 @@ def run(case, output):
         turn = np.ptp(np.unwrap(np.arctan2(yz[:, 1], yz[:, 0])))
         main, _, _ = pipe_contacts(sim)
         supported = [j for j in main if j <= last]
-        attached = (turn >= .9*2*np.pi and max(np.linalg.norm(yz, axis=1)) <= .115 and
-                    len(supported) >= 2 and max(supported)-min(supported) >= 3)
+        attached = (turn >= MIN_FRONT_ATTACHED_TURNS*2*np.pi and max(np.linalg.norm(yz, axis=1)) <= MAX_FRONT_ATTACHED_RADIUS_M and
+                    len(supported) >= 2 and max(supported)-min(supported) >= FRONT_MIN_CONTACT_SPAN)
         support_since = (data.time if support_since is None else support_since) if attached else None
-        return support_since is not None and data.time-support_since >= .8
+        return support_since is not None and data.time-support_since >= FRONT_SUPPORT_SETTLE_S
 
     def control(_):
         nonlocal last_control, last_feedback, first_tail_on, terminal_at, failure
@@ -206,8 +216,8 @@ def run(case, output):
                     terminal_at = float(data.time)
             elif core.stage == 'blocked':
                 failure = core.status()
-            elif controller.mode == 'hold' and core.stage == 'front_hold' and data.time-front_hold_started >= 1.5:
-                command('J')
+            elif controller.mode == 'hold' and core.stage == 'front_hold' and data.time-front_hold_started >= FRONT_UNSUPPORTED_TIMEOUT_S:
+                failure = 'front hold did not establish the required actual support'
             elif controller.mode == 'hold' and core.stage == 'align':
                 command('G')
         previous_mode = controller.mode
@@ -219,10 +229,10 @@ def run(case, output):
         if (core is not None and core.front is not None and core.stage == 'front' and core.front.stage == 'lead'
                 and any(controller.enabled[core.front.window[1]:])):
             failure = 'tail enabled before the front confirmation'
-        if (core is not None and core.front is not None and core.stage == 'first_shift' and
-                any(controller.enabled[core.front.window[1]:]) and first_tail_on is None):
+        if (core is not None and core.front is not None and core.stage in INTAKE_STAGES and
+                any(controller.enabled[core.front_count:]) and first_tail_on is None):
             first_tail_on = float(data.time)
-        if core is not None and core.stage == 'first_shift' and locked_front is not None:
+        if core is not None and core.stage in INTAKE_STAGES and locked_front is not None:
             front_target_change = max(front_target_change,
                 float(np.max(abs(np.radians(controller.targets[:held_front_count])-locked_front))))
         last_control = data.time
@@ -255,7 +265,8 @@ def run(case, output):
              bool(r['distal_contacts']) and any(j <= n//2 for j in r['main_links']) for r in held))
     ordered = first_tail_on is not None and front_confirmed_at is not None and first_tail_on >= front_confirmed_at
     passed = bool(failure is None and not trial.stopped and ordered and (recovery['passed'] if config.get('tee') else helix))
-    save(trial, output, 'locked_gait', None, case=case, passed=passed, failure=failure, config=config,
+    with contextlib.redirect_stdout(io.StringIO()):
+        save(trial, output, 'locked_gait', None, case=case, passed=passed, failure=failure, config=config,
          binary_enable=True, feedback_period_s=.2, commands=commands, operator_events=confirmations,
          entries=entries, recovery=recovery, helix_held=helix, first_tail_on_s=first_tail_on,
          front_confirmed_s=front_confirmed_at, front_before_tail=ordered,
@@ -265,7 +276,12 @@ def run(case, output):
          front_freeze_count=held_front_count,
          clear_since_s=clear_since, total_rolling_s=0. if not rolling else rolling[-1]['time_s']-rolling[0]['time_s'],
          controller_options=None if controller.helix_transition is None else asdict(controller.helix_transition.options),
-         gait_options=None if controller.helix_transition is None else asdict(controller.helix_transition.gait.o))
+         gait_options=None if controller.helix_transition is None else asdict(controller.helix_transition.gait.o),
+         parameters=asdict(sim.p), start_x=.1, assert_front_frozen=ASSERT_FRONT_FROZEN,
+         front_support_criteria=dict(min_turns=MIN_FRONT_ATTACHED_TURNS, max_radius_m=MAX_FRONT_ATTACHED_RADIUS_M,
+                                     settle_s=FRONT_SUPPORT_SETTLE_S, minimum_contact_index_span=FRONT_MIN_CONTACT_SPAN))
+    print(json.dumps(dict(output=str(output), passed=passed, failure=failure, final_stage=current_stage(),
+                          dynamics_s=float(data.time), helix_held=helix, front_before_tail=ordered)), flush=True)
     return passed
 
 
