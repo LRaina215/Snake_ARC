@@ -8,7 +8,7 @@ Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动移窗
 失能时Ctrl+3按全身实测姿态选窗接管并进入顺应；Ctrl+U始终按配置窗口形成。
 模式4转3会按实测重新选窗并撤去送链缓冲，成功后Ctrl+G开始滚动。
 Ctrl+4 主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，Ctrl+Y 提前返回，Ctrl+L沿任务方向强制推进一步。
-Ctrl+5 从当前圆弧接入 Helix 调试；Ctrl+J 单步，Ctrl+G 连续/暂停。
+Ctrl+5 从当前圆弧接入 Helix；先卷前部，暂停并 Ctrl+L 确认搭稳，再 Ctrl+J/G 送尾。
 Ctrl+6 接入 T 管重力矩越障；暂停时 Ctrl+L 确认实际姿态，Ctrl+J/G 再推进。
 不依赖 MuJoCo、EXE、相邻仓库或本仓库的其他 Python 模块。
 """
@@ -96,7 +96,8 @@ FEED_DIAGNOSTIC_PERIOD_S = 2.0 # 自动显示两侧判断数值；Ctrl+K随时�
 # ARC→Helix。半径是蛇身中心线的半径，螺距为每圈沿主管的前进量。
 HELIX_RADIUS_M = .094
 HELIX_PITCH_M = .13
-HELIX_MIN_END_DEPTH_LINKS = 1.5 # 截面短端低于拟合圆心的深度不足时，先向内移一节
+HELIX_MIN_FRONT_TURNS = .5     # 起卷侧至少预留半圈螺旋的材料长度，不足先调长
+HELIX_FRONT_RADIUS_BIAS_M = .010 # 前卷末段逐渐内扣，建立支撑后再送尾
 HELIX_STEP_S = 1.0             # Ctrl+J 单次最多推进的控制时间；等待新反馈时不消耗
 
 # T 管重力矩越障，初值来自 18 关节、主管/支管 110/60 mm 的仿真。
@@ -152,7 +153,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   模式4→3：按实测重新选窗接管，不继承送链缓冲使能；成功后Ctrl+G滚动
   Ctrl+4 主动送链：J/H各执行一段头侧增长/缩短，到位保持，-/=目标量减半/加倍
   送链中Ctrl+G暂停/继续；Ctrl+L沿任务方向强制推进一步，目标发完保持；Ctrl+Y提前返回起态
-  Ctrl+5 选择 ARC→Helix，选择时保持现状；Ctrl+J 单步，Ctrl+G 连续/暂停
+  Ctrl+5 选择 ARC→Helix；J/G先卷前部，暂停后L确认搭稳，J/G再逐节送尾
   Ctrl+6 选择 T 管重力矩越障（J1 为前端）；Ctrl+J/G 推进，Ctrl+L 确认实物姿态
   T 管模式对准支管时 Ctrl+J/H 正反单步；Ctrl+空格暂停，Ctrl+X 全部失能
   Ctrl+W 自动移窗与扩缩开/关（仅滑动模式）；外侧扭矩关闭
@@ -4475,11 +4476,20 @@ class GravityMomentGait:
 class GravityFrontTransition(ArcHelixTransition):
     """保持承载 ARC，只延长头端螺旋，直至操作者确认贴管。"""
 
+    def __init__(self, *args, minimum_front_turns=.5, front_radius_bias_m=0., **kwargs):
+        self.minimum_front_turns = minimum_front_turns
+        self.front_radius_bias_m = front_radius_bias_m
+        super().__init__(*args, **kwargs)
+
     def _check_front_entry(self):
         section = local_section(self.measured, self.lengths, *self.window)
         head, tail, _, _ = self.estimate_end_geometry(self.measured, self.lengths, section, self.window)
         self.events.append(dict(stage='front_check', head_length_m=head, tail_length_m=tail))
-        if head+.5*self.l <= tail:
+        leading_length = (self.window[0]-1)*self.l
+        minimum_length = self.minimum_front_turns*math.hypot(2.*math.pi*self.options.radius_m, self.options.pitch_m)
+        if leading_length < minimum_length and self.window[1] < self.n-1:
+            self._prepare_transfer(1)
+        elif head+.5*self.l <= tail or (self.window[0]-2)*self.l < minimum_length:
             self._prepare_shift()
         elif self.window[0] > 2:
             self._prepare_transfer(-1)
@@ -4494,7 +4504,11 @@ class GravityFrontTransition(ArcHelixTransition):
         self.shift_time += dt
         self.leading_extension = min(self.curve.head_length, self.leading_extension+.035*pace*dt)
         self.roll += .23*smooth(self.shift_time/1.5)*pace*dt
-        goal, _ = self.curve.targets(self.leading_extension, 0., self.curve.arc_length, self.phase+self.roll)
+        blend = smooth(self.leading_extension/max(self.curve.head_length, self.l))
+        radius = self.options.radius_m-self.front_radius_bias_m*blend
+        leading_helix = helix(0., radius, self.options.pitch_m, -self.direction)
+        goal, _, _ = self.curve.shifted_window(0., self.curve.arc_length, self.phase+self.roll,
+                                              self.leading_extension, leading_helix)
         coverage = np.clip(self.leading_extension/self.l+np.arange(1, self.n+1)-first+1., 0., 1.)
         coverage[last:] = 0.
         self._apply_curve(goal, coverage, 23., dt)
@@ -4511,13 +4525,15 @@ class GravityCrossingOptions:
     intake_error_deg: float = 16.
     step_s: float = 1.
     max_feedback_age_s: float = .8
+    min_front_turns: float = .5
+    front_radius_bias_m: float = .010
 
 
 class GravityCrossing:
     """头侧成形 → Shift Rolling → 解旋成右 U → 失能 → 回卷。"""
 
     def __init__(self, lengths, enabled, measured_deg, gait_options=GravityMomentOptions(r_h1=.094, r_h2=.098),
-                 options=GravityCrossingOptions(), from_helix=False):
+                 options=GravityCrossingOptions(), from_helix=False, helix_only=False):
         lengths = np.asarray(lengths, float)
         self.n, self.l = len(lengths)-1, float(np.mean(lengths))
         if not np.allclose(lengths, self.l):
@@ -4527,6 +4543,7 @@ class GravityCrossing:
         self.gait = GravityMomentGait(self.n, gait_options, self.l)
         self.gait.segments(options.release_radius_m, ls=options.release_line_m, th1=math.pi)
         self.options = options
+        self.helix_only = helix_only
         self._enabled = np.asarray(enabled, bool).copy()
         self.measured = np.radians(measured_deg)
         self._targets = self.measured.copy()
@@ -4537,6 +4554,8 @@ class GravityCrossing:
         self.accepted = None
         self.front = None
         self.front_extended = False
+        self.front_ready_since = None
+        self.front_tracking_error_deg = None
         self.align_direction = 1
         self.events = []
         if from_helix:
@@ -4554,8 +4573,61 @@ class GravityCrossing:
             arc_options = ArcHelixOptions(radius_m=gait_options.r_h1, pitch_m=gait_options.pitch,
                                          prepare_front=True)
             self.front = GravityFrontTransition(lengths, (int(active[0]), int(active[-1])),
-                                                measured_deg, options=arc_options)
+                                                measured_deg, options=arc_options,
+                                                minimum_front_turns=options.min_front_turns)
+            self._plan_arc_reference(lengths)
+
+    @staticmethod
+    def _section_radius(q, lengths, window):
+        xy = local_section(q, lengths, *window)['projected'][1:-1]
+        fit = np.linalg.lstsq(np.column_stack((2.*xy, np.ones(len(xy)))), (xy*xy).sum(axis=1), rcond=None)[0]
+        return math.sqrt(max(0., fit[2]+fit[:2]@fit[:2]))
+
+    def _plan_arc_reference(self, lengths):
+        """将送链留下的不均匀圆弧接到同半径、同总弯曲的曲线基元。"""
+        first, last = self.front.window
+        section = self.measured[first-1:last]
+        parity = np.arange(first-1, last)%2
+        budget = np.array([section[parity == axis].sum() for axis in (0, 1)])
+        phase = math.atan2(budget[1], budget[0])
+        radius = self._section_radius(self.measured, lengths, (first, last))
+        count = last-first+1
+        candidates = []
+        for size in sorted({max(4, count-count%2), count+count%2}):
+            amplitude = np.linalg.norm(budget)/(size/2.)
+            for start in range(max(2, first-1), min(self.n-size, first+1)+1):
+                window = (start, start+size-1)
+                mask = (np.arange(1, self.n+1) >= window[0]) & (np.arange(1, self.n+1) <= window[1])
+                target = np.where(np.arange(self.n)%2 == 0, amplitude*math.cos(phase), amplitude*math.sin(phase))
+                target[~mask] = 0.
+                fitted_radius = self._section_radius(target, lengths, window)
+                score = abs(fitted_radius-radius)/.01+.05*(abs(start-first)+abs(window[1]-last))
+                candidates.append((score, window, target, mask))
+        _, window, target, mask = min(candidates, key=lambda item: item[0])
+        self.arc_reference = dict(window=window, target=target, mask=mask, lengths=lengths.copy())
+        shared = self._enabled | mask
+        change = np.max(abs(target[shared]-self.measured[shared]))
+        if window != (first, last) or change > math.radians(8.):
+            self._enabled |= mask
+            self.arc_reference_ready_since = None
+            self._enter('arc_settle')
+        else:
             self._enter('front')
+
+    def _advance_arc_reference(self, dt, fresh):
+        reference = self.arc_reference
+        self._set_targets(reference['target'], dt, rate=15.)
+        error = np.max(abs(reference['target'][self._enabled]-self.measured[self._enabled]))
+        if fresh:
+            ready = error <= math.radians(8.)
+            self.arc_reference_ready_since = (self.elapsed if self.arc_reference_ready_since is None else
+                                              self.arc_reference_ready_since) if ready else None
+            if self.arc_reference_ready_since is not None and self.elapsed-self.arc_reference_ready_since >= .4:
+                self._enabled = reference['mask'].copy()
+                self.front = GravityFrontTransition(reference['lengths'], reference['window'], np.degrees(self.measured),
+                    options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
+                    minimum_front_turns=self.options.min_front_turns)
+                self._enter('front')
 
     @property
     def targets(self):
@@ -4576,6 +4648,17 @@ class GravityCrossing:
     def step_once(self):
         self.running = False
         self.step_left = self.options.step_s
+
+    def retry_front(self):
+        """前部成形后选择继续而未确认搭稳时，逐步内扣再观察。"""
+        if self.stage == 'front' and self.front_extended:
+            if self.front.front_radius_bias_m >= self.options.front_radius_bias_m:
+                return
+            self.front.front_radius_bias_m = min(self.options.front_radius_bias_m,
+                                                 self.front.front_radius_bias_m+.0025)
+            self.front_extended = False
+            self.front_ready_since = None
+            self.events.append(dict(stage='front_retry', radius_bias_m=self.front.front_radius_bias_m))
 
     def _helix(self, phase, radius):
         return self.gait.targets(phase, radius)[0]
@@ -4638,7 +4721,9 @@ class GravityCrossing:
             self.step_left = 0.
         self.elapsed += dt
 
-        if self.stage == 'front':
+        if self.stage == 'arc_settle':
+            self._advance_arc_reference(dt, fresh)
+        elif self.stage == 'front':
             self.front.running = True
             self.front.advance(dt, now, feedback_time, measured_deg)
             self._enabled, self._targets = self.front.enabled, self.front.targets
@@ -4648,8 +4733,15 @@ class GravityCrossing:
                 self._enter('blocked')
             elif (not self.front_extended and self.front.stage == 'lead' and
                   self.front.leading_extension >= self.front.curve.head_length):
-                self.front_extended = True
-                self.pause()
+                self.front_tracking_error_deg = float(np.degrees(np.max(
+                    abs(self._targets[self._enabled]-self.measured[self._enabled]))))
+                if fresh:
+                    settled = self.front_tracking_error_deg <= 10.
+                    self.front_ready_since = (self.elapsed if self.front_ready_since is None else
+                                              self.front_ready_since) if settled else None
+                    if self.front_ready_since is not None and self.elapsed-self.front_ready_since >= .4:
+                        self.front_extended = True
+                        self.pause()
         elif self.stage in ('first_shift', 'rewrap'):
             self._advance_shift(dt, fresh)
         elif self.stage == 'align':
@@ -4740,7 +4832,7 @@ class GravityCrossing:
         self._set_targets(self._helix(self.phase, radius)+(1.-smooth(t/2.))*residual, dt, rate=45.)
         if t >= 5.:
             if self.stage == 'first_recover':
-                self._enter('align')
+                self._enter('complete' if self.helix_only else 'align')
                 self.pause()
             else:
                 self._enter('roll')
@@ -4748,6 +4840,7 @@ class GravityCrossing:
     def status(self):
         front = None if self.front is None else self.front.status()
         return dict(stage=self.stage, elapsed_s=self.elapsed, phase_rad=math.remainder(self.phase, math.tau),
+                    helix_only=self.helix_only, front_tracking_error_deg=self.front_tracking_error_deg,
                     accepted_joint=self.accepted, shift_m=self.offset, step_remaining_s=self.step_left,
                     front=front, events=self.events.copy())
 # END ARC_HELIX_CORE
@@ -4906,14 +4999,7 @@ class RollingArcController:
 
     def read_helix_entry(self):
         """用同一帧全身舵机角重建当前搭管姿态并规划切换。"""
-        active = np.flatnonzero(self.enabled)+1
-        if len(active) < 3 or np.any(np.diff(active) != 1):
-            raise ValueError('ARC→Helix 需要一个连续使能的圆弧')
-        self.refresh_compliance_feedback()
-        options = ArcHelixOptions(radius_m=HELIX_RADIUS_M, pitch_m=HELIX_PITCH_M,
-                                  min_end_depth_links=HELIX_MIN_END_DEPTH_LINKS, step_s=HELIX_STEP_S)
-        return ArcHelixTransition(LINK_LENGTHS_M, (int(active[0]), int(active[-1])),
-                                  self.measured_angles(), self.direction, options)
+        return self.read_gravity_entry(False, helix_only=True)
 
     def select_helix(self):
         """接管时保持已有目标，第一次推进时按最新角度重新规划。"""
@@ -4933,19 +5019,34 @@ class RollingArcController:
         self.section_block_reason = None
         self.pending_phase, self.mode, self.freeze_targets = 0., 'hold', True
 
-    def read_gravity_entry(self, from_helix):
+    def read_gravity_entry(self, from_helix, helix_only=False):
         self.refresh_compliance_feedback()
+        enabled = self.enabled.copy()
+        selection = None
+        if not from_helix:
+            focus = None
+            if self.feeding_selected and self.feeding is not None:
+                focus = self.feeding.profile(self.feeding.position, self.feeding.bias)[1]
+            selection = choose_feeding_arc(self.measured_angles(), LINK_LENGTHS_M, enabled, focus)
+            first, last = selection['chosen']
+            enabled = [first <= j <= last for j in range(1, NUM_JOINTS+1)]
         gait = GravityMomentOptions(r_h1=HELIX_RADIUS_M, r_h2=GRAVITY_OPEN_RADIUS_M, pitch=HELIX_PITCH_M)
         options = GravityCrossingOptions(retain_joints=GRAVITY_RETAIN_JOINTS, release_line_m=GRAVITY_RELEASE_LINE_M,
                                          release_radius_m=GRAVITY_RELEASE_RADIUS_M,
                                          alignment_rate_rad_s=GRAVITY_ALIGN_RATE_RAD_S,
                                          shift_rate_m_s=GRAVITY_SHIFT_RATE_M_S, shift_roll_rad_s=GRAVITY_SHIFT_ROLL_RAD_S,
-                                         intake_error_deg=GRAVITY_INTAKE_ERROR_DEG, step_s=HELIX_STEP_S)
-        return GravityCrossing(LINK_LENGTHS_M, self.enabled, self.measured_angles(), gait, options, from_helix)
+                                         intake_error_deg=GRAVITY_INTAKE_ERROR_DEG, step_s=HELIX_STEP_S,
+                                         min_front_turns=HELIX_MIN_FRONT_TURNS,
+                                         front_radius_bias_m=HELIX_FRONT_RADIUS_BIAS_M)
+        core = GravityCrossing(LINK_LENGTHS_M, enabled, self.measured_angles(), gait, options,
+                               from_helix=from_helix, helix_only=helix_only)
+        core.events.insert(0, dict(stage='entry_selection', source_enabled=self.enabled.copy(),
+                                  selection=selection, selected_enabled=enabled))
+        return core
 
     def select_gravity(self):
         current = self.helix_transition
-        if isinstance(current, GravityCrossing):
+        if isinstance(current, GravityCrossing) and not current.helix_only:
             current.pause()
             self.mode, self.freeze_targets = 'hold', True
             return
@@ -4980,10 +5081,12 @@ class RollingArcController:
                 raise ValueError('当前等待实物姿态确认；先查看 Ctrl+K，再按 Ctrl+L')
             if not core.started and self.mode == 'hold':
                 align_direction = core.align_direction if gravity else 1
-                core = self.read_gravity_entry(core.front is None) if gravity else self.read_helix_entry()
+                core = self.read_gravity_entry(core.front is None, core.helix_only) if gravity else self.read_helix_entry()
                 self.helix_transition = core
                 if gravity:
                     core.align_direction = align_direction
+            if gravity and self.mode == 'hold':
+                core.retry_front()
             if command in ('step', 'back'):
                 if self.mode != 'step':
                     core.step_once()
@@ -4994,7 +5097,7 @@ class RollingArcController:
                 self.mode = 'run'
         else:
             if gravity:
-                raise ValueError('T 管模式用 Ctrl+J/G 推进、Ctrl+L 确认、Ctrl+空格暂停、Ctrl+X 失能')
+                raise ValueError('步态切换用 Ctrl+J/G 推进、Ctrl+L 确认、Ctrl+空格暂停、Ctrl+X 失能')
             raise ValueError('ARC→Helix 使用Ctrl+J单步、Ctrl+G连续、Ctrl+空格暂停；退出用Ctrl+X')
         self.freeze_targets = self.mode == 'hold'
         return True
@@ -5723,7 +5826,7 @@ class RollingArcController:
             self.select_gravity()
             return
         if command == 'gait_helix':
-            if isinstance(self.helix_transition, GravityCrossing):
+            if isinstance(self.helix_transition, GravityCrossing) and not self.helix_transition.helix_only:
                 raise ValueError('当前为 T 管越障，结束时用 Ctrl+X')
             self.select_helix()
             return
@@ -5854,7 +5957,7 @@ class RollingArcController:
             section.update(block_reason=self.section_block_reason, actual_body_geometry=self.actual_section,
                            options=asdict(self.options), input='measured_joint_angles', window_fixed=self.sliding is None)
         age = None if self.feedback_wall_s is None else time.monotonic()-self.feedback_wall_s
-        gait = ('gravity_crossing' if isinstance(self.helix_transition, GravityCrossing) else
+        gait = ('gravity_crossing' if isinstance(self.helix_transition, GravityCrossing) and not self.helix_transition.helix_only else
                 'arc_to_helix' if self.helix_transition is not None else
                 'active_feeding' if self.feeding_selected else 'sliding_section_compliance' if self.sliding is not None else
                 'basic_arc' if self.compliance is None else 'fixed_section_compliance')
@@ -5890,7 +5993,7 @@ class RollingArcController:
         elif self.settle_remaining > 0:
             label += f'，静置余{self.settle_remaining:.1f}s'
         gravity = isinstance(self.helix_transition, GravityCrossing)
-        gait = ('T 管重力矩越障' if gravity else 'ARC→Helix' if self.helix_transition is not None else
+        gait = ('T 管重力矩越障' if gravity and not self.helix_transition.helix_only else 'ARC→Helix' if self.helix_transition is not None else
                 '主动送链' if self.feeding_selected else '角度反馈滑窗顺应' if self.sliding is not None else
                 '基础圆弧' if self.compliance is None else '固定截面顺应')
         amplitude = (FEED_AMPLITUDE_DEG if self.feeding is None else self.feeding.options.amplitude_deg) if self.feeding_selected else self.amplitude
@@ -5899,7 +6002,8 @@ class RollingArcController:
         if gravity:
             h = self.helix_transition.status()
             instruction = {
-                'front': '先头部绕上主管；尾部保持失能。头部贴稳后暂停并按 Ctrl+L',
+                'arc_settle': '将实测承载弧接入同半径的曲线参考，接好后再卷前部',
+                'front': '先卷头部、尾部失能。贴稳后 L 确认；未贴稳继续 J/G，逐级内扣再观察',
                 'first_shift': 'Shift Rolling 逐节接入尾部',
                 'first_recover': '收紧螺旋，继续滚动至对准阶段',
                 'align': 'Ctrl+J/H 微调。确认前部过支管、螺旋已对准后按 Ctrl+L',
@@ -5910,6 +6014,7 @@ class RollingArcController:
                 'rewrap': 'Shift Rolling 回卷尾部并继续推进前部',
                 'recover': '回卷接收完成，恢复常速滚动',
                 'roll': '继续滚动，现场观察是否整身清障',
+                'complete': 'ARC→Helix 完成并保持。继续 T 管流程用 Ctrl+6',
             }.get(h['stage'], '查看调长状态和反馈')
             print(f"阶段={h['stage']} | 曲线进给={1000*h['shift_m']:.1f} mm | "
                   f"已接收边界={h['accepted_joint']} | 相位={h['phase_rad']:.3f} rad | {instruction}", flush=True)
@@ -6196,7 +6301,7 @@ def preview_payload(controller):
         enable_known=controller.touched_hardware, feedback_wall_s=controller.feedback_wall_s,
         window=[controller.first, controller.last], phase_rad=controller.phase,
         mode=controller.mode,
-        gait='T 管重力矩越障' if isinstance(controller.helix_transition, GravityCrossing) else 'ARC→Helix' if controller.helix_transition is not None else '主动送链' if controller.feeding_selected else '自动位置/数量' if slider else '固定顺应' if controller.compliance else '基础圆弧',
+        gait='T 管重力矩越障' if isinstance(controller.helix_transition, GravityCrossing) and not controller.helix_transition.helix_only else 'ARC→Helix' if controller.helix_transition is not None else '主动送链' if controller.feeding_selected else '自动位置/数量' if slider else '固定顺应' if controller.compliance else '基础圆弧',
         feeding=None if feeding is None else copy.deepcopy(feeding.snapshot()),
         automatic=None if slider is None else slider.automatic,
         selection=copy.deepcopy(selection), pending=copy.deepcopy(getattr(slider, 'pending', None)),

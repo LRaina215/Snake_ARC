@@ -37,7 +37,7 @@ python .\codes\Rolling_Arc_Real.py
 
 **主动送链调长**：形成完成后按**Ctrl+4**，每按一次**Ctrl+J/H**执行一段头侧增长/缩短，到位保持，不自动往返。默认请求64.5 mm，**Ctrl+-/=**减半/加倍；到可达边界停止同向推进，反向键可退出。**Ctrl+G**暂停/继续，**Ctrl+L**推进一帧，**Ctrl+Y**手动返回本步起态，**Ctrl+X**全部失能。仿真同键位；参数在实机文件顶部`FEED_*`修改。[完整操作说明](docs/主动送链实机验收说明.md)。
 
-**ARC→Helix**：搭管圆弧稳定后按 **Ctrl+5**，此时保持现状。**Ctrl+J** 逐步推进，**Ctrl+G** 连续或暂停，**Ctrl+空格** 暂停，**Ctrl+K** 查看阶段和两侧长度估计。第一次推进时按最新关节角重新判断是否先调长。实机和仿真手调同键位。[三种起态的仿真记录](validation/reports/arc_helix_motor_feedback/README.md)
+**ARC→Helix**：搭管圆弧稳定后按 **Ctrl+5**，也可在模式4调长结束后接入。**Ctrl+J/G** 先形成前部螺旋，程序暂停后观察是否搭稳。搭稳按 **Ctrl+L** 确认，再用 **J/G** 逐节送尾；未搭稳继续 **J/G** 会逐级内扣再观察。**Ctrl+空格** 暂停，**Ctrl+K** 查看阶段。实机和仿真手调同键位，J1为前端。[切换验证记录](validation/reports/mode_handoff/README.md)
 
 **T 管重力矩越障（实机）**用 **Ctrl+6** 选择，保持 J1 为前端。**Ctrl+J/G** 单步或连续推进，暂停后用 **Ctrl+L** 确认当前姿态，**Ctrl+K** 查看下一步。[操作顺序与参数](validation/reports/gm_arc_handoff/README.md#实机操作)。
 

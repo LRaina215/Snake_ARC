@@ -5,6 +5,7 @@ import math
 import numpy as np
 
 from .arc_helix_transition import ArcHelixOptions, ArcHelixTransition
+from .curve_gait import helix
 from .gravity_global_shift import MeasuredGravityShift
 from .gravity_moment import GravityMomentGait, GravityMomentOptions, smooth
 from .section_geometry import local_section
@@ -13,11 +14,20 @@ from .section_geometry import local_section
 class GravityFrontTransition(ArcHelixTransition):
     """保持承载 ARC，只延长头端螺旋，直至操作者确认贴管。"""
 
+    def __init__(self, *args, minimum_front_turns=.5, front_radius_bias_m=0., **kwargs):
+        self.minimum_front_turns = minimum_front_turns
+        self.front_radius_bias_m = front_radius_bias_m
+        super().__init__(*args, **kwargs)
+
     def _check_front_entry(self):
         section = local_section(self.measured, self.lengths, *self.window)
         head, tail, _, _ = self.estimate_end_geometry(self.measured, self.lengths, section, self.window)
         self.events.append(dict(stage='front_check', head_length_m=head, tail_length_m=tail))
-        if head+.5*self.l <= tail:
+        leading_length = (self.window[0]-1)*self.l
+        minimum_length = self.minimum_front_turns*math.hypot(2.*math.pi*self.options.radius_m, self.options.pitch_m)
+        if leading_length < minimum_length and self.window[1] < self.n-1:
+            self._prepare_transfer(1)
+        elif head+.5*self.l <= tail or (self.window[0]-2)*self.l < minimum_length:
             self._prepare_shift()
         elif self.window[0] > 2:
             self._prepare_transfer(-1)
@@ -32,7 +42,11 @@ class GravityFrontTransition(ArcHelixTransition):
         self.shift_time += dt
         self.leading_extension = min(self.curve.head_length, self.leading_extension+.035*pace*dt)
         self.roll += .23*smooth(self.shift_time/1.5)*pace*dt
-        goal, _ = self.curve.targets(self.leading_extension, 0., self.curve.arc_length, self.phase+self.roll)
+        blend = smooth(self.leading_extension/max(self.curve.head_length, self.l))
+        radius = self.options.radius_m-self.front_radius_bias_m*blend
+        leading_helix = helix(0., radius, self.options.pitch_m, -self.direction)
+        goal, _, _ = self.curve.shifted_window(0., self.curve.arc_length, self.phase+self.roll,
+                                              self.leading_extension, leading_helix)
         coverage = np.clip(self.leading_extension/self.l+np.arange(1, self.n+1)-first+1., 0., 1.)
         coverage[last:] = 0.
         self._apply_curve(goal, coverage, 23., dt)
@@ -49,13 +63,15 @@ class GravityCrossingOptions:
     intake_error_deg: float = 16.
     step_s: float = 1.
     max_feedback_age_s: float = .8
+    min_front_turns: float = .5
+    front_radius_bias_m: float = .010
 
 
 class GravityCrossing:
     """头侧成形 → Shift Rolling → 解旋成右 U → 失能 → 回卷。"""
 
     def __init__(self, lengths, enabled, measured_deg, gait_options=GravityMomentOptions(r_h1=.094, r_h2=.098),
-                 options=GravityCrossingOptions(), from_helix=False):
+                 options=GravityCrossingOptions(), from_helix=False, helix_only=False):
         lengths = np.asarray(lengths, float)
         self.n, self.l = len(lengths)-1, float(np.mean(lengths))
         if not np.allclose(lengths, self.l):
@@ -65,6 +81,7 @@ class GravityCrossing:
         self.gait = GravityMomentGait(self.n, gait_options, self.l)
         self.gait.segments(options.release_radius_m, ls=options.release_line_m, th1=math.pi)
         self.options = options
+        self.helix_only = helix_only
         self._enabled = np.asarray(enabled, bool).copy()
         self.measured = np.radians(measured_deg)
         self._targets = self.measured.copy()
@@ -75,6 +92,8 @@ class GravityCrossing:
         self.accepted = None
         self.front = None
         self.front_extended = False
+        self.front_ready_since = None
+        self.front_tracking_error_deg = None
         self.align_direction = 1
         self.events = []
         if from_helix:
@@ -92,8 +111,61 @@ class GravityCrossing:
             arc_options = ArcHelixOptions(radius_m=gait_options.r_h1, pitch_m=gait_options.pitch,
                                          prepare_front=True)
             self.front = GravityFrontTransition(lengths, (int(active[0]), int(active[-1])),
-                                                measured_deg, options=arc_options)
+                                                measured_deg, options=arc_options,
+                                                minimum_front_turns=options.min_front_turns)
+            self._plan_arc_reference(lengths)
+
+    @staticmethod
+    def _section_radius(q, lengths, window):
+        xy = local_section(q, lengths, *window)['projected'][1:-1]
+        fit = np.linalg.lstsq(np.column_stack((2.*xy, np.ones(len(xy)))), (xy*xy).sum(axis=1), rcond=None)[0]
+        return math.sqrt(max(0., fit[2]+fit[:2]@fit[:2]))
+
+    def _plan_arc_reference(self, lengths):
+        """将送链留下的不均匀圆弧接到同半径、同总弯曲的曲线基元。"""
+        first, last = self.front.window
+        section = self.measured[first-1:last]
+        parity = np.arange(first-1, last)%2
+        budget = np.array([section[parity == axis].sum() for axis in (0, 1)])
+        phase = math.atan2(budget[1], budget[0])
+        radius = self._section_radius(self.measured, lengths, (first, last))
+        count = last-first+1
+        candidates = []
+        for size in sorted({max(4, count-count%2), count+count%2}):
+            amplitude = np.linalg.norm(budget)/(size/2.)
+            for start in range(max(2, first-1), min(self.n-size, first+1)+1):
+                window = (start, start+size-1)
+                mask = (np.arange(1, self.n+1) >= window[0]) & (np.arange(1, self.n+1) <= window[1])
+                target = np.where(np.arange(self.n)%2 == 0, amplitude*math.cos(phase), amplitude*math.sin(phase))
+                target[~mask] = 0.
+                fitted_radius = self._section_radius(target, lengths, window)
+                score = abs(fitted_radius-radius)/.01+.05*(abs(start-first)+abs(window[1]-last))
+                candidates.append((score, window, target, mask))
+        _, window, target, mask = min(candidates, key=lambda item: item[0])
+        self.arc_reference = dict(window=window, target=target, mask=mask, lengths=lengths.copy())
+        shared = self._enabled | mask
+        change = np.max(abs(target[shared]-self.measured[shared]))
+        if window != (first, last) or change > math.radians(8.):
+            self._enabled |= mask
+            self.arc_reference_ready_since = None
+            self._enter('arc_settle')
+        else:
             self._enter('front')
+
+    def _advance_arc_reference(self, dt, fresh):
+        reference = self.arc_reference
+        self._set_targets(reference['target'], dt, rate=15.)
+        error = np.max(abs(reference['target'][self._enabled]-self.measured[self._enabled]))
+        if fresh:
+            ready = error <= math.radians(8.)
+            self.arc_reference_ready_since = (self.elapsed if self.arc_reference_ready_since is None else
+                                              self.arc_reference_ready_since) if ready else None
+            if self.arc_reference_ready_since is not None and self.elapsed-self.arc_reference_ready_since >= .4:
+                self._enabled = reference['mask'].copy()
+                self.front = GravityFrontTransition(reference['lengths'], reference['window'], np.degrees(self.measured),
+                    options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
+                    minimum_front_turns=self.options.min_front_turns)
+                self._enter('front')
 
     @property
     def targets(self):
@@ -114,6 +186,17 @@ class GravityCrossing:
     def step_once(self):
         self.running = False
         self.step_left = self.options.step_s
+
+    def retry_front(self):
+        """前部成形后选择继续而未确认搭稳时，逐步内扣再观察。"""
+        if self.stage == 'front' and self.front_extended:
+            if self.front.front_radius_bias_m >= self.options.front_radius_bias_m:
+                return
+            self.front.front_radius_bias_m = min(self.options.front_radius_bias_m,
+                                                 self.front.front_radius_bias_m+.0025)
+            self.front_extended = False
+            self.front_ready_since = None
+            self.events.append(dict(stage='front_retry', radius_bias_m=self.front.front_radius_bias_m))
 
     def _helix(self, phase, radius):
         return self.gait.targets(phase, radius)[0]
@@ -176,7 +259,9 @@ class GravityCrossing:
             self.step_left = 0.
         self.elapsed += dt
 
-        if self.stage == 'front':
+        if self.stage == 'arc_settle':
+            self._advance_arc_reference(dt, fresh)
+        elif self.stage == 'front':
             self.front.running = True
             self.front.advance(dt, now, feedback_time, measured_deg)
             self._enabled, self._targets = self.front.enabled, self.front.targets
@@ -186,8 +271,15 @@ class GravityCrossing:
                 self._enter('blocked')
             elif (not self.front_extended and self.front.stage == 'lead' and
                   self.front.leading_extension >= self.front.curve.head_length):
-                self.front_extended = True
-                self.pause()
+                self.front_tracking_error_deg = float(np.degrees(np.max(
+                    abs(self._targets[self._enabled]-self.measured[self._enabled]))))
+                if fresh:
+                    settled = self.front_tracking_error_deg <= 10.
+                    self.front_ready_since = (self.elapsed if self.front_ready_since is None else
+                                              self.front_ready_since) if settled else None
+                    if self.front_ready_since is not None and self.elapsed-self.front_ready_since >= .4:
+                        self.front_extended = True
+                        self.pause()
         elif self.stage in ('first_shift', 'rewrap'):
             self._advance_shift(dt, fresh)
         elif self.stage == 'align':
@@ -278,7 +370,7 @@ class GravityCrossing:
         self._set_targets(self._helix(self.phase, radius)+(1.-smooth(t/2.))*residual, dt, rate=45.)
         if t >= 5.:
             if self.stage == 'first_recover':
-                self._enter('align')
+                self._enter('complete' if self.helix_only else 'align')
                 self.pause()
             else:
                 self._enter('roll')
@@ -286,5 +378,6 @@ class GravityCrossing:
     def status(self):
         front = None if self.front is None else self.front.status()
         return dict(stage=self.stage, elapsed_s=self.elapsed, phase_rad=math.remainder(self.phase, math.tau),
+                    helix_only=self.helix_only, front_tracking_error_deg=self.front_tracking_error_deg,
                     accepted_joint=self.accepted, shift_m=self.offset, step_remaining_s=self.step_left,
                     front=front, events=self.events.copy())

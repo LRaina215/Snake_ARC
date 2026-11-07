@@ -201,7 +201,7 @@ class DebugArcController(real.RollingArcController):
         if not real.DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and command.strip().lower() == 'reverse':
             raise ValueError('冻结角度基准未标定反向滚动；先切换基础/固定模式')
         command = command.strip().lower()
-        if command == 'gait_helix' or (self.helix_transition is not None and command.startswith('gait_')):
+        if command in ('gait_helix', 'gait_gravity') or (self.helix_transition is not None and command.startswith('gait_')):
             super().command(command)
         elif command.startswith('gait_'):
             self.select_gait(command[5:])

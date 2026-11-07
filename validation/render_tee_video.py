@@ -40,6 +40,8 @@ LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
                  'direct_shift': '整身采样区间向前移，尾部逐节接入',
                  'direct_shift_cruise': '接入全螺旋后继续推进'}
 MOTOR_STAGES = {
+    'feeding': '主动送链，调整左右长度',
+    'arc_settle': '实测承载圆弧接入曲线参考',
     'front': '保持尾部失能，先形成前部螺旋',
     'first_shift': '首次 Shift Rolling，前进并逐节送尾',
     'first_recover': '全身螺旋成形，恢复滚动',
@@ -51,6 +53,7 @@ MOTOR_STAGES = {
     'rewrap': 'Shift Rolling 回卷，前部同时推进',
     'recover': '回卷完成，恢复常速',
     'roll': '整身清障后继续螺旋滚动',
+    'complete': '完整 Helix 已形成，保持',
 }
 W, H = 640, 480
 
@@ -157,7 +160,8 @@ def main():
             else:
                 control = f'使能 {int(np.sum(mask))} 关节'
                 colors = '蓝=使能 紫=失能'
-            draw.text((12, 40), f'全身平均位置 x = {center[0] * 1000:6.0f} mm（支管轴 x = 350 mm）    {control}    '
+            pipe_note = '直管' if report.get('scene') == 'straight' else '支管轴 x = 350 mm'
+            draw.text((12, 40), f'全身平均位置 x = {center[0] * 1000:6.0f} mm（{pipe_note}）    {control}    '
                                 f'支管接触: {"连杆" + ",".join(map(str, contact)) if contact else "无"}    '
                                 f'{args.speed:g}倍速回放（{colors}）', fill=(62, 86, 102), font=SMALL)
             draw.text((12, 76), '斜视', fill=(80, 80, 80), font=SMALL)
@@ -176,13 +180,20 @@ def main():
                 y = H+74
                 held = raw in ('right_u_hold', 'drop_hold')
                 operation = '保持，Ctrl+L 确认后 Ctrl+J/G 执行下一段' if held else 'Ctrl+G 连续，可用 Ctrl+空格 暂停'
+                if raw == 'complete':
+                    operation = '完整 Helix 保持，继续 T 管流程用 Ctrl+6'
+                if report.get('commands'):
+                    sent = [e for e in report['commands'] if e['time_s'] <= times[index]]
+                    if sent:
+                        operation = f'最近指令 {sent[-1]["key"]}  |  '+operation
                 events = [e for e in report.get('operator_events', []) if 0. <= times[index]-e['time_s'] <= .8]
                 if events:
                     operation = f"操作者确认 {events[-1]['stage']}，对应 Ctrl+L 后 Ctrl+G"
                 draw.text((12, y), f'实机对应操作  {operation}', fill=(23, 53, 74), font=SMALL)
                 phase = sample.get('reference_roll_rad', 0.)
+                clearance = '' if report.get('scene') == 'straight' else '，清障线 409 mm'
                 draw.text((12, y+27), f'控制读角周期 {report["feedback_period_s"]:g} s  |  二值使能  |  相位 {phase:.3f} rad  |  '
-                          f'全身最小 x = {sample["x_min_m"]*1000:.0f} mm，清障线 409 mm',
+                          f'全身最小 x = {sample["x_min_m"]*1000:.0f} mm{clearance}',
                           fill=(62, 86, 102), font=SMALL)
                 draw.text((12, y+63), '关节 / 使能', fill=(62, 86, 102), font=SMALL)
                 draw.text((12, y+93), '已发目标 (°)', fill=(62, 86, 102), font=SMALL)
