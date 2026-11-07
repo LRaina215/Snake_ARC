@@ -330,8 +330,36 @@ class GravityCrossing:
                 self.accepted += 1
                 self.events.append(dict(stage='intake', joint=self.accepted, shift_m=self.offset))
             else:
-                self._enter('complete' if self.helix_only else 'align')
-                self.pause()
+                self._start_helix_normalize()
+
+    def _start_helix_normalize(self):
+        """拼接曲线退场，全身逐渐归到同一半径、螺距、绕向和相位的Helix。"""
+        self.phase = self._fit_phase(self.n, self.gait.o.r_h1)
+        self.tracking_since = None
+        self._enter('helix_normalize')
+
+    def restore_helix(self, feedback_time, measured_deg):
+        """已有全身使能时恢复统一Helix；保持当前目标，下一次J/G才动作。"""
+        if not self._enabled.all():
+            raise ValueError('当前仍有失能尾段，不能直接按全身Helix归形；请先完成逐段接管')
+        self.pause()
+        self.measured = np.radians(measured_deg)
+        self.feedback_time = feedback_time
+        self.started = self.helix_only = True
+        self._start_helix_normalize()
+
+    def _advance_helix_normalize(self, dt, fresh):
+        goal = self._helix(self.phase, self.gait.o.r_h1)
+        self._set_targets(goal, dt)
+        if not fresh:
+            return
+        targets_done = np.max(abs(goal-self._targets)) < 1e-9
+        follows = np.max(abs(goal-self.measured)) <= math.radians(5.)
+        ready = targets_done and follows
+        self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if ready else None
+        if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
+            self._enter('complete' if self.helix_only else 'align')
+            self.pause()
 
     def _helix(self, phase, radius):
         return self.gait.targets(phase, radius)[0]
@@ -431,6 +459,8 @@ class GravityCrossing:
             self._advance_front_seat(dt, fresh)
         elif self.stage == 'first_shift':
             self._advance_tail_intake(dt, fresh)
+        elif self.stage == 'helix_normalize':
+            self._advance_helix_normalize(dt, fresh)
         elif self.stage in ('return_seat', 'return_wind', 'return_finish'):
             self._advance_source_return(dt)
         elif self.stage == 'align':

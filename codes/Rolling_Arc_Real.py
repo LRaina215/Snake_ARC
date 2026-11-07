@@ -157,6 +157,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   Ctrl+5 自动识别ARC并调整两侧余长；J/G先成前部，L确认搭稳后J/G逐节送尾
   Ctrl+6 选择 T 管重力矩越障（J1 为前端）；Ctrl+J/G 推进，Ctrl+L 确认实物姿态
   模式5/6：Ctrl+J每次最多1秒；Ctrl+G按一次连续到确认点/完成，再按暂停；不必反复按J
+  全身已使能时再Ctrl+5选择统一Helix归形，再Ctrl+J/G；尾段仍失能时先完成逐段接管
   T 管模式对准支管时 Ctrl+J/H 正反单步；Ctrl+空格暂停，Ctrl+X 全部失能
   Ctrl+W 自动移窗与扩缩开/关（仅滑动模式）；外侧扭矩关闭
   Ctrl+上/下 幅值±2°；Ctrl+右/左 角频率±0.05 rad/s
@@ -4796,8 +4797,36 @@ class GravityCrossing:
                 self.accepted += 1
                 self.events.append(dict(stage='intake', joint=self.accepted, shift_m=self.offset))
             else:
-                self._enter('complete' if self.helix_only else 'align')
-                self.pause()
+                self._start_helix_normalize()
+
+    def _start_helix_normalize(self):
+        """拼接曲线退场，全身逐渐归到同一半径、螺距、绕向和相位的Helix。"""
+        self.phase = self._fit_phase(self.n, self.gait.o.r_h1)
+        self.tracking_since = None
+        self._enter('helix_normalize')
+
+    def restore_helix(self, feedback_time, measured_deg):
+        """已有全身使能时恢复统一Helix；保持当前目标，下一次J/G才动作。"""
+        if not self._enabled.all():
+            raise ValueError('当前仍有失能尾段，不能直接按全身Helix归形；请先完成逐段接管')
+        self.pause()
+        self.measured = np.radians(measured_deg)
+        self.feedback_time = feedback_time
+        self.started = self.helix_only = True
+        self._start_helix_normalize()
+
+    def _advance_helix_normalize(self, dt, fresh):
+        goal = self._helix(self.phase, self.gait.o.r_h1)
+        self._set_targets(goal, dt)
+        if not fresh:
+            return
+        targets_done = np.max(abs(goal-self._targets)) < 1e-9
+        follows = np.max(abs(goal-self.measured)) <= math.radians(5.)
+        ready = targets_done and follows
+        self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if ready else None
+        if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
+            self._enter('complete' if self.helix_only else 'align')
+            self.pause()
 
     def _helix(self, phase, radius):
         return self.gait.targets(phase, radius)[0]
@@ -4897,6 +4926,8 @@ class GravityCrossing:
             self._advance_front_seat(dt, fresh)
         elif self.stage == 'first_shift':
             self._advance_tail_intake(dt, fresh)
+        elif self.stage == 'helix_normalize':
+            self._advance_helix_normalize(dt, fresh)
         elif self.stage in ('return_seat', 'return_wind', 'return_finish'):
             self._advance_source_return(dt)
         elif self.stage == 'align':
@@ -5150,6 +5181,37 @@ class RollingArcController:
 
     def select_helix(self):
         """接管时保持已有目标，第一次推进时按最新角度重新规划。"""
+        current = self.helix_transition
+        if isinstance(current, GravityCrossing) and current.started and current.stage != 'helix_normalize' and (
+                current.enabled.all() or not current.helix_only):
+            self.refresh_compliance_feedback()
+            _, sample_time = self.motor_sample_clock()
+            current.restore_helix(sample_time, self.measured_angles())
+            self.mode, self.freeze_targets = 'hold', True
+            print('已选择全身Helix归形；Ctrl+J单步或Ctrl+G连续，保持单一半径、螺距与绕向。', flush=True)
+            return
+        if self.mode == 'released':
+            # 重启后若实物已是全身螺旋，按实测角预置后接管，不先强拉成配置ARC。
+            self.refresh_compliance_feedback()
+            measured = self.measured_angles()
+            try:
+                core = GravityCrossing(LINK_LENGTHS_M, [True]*NUM_JOINTS, measured,
+                    GravityMomentOptions(r_h1=HELIX_RADIUS_M, r_h2=GRAVITY_OPEN_RADIUS_M, pitch=HELIX_PITCH_M),
+                    from_helix=True, helix_only=True)
+            except ValueError as exc:
+                raise ValueError('当前实测姿态不属于可接管的全身Helix；先形成并稳定搭管ARC，再按Ctrl+5') from exc
+            _, sample_time = self.motor_sample_clock()
+            core.restore_helix(sample_time, measured)
+            enabled = [True]*NUM_JOINTS
+            targets = np.clip(measured, MIN_ANGLE_DEG, MAX_ANGLE_DEG).tolist()
+            self.touched_hardware = True
+            self.bus.prepare_enabled(targets, enabled)
+            self.targets, self.enabled = targets, enabled
+            self.first, self.last = 1, NUM_JOINTS
+            self.helix_transition = core
+            self.hold_for_helix_mode()
+            print('已按实测角接管现有全身螺旋并保持；Ctrl+J/G逐渐归到同一条Helix。', flush=True)
+            return
         if self.helix_transition is not None and self.helix_transition.started:
             self.helix_transition.pause()
             self.mode, self.freeze_targets = 'hold', True
@@ -5981,8 +6043,6 @@ class RollingArcController:
             self.select_gravity()
             return
         if command == 'gait_helix':
-            if isinstance(self.helix_transition, GravityCrossing) and not self.helix_transition.helix_only:
-                raise ValueError('当前为 T 管越障，结束时用 Ctrl+X')
             self.select_helix()
             return
         if self.helix_transition is not None:
@@ -6166,6 +6226,7 @@ class RollingArcController:
                 'front_hold': '前部目标保持、尾部未接入；实物搭稳后Ctrl+L确认，再Ctrl+J/G送尾',
                 'front_seat': '仅前部小幅就位；实物已搭稳可直接Ctrl+L确认送尾',
                 'first_shift': '逐段送尾：Ctrl+G按一次连续至完成，再按G/空格暂停；J只推进1秒，重复L不重置',
+                'helix_normalize': '全身归到同一条Helix；Ctrl+J单步/Ctrl+G连续，结束后保持；空格暂停',
                 'align': 'Ctrl+J/H 微调。确认前部过支管、螺旋已对准后按 Ctrl+L',
                 'unwind': '形成右侧小 U；从尾朝头观察，确认 U 搭稳后暂停并按 Ctrl+L',
                 'right_u_hold': '确认小 U 搭在主管右侧，前部贴稳后按 Ctrl+L，再用 Ctrl+J/G 释放尾段',
@@ -6176,7 +6237,7 @@ class RollingArcController:
                 'return_finish': '消去切线圆弧，接回完整螺旋',
                 'recover': '回卷接收完成，恢复常速滚动',
                 'roll': '继续滚动，现场观察是否整身清障',
-                'complete': 'ARC→Helix 完成并保持。继续 T 管流程用 Ctrl+6',
+                'complete': '全身Helix目标已统一并保持。Ctrl+5可重新归形，Ctrl+6接T管流程',
             }.get(h['stage'], '查看调长状态和反馈')
             print(f"阶段={h['stage']} | 曲线进给={1000*h['shift_m']:.1f} mm | "
                   f"已接收边界={h['accepted_joint']} | 相位={h['phase_rad']:.3f} rad | {instruction}", flush=True)
