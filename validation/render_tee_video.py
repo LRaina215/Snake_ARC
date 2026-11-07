@@ -39,6 +39,19 @@ LOCKED_STAGES = {**GM_STAGES, 'drop': '尾部失能，自然摆至轴下',
                  'front_only_coil': '前部先包绕，后段保持失能',
                  'direct_shift': '整身采样区间向前移，尾部逐节接入',
                  'direct_shift_cruise': '接入全螺旋后继续推进'}
+MOTOR_STAGES = {
+    'front': '保持尾部失能，先形成前部螺旋',
+    'first_shift': '首次 Shift Rolling，前进并逐节送尾',
+    'first_recover': '全身螺旋成形，恢复滚动',
+    'align': '滚动对准支管，等待现场确认',
+    'unwind': '尾部解旋，形成主管右侧小 U',
+    'right_u_hold': '小 U 保持搭管，等待确认',
+    'drop': '尾部关闭扭矩，靠重力落向轴下',
+    'drop_hold': '尾部保持失能，等待确认下垂',
+    'rewrap': 'Shift Rolling 回卷，前部同时推进',
+    'recover': '回卷完成，恢复常速',
+    'roll': '整身清障后继续螺旋滚动',
+}
 W, H = 640, 480
 
 
@@ -50,14 +63,20 @@ def main():
     parser.add_argument('--speed', type=float, default=4.)
     parser.add_argument('--fps', type=int, default=20)
     parser.add_argument('--fixed-camera', action='store_true', help='Keep the oblique view fixed along the pipe')
+    parser.add_argument('--start', type=float, default=0., help='First recorded simulation time to show')
+    parser.add_argument('--end', type=float, default=float('inf'), help='Last recorded simulation time to show')
+    parser.add_argument('--output', type=Path, help='Override the output video path')
     args = parser.parse_args()
     data = json.loads((args.input / f'{args.label}.json').read_text(encoding='utf-8'))
     report, samples = data['summary'], data['samples']
+    motor_commands = report.get('binary_enable', False)
     trace = np.load(args.input / f'{args.label}_trace.npz')
     if 'options' in report and 'r_h1' in report['options']:
         STAGES.update(GM_STAGES)
     if args.label == 'locked_gait':
         STAGES.update(LOCKED_STAGES)
+    if motor_commands:
+        STAGES.update(MOTOR_STAGES)
     params = ArcParameters(**report['parameters']) if 'parameters' in report else ArcParameters(joints=report.get('joints', 18), first_joint=1, last_joint=report.get('joints', 18))
     sim = TeeSimulation(report.get('scene', 'straight'), params, report.get('start_x', 0.))
     model, d = sim.model, sim.data
@@ -72,11 +91,16 @@ def main():
     shift_samples = [row for row in report.get('shift', {}).get('curve_samples', []) if 'window_shift_m' in row]
     shift_times = [row['time_s'] for row in shift_samples]
     step = max(1, int(round(args.speed / args.fps / np.median(np.diff(times)))))
-    indices = list(range(0, len(times), step))
-    if indices[-1] != len(times) - 1:
-        indices.append(len(times) - 1)
-    out = args.input / f'{args.label}_{args.speed:g}x.mp4'
-    writer = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*'mp4v'), args.fps, (2 * W, H + 70))
+    selected = np.flatnonzero((times >= args.start) & (times <= args.end))
+    if not len(selected):
+        raise ValueError('Requested interval has no recorded states')
+    indices = list(range(int(selected[0]), int(selected[-1])+1, step))
+    if indices[-1] != selected[-1]:
+        indices.append(int(selected[-1]))
+    out = args.output or args.input / f'{args.label}_{args.speed:g}x.mp4'
+    out.parent.mkdir(parents=True, exist_ok=True)
+    panel_height = 158 if motor_commands else 0
+    writer = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*'mp4v'), args.fps, (2 * W, H + 70 + panel_height))
     if not writer.isOpened():
         raise RuntimeError('could not open video writer')
     with mujoco.Renderer(model, height=H, width=W) as renderer:
@@ -109,7 +133,7 @@ def main():
             stage = (raw.split('_')[0] + ' ' if re.match(r'c\d+_', raw) else '') + STAGES.get(key, key)
             if report.get('right_intake') and raw == 'arc_curve_shift':
                 stage = '前部移位，右侧逐节上管'
-            if args.label == 'locked_gait' and 'cycle' in sample:
+            if args.label == 'locked_gait' and 'cycle' in sample and not motor_commands:
                 stage = f"第 {sample['cycle']} 轮  {stage}"
             if report.get('gravity_requested'):
                 release = report.get('gravity_handoff', {}).get('gravity_crossing', {}).get('release', {})
@@ -121,7 +145,7 @@ def main():
             fell = sample.get('ground_force_n', 0.) > 1.
             if fell:
                 stage = '失去主管支撑，落地'
-            canvas = Image.new('RGB', (2 * W, H + 70), 'white')
+            canvas = Image.new('RGB', (2 * W, H + 70 + panel_height), 'white')
             canvas.paste(Image.fromarray(views[0]), (0, 70))
             canvas.paste(Image.fromarray(views[1]), (W, 70))
             draw = ImageDraw.Draw(canvas)
@@ -148,6 +172,32 @@ def main():
                 shifted = shift_samples[np.searchsorted(shift_times, times[index], side='right')-1]['window_shift_m']
                 draw.text((12, 124), f'采样区间前移 {shifted * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
             draw.text((W + 12, 76), '端视（沿管轴）', fill=(230, 230, 230), font=SMALL)
+            if motor_commands:
+                y = H+74
+                held = raw in ('right_u_hold', 'drop_hold')
+                operation = '保持，Ctrl+L 确认后 Ctrl+J/G 执行下一段' if held else 'Ctrl+G 连续，可用 Ctrl+空格 暂停'
+                events = [e for e in report.get('operator_events', []) if 0. <= times[index]-e['time_s'] <= .8]
+                if events:
+                    operation = f"操作者确认 {events[-1]['stage']}，对应 Ctrl+L 后 Ctrl+G"
+                draw.text((12, y), f'实机对应操作  {operation}', fill=(23, 53, 74), font=SMALL)
+                phase = sample.get('reference_roll_rad', 0.)
+                draw.text((12, y+27), f'控制读角周期 {report["feedback_period_s"]:g} s  |  二值使能  |  相位 {phase:.3f} rad  |  '
+                          f'全身最小 x = {sample["x_min_m"]*1000:.0f} mm，清障线 409 mm',
+                          fill=(62, 86, 102), font=SMALL)
+                draw.text((12, y+63), '关节 / 使能', fill=(62, 86, 102), font=SMALL)
+                draw.text((12, y+93), '已发目标 (°)', fill=(62, 86, 102), font=SMALL)
+                draw.text((12, y+121), '仿真实测 (°)', fill=(62, 86, 102), font=SMALL)
+                measured = np.degrees(d.qpos[sim.drive.qadr])
+                targets = np.degrees(trace['targets'][index])
+                cell = (2*W-170)/len(mask)
+                for j, enabled in enumerate(mask):
+                    x = 165+j*cell
+                    color = (20, 124, 179) if enabled else (144, 79, 172)
+                    draw.rounded_rectangle((x, y+60, x+cell-4, y+86), radius=4, fill=color)
+                    draw.text((x+6, y+60), f'J{j+1}', fill='white', font=SMALL)
+                    target = f'{targets[j]:.0f}' if enabled else '—'
+                    draw.text((x+6, y+93), target, fill=color, font=SMALL)
+                    draw.text((x+6, y+121), f'{measured[j]:.0f}', fill=(62, 86, 102), font=SMALL)
             frame = cv2.cvtColor(np.asarray(canvas), cv2.COLOR_RGB2BGR)
             for _ in range(args.fps if fell and index == indices[-1] else 1):
                 writer.write(frame)

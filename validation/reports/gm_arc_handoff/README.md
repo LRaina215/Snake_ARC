@@ -31,6 +31,8 @@
 python .\validation\gm_real_handoff_check.py --output artifacts/gm_real_handoff/binary_arc_confirmed
 ```
 
+这次实机核心轨迹的演示放在 `artifacts/gm_real_handoff/demos/`。`01_full_4x.mp4` 为完整流程，`02_arc_to_helix_2x.mp4` 展示先绕前部再送尾，`03_right_u_drop_1x.mp4` 展示原速解旋与失能下落，`04_rewrap_crossing_4x.mp4` 展示回卷与清障。四段均取自 `binary_arc_confirmed` 的同一次实际运动记录，画面含控制目标、仿真关节实际角、二值使能和实机对应操作。热键文字依据阶段及实验脚本的操作者确认事件标注。
+
 ## 前部先成螺旋、Shift Rolling 后连续接入重力矩越障
 
 沿用 18 关节、110／60 mm T 管、摩擦 0.5、限矩 2.355 N·m 和 x = 80 mm 开放 ARC 起态。只在仿真开始前摆放一次。假设前部先贴管、后段在 Shift Rolling 中接入后，可以用现有右 U 和失能回卷流程继续越障。恢复滚动时检测上一轮通过轨迹附近的相位、前后管顶跨点、支管位置和尾侧主管接触，满足后直接进入原解旋曲线。验收要求右 U 实际承托、零力矩下落并带动前部前移、尾段逐节回卷，以及整身越过 x = 409 mm 后持续贴管滚动。
