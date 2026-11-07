@@ -64,7 +64,7 @@ SECTION_MIN_GAP_FRACTION = .4   # 端距/主动骨架长度的最低开口比例
 SECTION_MIN_ACTUAL_TURN_DEG = 150.0
 SECTION_MAX_ACTUAL_TURN_DEG = 218.0
 SECTION_MAX_PLANE_RMS_M = .015
-LINK_LENGTHS_M = [.0645] * (NUM_JOINTS + 1)  # 仿真骨架尺寸，按实机铰链中心距修改
+LINK_LENGTHS_M = [.0645] * (NUM_JOINTS + 1)  # 旧仿真尺寸；新连接件转轴中心距／头尾段仍待核对，不能用102mm外形长度代替
 COMPLIANCE_FEEDBACK_PERIOD_S = .20  # 全关节读角；不把重复计算当20 Hz新实测
 MAX_FEEDBACK_AGE_S = .8
 
@@ -124,12 +124,13 @@ SUPPORT_CURVATURE_THRESHOLD_DEG = 20.0
 # 不可靠时输入 support=9:11，人工指定实际承担支撑的关节区间；与使能窗口不同。
 DEFAULT_MANUAL_SUPPORT = None
 
-# 零位沿用 configs/hardware_20j_reference.json 的原校准，当前使用其中J1..J18。
+# 2026-11-07：用户确认18关节全部放直，使用该姿态的完整精度读角重标软件零位。
+# 对照 configs/hardware_18j_reference.json；历史20路档案不再适用于当前装配。
 # 默认ID为1..NUM_JOINTS。若硬件ID不连续，按关节顺序改SERVO_IDS与对应零位。
-# 保留历史20项零位供数量切换时取用；修改数量不生成或猜测新的零位。
+# 这里只有当前实机的18项实测零位；增加关节时需要提供相应的真实校准。
 SERVO_IDS = list(range(1, NUM_JOINTS + 1))
-ZERO_RAW = [2027, 1953, 2013, 2088, 2057, 1985, 2022, 2111, 2068, 2027,
-            2089, 2103, 1990, 2031, 2073, 2021, 2095, 2062, 2057, 2070][:NUM_JOINTS]
+ZERO_RAW = [1778, 2078, 2055, 2024, 2032, 2018, 1041, 2054, 2050,
+            3049, 2033, 2047, 2047, 3058, 2063, 2045, 2063, 2022][:NUM_JOINTS]
 SERVO_DIRECTION = [1] * NUM_JOINTS
 # 原项目控制器角 -> 舵机协议角：奇数同号，偶数反号。与零位方向是两层换算。
 MODEL_TO_SERVO_SIGN = [1 if j % 2 else -1 for j in range(1, NUM_JOINTS + 1)]

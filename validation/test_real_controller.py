@@ -74,7 +74,7 @@ class RealControllerTests(unittest.TestCase):
                 self.assertEqual(len(controller.enabled), 18)
 
     def test_calibration_and_wave_agree_with_validated_simulation(self):
-        profile = json.loads((ROOT / 'configs/hardware_20j_reference.json').read_text(encoding='utf-8'))
+        profile = json.loads((ROOT / 'configs/hardware_18j_reference.json').read_text(encoding='utf-8'))
         joints = sorted(profile['Joints'], key=lambda j: j['Index'])[:real.NUM_JOINTS]
         self.assertEqual(real.ZERO_RAW, [j['Zero'] for j in joints])
         self.assertEqual(real.SERVO_IDS, [j['ServoId'] for j in joints])
@@ -85,6 +85,19 @@ class RealControllerTests(unittest.TestCase):
             for a, b in zip(actual, expected):
                 self.assertAlmostEqual(a, b)
         self.assertEqual(real.angle_to_raw(7, 60), real.ZERO_RAW[7] - round(60 * 4096 / 360))
+
+    def test_confirmed_straight_pose_has_zero_angles_and_straight_reconstruction(self):
+        fixture = json.loads((ROOT/'validation/fixtures/straight_pose_hardware18_20261107.json').read_text(encoding='utf-8'))
+        raw = fixture['reconstructed_raw_positions']
+        old = [(value-zero)*360/4096*real.MODEL_TO_SERVO_SIGN[i]
+               for i, (value, zero) in enumerate(zip(raw, fixture['old_zero_raw']))]
+        self.assertAlmostEqual(old[6], -86.220703125)
+        self.assertAlmostEqual(old[9], -89.82421875)
+        angles = [real.raw_to_angle(i, value) for i, value in enumerate(raw)]
+        self.assertLess(max(abs(a) for a in angles), 1e-9)
+        points = real.forward(real.np.radians(angles), real.LINK_LENGTHS_M)
+        self.assertLess(float(real.np.max(real.np.abs(points[:, 1:]))), 1e-12)
+        self.assertEqual([real.angle_to_raw(i, 0.) for i in range(real.NUM_JOINTS)], raw)
 
     def test_preload_then_enable_and_no_target_writes_to_passive_joints(self):
         port = RecordingSerial()

@@ -1,0 +1,146 @@
+{
+  "Name": "18关节实机直线姿态零位（2026-11-07）",
+  "BaudRate": 115200,
+  "Calibration": {
+    "status": "user_confirmed_straight_pose",
+    "source_log": "rolling_arc_20261107_155147_986557.jsonl",
+    "sample_time_s": 32.53099999999995,
+    "method": "由旧零位及完整精度反馈反算编码器位置；只更新软件零位，不写舵机内部参数"
+  },
+  "Geometry": {
+    "status": "requires_axis_centre_measurement",
+    "software_segment_length_mm": 64.5,
+    "reported_module_outer_length_mm": 102,
+    "reported_adjacent_motor_centre_mm": 78,
+    "reported_same_axis_motor_centre_mm": 146,
+    "note": "所报电机中心／外形尺寸尚不能唯一确定模型中全部转轴中心和头尾端点的位置，本轮不据此猜测几何。"
+  },
+  "Joints": [
+    {
+      "Index": 1,
+      "ServoId": 1,
+      "AxisType": 0,
+      "Zero": 1778,
+      "Direction": 1
+    },
+    {
+      "Index": 2,
+      "ServoId": 2,
+      "AxisType": 1,
+      "Zero": 2078,
+      "Direction": 1
+    },
+    {
+      "Index": 3,
+      "ServoId": 3,
+      "AxisType": 0,
+      "Zero": 2055,
+      "Direction": 1
+    },
+    {
+      "Index": 4,
+      "ServoId": 4,
+      "AxisType": 1,
+      "Zero": 2024,
+      "Direction": 1
+    },
+    {
+      "Index": 5,
+      "ServoId": 5,
+      "AxisType": 0,
+      "Zero": 2032,
+      "Direction": 1
+    },
+    {
+      "Index": 6,
+      "ServoId": 6,
+      "AxisType": 1,
+      "Zero": 2018,
+      "Direction": 1
+    },
+    {
+      "Index": 7,
+      "ServoId": 7,
+      "AxisType": 0,
+      "Zero": 1041,
+      "Direction": 1
+    },
+    {
+      "Index": 8,
+      "ServoId": 8,
+      "AxisType": 1,
+      "Zero": 2054,
+      "Direction": 1
+    },
+    {
+      "Index": 9,
+      "ServoId": 9,
+      "AxisType": 0,
+      "Zero": 2050,
+      "Direction": 1
+    },
+    {
+      "Index": 10,
+      "ServoId": 10,
+      "AxisType": 1,
+      "Zero": 3049,
+      "Direction": 1
+    },
+    {
+      "Index": 11,
+      "ServoId": 11,
+      "AxisType": 0,
+      "Zero": 2033,
+      "Direction": 1
+    },
+    {
+      "Index": 12,
+      "ServoId": 12,
+      "AxisType": 1,
+      "Zero": 2047,
+      "Direction": 1
+    },
+    {
+      "Index": 13,
+      "ServoId": 13,
+      "AxisType": 0,
+      "Zero": 2047,
+      "Direction": 1
+    },
+    {
+      "Index": 14,
+      "ServoId": 14,
+      "AxisType": 1,
+      "Zero": 3058,
+      "Direction": 1
+    },
+    {
+      "Index": 15,
+      "ServoId": 15,
+      "AxisType": 0,
+      "Zero": 2063,
+      "Direction": 1
+    },
+    {
+      "Index": 16,
+      "ServoId": 16,
+      "AxisType": 1,
+      "Zero": 2045,
+      "Direction": 1
+    },
+    {
+      "Index": 17,
+      "ServoId": 17,
+      "AxisType": 0,
+      "Zero": 2063,
+      "Direction": 1
+    },
+    {
+      "Index": 18,
+      "ServoId": 18,
+      "AxisType": 1,
+      "Zero": 2022,
+      "Direction": 1
+    }
+  ]
+}

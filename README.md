@@ -27,7 +27,7 @@ python .\codes\Rolling_Arc_Debug_Mujoco.py
 
 ## 实机测试
 
-当前实机默认18关节、ID为1–18；零位沿用原校准表的前18项。直接运行一份Python文件控制舵机，无需填写启动参数或使用外部可视化程序。默认自动识别CH340，日志自动保存到`codes/logs/`：
+当前实机默认18关节、ID为1–18；零位使用2026-11-07用户确认直线姿态的新校准。直接运行一份Python文件控制舵机，无需填写启动参数或使用外部可视化程序。默认自动识别CH340，日志自动保存到`codes/logs/`：
 
 ```powershell
 python .\codes\Rolling_Arc_Real.py
