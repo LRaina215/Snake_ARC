@@ -19,7 +19,9 @@ def review(folder):
     summary,rows=record['summary'],record['samples'];trace=np.load(folder/'locked_gait_trace.npz')
     sim=TeeSimulation(summary['scene'],ArcParameters(**summary['parameters']))
     m,d=sim.model,sim.data;n=sim.p.joints
-    tail=slice(m.body('head').id+9,m.body('head').id+n+1)
+    # Legacy recordings retained eight; new ones save the exact curve boundary.
+    retained=summary.get('controller_status',{}).get('release_retain_joints',8)
+    tail=slice(m.body('head').id+retained+1,m.body('head').id+n+1)
     held=[];rolling=[];open_angles=[];material=[];wind=[];drops=[];episodes=[]
     previous=None
     for i,row in enumerate(rows):
@@ -44,9 +46,11 @@ def review(folder):
                 max_radius_m=float(np.linalg.norm(yz,axis=1).max()))
             (held if stage=='complete' else rolling).append(shape)
         if stage in ('drop','drop_hold'):
-            com=np.average(d.xipos[tail],axis=0,weights=m.body_mass[tail])
+            frame_retained=int(np.asarray(trace['masks'][i],bool).sum())
+            released=slice(m.body('head').id+frame_retained+1,m.body('head').id+n+1)
+            com=np.average(d.xipos[released],axis=0,weights=m.body_mass[released])
             drops.append(dict(time_s=row['time_s'],tail_com_y_m=float(com[1]),tail_com_z_m=float(com[2]),
-                gravity_moment_x_nm=float(-9.81*m.body_mass[tail].sum()*com[1]),
+                gravity_moment_x_nm=float(-9.81*m.body_mass[released].sum()*com[1]),
                 head_x_m=row['head_x_m'],front_angle_deg=row['front_angle_deg']))
     u_confirmations=[]
     for e in summary.get('operator_events',[]):
@@ -54,9 +58,11 @@ def review(folder):
         if 'qpos' not in e:
             u_confirmations.append(dict(time_s=e['time_s'],exact_pose_saved=False));continue
         d.qpos[:]=e['qpos'];mujoco.mj_kinematics(m,d);mujoco.mj_comPos(m,d);points=backbone(m,d)
+        retained=e.get('retained_joints',8)
+        tail=slice(m.body('head').id+retained+1,m.body('head').id+n+1)
         com=np.average(d.xipos[tail],axis=0,weights=m.body_mass[tail]);main=e['main_links']
         ready=bool(com[1]<-.04 and points[-1,1]<-.12 and points[-1,2]>=1.175 and
-            any(j<=8 for j in main) and any(j>10 and points[j,2]>1.2 for j in main))
+            any(j<=retained for j in main) and any(j>retained+2 and points[j,2]>1.2 for j in main))
         u_confirmations.append(dict(time_s=e['time_s'],exact_pose_saved=True,actual_right_u_ready=ready,
             tail_com_y_m=float(com[1]),tail_com_z_m=float(com[2]),tail_end_m=points[-1].tolist(),main_links=main))
     forces,masks=trace['actuator_force'],trace['masks']

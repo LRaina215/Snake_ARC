@@ -64,6 +64,8 @@ python .\codes\Rolling_Arc_Real.py
 
 **小U前手调抱紧**：在Ctrl+6的 `align` 对准阶段，**Ctrl+O收紧／Ctrl+P放松Helix半径，每次1 mm**，自动平滑执行并保持，再L确认、J/G形成小U。原放松、释放和回卷半径不改，不会全程抱紧。步长／速度在顶部 `GRAVITY_GRIP_RADIUS_STEP_MM / GRAVITY_GRIP_RADIUS_RATE_MM_S` 修改；这不是模式4左右调长ARC半径。
 
+**本次实测默认**：小U为150°、半径90 mm，直尾129 mm；释放时按当前曲线分界保留前部，K显示具体数量。解旋中可L确认当前姿态，再J/G释放尾段。首次ARC→Helix速度提高至原来的1.3倍，后续重力释放回卷速度不变；顶部 `HELIX_TRANSITION_SPEED_SCALE=1.0` 可恢复原速。[参数与验证范围](docs/2026-11-08实测候选U分配与切换提速.md)。修改后需重启Python。
+
 ## 自动实验
 
 自动研究实验与手调入口分开保留。例如无图形窗口运行基础急弯：

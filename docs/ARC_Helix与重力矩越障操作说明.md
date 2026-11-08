@@ -80,8 +80,8 @@ L确认时保持目标；继续回卷后前部目标随曲线变化。现场对�
 | --- | --- | --- |
 | `align` 对准支管 | J/H正反微调。观察前部已绕过支管且仍贴稳主管；Ctrl+空格暂停，L确认，然后J | 开始 `unwind` 解旋 |
 | `grip_adjust` 小U前半径手调 | O/P继续收紧／放松，空格暂停，J/G继续；到位自动保持，也可L采用当前值后J/G | 按选定初始半径形成小U，之后恢复原放松流程 |
-| `unwind` 解旋 | 每次J推进一段，停住后再按下一次；也可G连续。观察小U从尾朝头看搭在主管右侧 | 到 `right_u_hold` 自动暂停；若已形成合适姿态且解旋已推进至少3 s，也可暂停后L确认 |
-| `right_u_hold` 右侧小U保持 | 确认U搭在主管右侧、前部仍承托，L确认，再J | 保留配置的前部关节，关闭其余尾段扭矩；尾部自然下落 |
+| `unwind` 解旋 | 每次J推进一段，停住后再按下一次；也可G连续。观察小U从尾朝头看搭在主管右侧 | 到 `right_u_hold` 自动暂停；已形成合适姿态时也可提前L确认，无3秒最低等待 |
+| `right_u_hold` 右侧小U保持 | 确认U搭在主管右侧、前部仍承托，L确认，再J/G | 按当前曲线分界保留前部，关闭其余尾段扭矩；尾部自然下落。K显示保留范围 |
 | `drop_hold` 尾部下垂 | 确认尾段摆到主管轴线下方，L确认，再J | 进入 `return_seat`，逐个接管切线弧与直尾 |
 | `return_seat`／`return_wind`／`return_finish` | 继续逐次J，或G连续 | 缩短直线段、前部随曲线滚动推进，尾部逐节缠绕上管，再消去切线弧 |
 | `recover`／`roll` | J单步或G连续，现场观察整身是否清障 | 恢复完整Helix与滚动 |
@@ -120,10 +120,14 @@ L确认时保持目标；继续回卷后前部目标随曲线变化。现场对�
 | `HELIX_RADIUS_M / HELIX_PITCH_M` | 蛇身中心线螺旋半径／每圈轴向螺距 |
 | `HELIX_MIN_FRONT_TURNS / HELIX_FRONT_SEAT_RAD` | 前部材料预算／前部单独小幅滚动就位量 |
 | `HELIX_STEP_S` | 模式5/6的J单步控制时间预算 |
+| `HELIX_TRANSITION_SPEED_SCALE` | 首次ARC→Helix速度倍率，默认1.3；不加快后续重力释放回卷，1.0恢复原速 |
 | `GRAVITY_ALIGN_RATE_RAD_S` | 对准阶段滚动速度 |
-| `GRAVITY_RETAIN_JOINTS / GRAVITY_RELEASE_*` | 释放时保留前部数量、解旋直线长度与半径 |
+| `GRAVITY_U_ANGLE_DEG / GRAVITY_U_RADIUS_M / GRAVITY_RELEASE_LINE_M` | 本次实测候选150°／90 mm／129 mm；分别为U角度、U中心线半径与直尾长度 |
+| `GRAVITY_RETAIN_JOINTS` | 默认None，按实际执行到的目标曲线分界保留完整螺旋关节；可改整数手动指定。候选目标在旧模型预计保留J1–J12 |
 | `GRAVITY_SHIFT_RATE_M_S / GRAVITY_RETURN_ROLL_RAD_S` | 首次ARC接尾与重力矩回卷共用的直尾缩短速度／前部相位推进速度 |
 | `GRAVITY_GRIP_RADIUS_STEP_MM / GRAVITY_GRIP_RADIUS_RATE_MM_S` | O/P每次调节的半径量／平滑速度；仅作用于小U前抱管阶段 |
+
+当前分配和提速的检查结果见[实测候选说明](2026-11-08实测候选U分配与切换提速.md)。它们尚待新连接件实机验收，不能据此认定防滑已解决；修改文件后退出旧Python再启动。
 
 历史版本18关节、主管／支管110/60 mm的10类仿真见[旧报告](../validation/reports/sequential_handoff/README.md)。晚间替换首次送尾后，已验证近等长、头短、尾短三种直管起态，并续跑10 s；T管代表例完成前部支撑和原回卷接入，但停在自动操作者的对准判据，未完成完整T管回归。新连接件的实机与准确几何尚未验收，不继承旧版本的全场景通过结论。
 

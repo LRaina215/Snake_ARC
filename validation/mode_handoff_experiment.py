@@ -145,11 +145,13 @@ def run(case, output):
     def confirm(stage):
         nonlocal front_confirmed_at
         main,branch,_=pipe_contacts(sim)
+        retained = controller.helix_transition.unwind_retain_count()
         snapshot=dict(stage=stage,stage_before=current_stage(),time_s=float(data.time),qpos=data.qpos.tolist(),qvel=data.qvel.tolist(),
             targets_rad=np.radians(controller.targets).tolist(),enabled=controller.enabled.copy(),
             actuator_force_nm=data.actuator_force.tolist(),main_links=main,branch_links=branch,
             ground_force_n=float(sim.measure(controller.command_phase)['ground_contact_force_n']),
-            actual_right_u_ready=bool(right_u_ready(trial,np.arange(n)<8)),
+            retained_joints=retained,
+            actual_right_u_ready=bool(right_u_ready(trial,np.arange(n)<retained)),
             feedback_age_s=float(data.time-controller.feedback_motor_clock_s))
         command('N')
         command('L')
@@ -227,10 +229,10 @@ def run(case, output):
                 locked_front = np.radians(controller.targets[:held_front_count])
             elif core.stage == 'align' and helix_alignment_ready(trial, (90., 130.), 1.035, .10):
                 confirm('align')
-            elif (core.stage == 'right_u_hold' or core.stage == 'unwind' and core.elapsed >= 3.) and right_u_ready(trial, np.arange(n)<8):
+            elif core.stage in ('right_u_hold', 'unwind') and right_u_ready(trial, np.arange(n)<core.unwind_retain_count()):
                 confirm('right_u_hold')
             elif core.stage == 'drop_hold':
-                tail = slice(model.body('head').id+9, model.body('head').id+n+1)
+                tail = slice(model.body('head').id+core.release_retain_joints+1, model.body('head').id+n+1)
                 com = np.average(data.xipos[tail], axis=0, weights=model.body_mass[tail])
                 if abs(com[1]) <= .015 and com[2] <= PIPE_HEIGHT-.10:
                     confirm('drop_hold')

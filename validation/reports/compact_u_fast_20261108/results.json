@@ -1,0 +1,373 @@
+{
+  "hardware_run": false,
+  "software_checks_passed": 38,
+  "default_speed_scale": 1.3,
+  "u_angle_deg": 150.0,
+  "u_radius_m": 0.09,
+  "straight_m": 0.129,
+  "retain_joints": "derived from current target curve; planned 12 with old 64.5 mm model",
+  "runs": {
+    "arc_helix_fast": {
+      "full_review": {
+        "case": "ctrl4_ctrl5",
+        "controller_passed": true,
+        "failure": null,
+        "final_stage": "complete",
+        "frames": 2631,
+        "stage_intervals": [
+          {
+            "stage": "feeding",
+            "start_s": 2.5009999999998356,
+            "end_s": 24.700000000007204
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 24.750000000007265,
+            "end_s": 26.100000000008915
+          },
+          {
+            "stage": "front",
+            "start_s": 26.150000000008976,
+            "end_s": 33.500000000012626
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 33.55000000001251,
+            "end_s": 35.1000000000089
+          },
+          {
+            "stage": "front",
+            "start_s": 35.15000000000878,
+            "end_s": 38.100000000001906
+          },
+          {
+            "stage": "front_finish",
+            "start_s": 38.15000000000179,
+            "end_s": 73.09999999998499
+          },
+          {
+            "stage": "front_seat",
+            "start_s": 73.14999999998523,
+            "end_s": 74.29999999999072
+          },
+          {
+            "stage": "front_hold",
+            "start_s": 74.34999999999096,
+            "end_s": 74.89999999999358
+          },
+          {
+            "stage": "return_seat",
+            "start_s": 74.94999999999382,
+            "end_s": 83.55000000003488
+          },
+          {
+            "stage": "return_wind",
+            "start_s": 83.60000000003512,
+            "end_s": 120.75000000021251
+          },
+          {
+            "stage": "return_finish",
+            "start_s": 120.80000000021275,
+            "end_s": 122.75000000022206
+          },
+          {
+            "stage": "recover",
+            "start_s": 122.8000000002223,
+            "end_s": 127.75000000024593
+          },
+          {
+            "stage": "helix_normalize",
+            "start_s": 127.80000000024617,
+            "end_s": 128.5000000002495
+          },
+          {
+            "stage": "complete",
+            "start_s": 128.55000000024975,
+            "end_s": 131.50000000026384
+          }
+        ],
+        "commands": [
+          {
+            "time_s": 2.4999999999998357,
+            "key": "Ctrl+4",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": null
+          },
+          {
+            "time_s": 2.4999999999998357,
+            "key": "Ctrl+H",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": null
+          },
+          {
+            "time_s": 24.72000000000723,
+            "key": "Ctrl+5",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": "arc_settle"
+          },
+          {
+            "time_s": 24.72000000000723,
+            "key": "Ctrl+G",
+            "stage_before": "arc_settle",
+            "result": "accepted",
+            "stage": "arc_settle"
+          },
+          {
+            "time_s": 74.91999999999368,
+            "key": "Ctrl+N",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "front_hold"
+          },
+          {
+            "time_s": 74.91999999999368,
+            "key": "Ctrl+L",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "return_seat"
+          },
+          {
+            "time_s": 74.91999999999368,
+            "key": "Ctrl+G",
+            "stage_before": "return_seat",
+            "result": "accepted",
+            "stage": "return_seat"
+          }
+        ],
+        "front_before_tail": true,
+        "actual_helix_shape_passed": true,
+        "helix_shape_frames": 60,
+        "final_min_turns": 1.9775527176744263,
+        "final_max_radius_m": 0.10694582788107444,
+        "preparation_max_near_pipe_coverage_deg": 236.51108932632968,
+        "actual_mode4_material_change_m": -0.07020769257771386,
+        "passive_actuator_force_max_nm": 0.0,
+        "self_contact_events": [],
+        "floor_frames": 0,
+        "low_total_force_frames": 2,
+        "maximum_actual_joint_deg": 74.6835439810725,
+        "maximum_tracking_deg": 24.073078533806,
+        "saturated_frames": 188,
+        "right_u_confirmations": [],
+        "recovery": {
+          "passed": false,
+          "reason": "recovery not reached"
+        },
+        "gravity_drop": null,
+        "passed": true
+      },
+      "source_review": {
+        "case": "ctrl4_ctrl5",
+        "controller_passed": true,
+        "actual_final_shape_passed": true,
+        "frames": 2631,
+        "final_min_turns": 1.9775527176744263,
+        "final_max_radius_m": 0.10694582788107444,
+        "preparation_max_near_pipe_coverage_deg": 236.51108932632968,
+        "source_front_target_change_rad": 1.7395531541661715,
+        "source_head_advance_m": 0.18118991628508133,
+        "source_intake_supported": false,
+        "passive_force_max_nm": 0.0,
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "floor_frames": 0,
+        "saturated_frames": 188,
+        "max_joint_deg": 74.6835439810725,
+        "failure": null,
+        "passed": false
+      },
+      "raw_directory": "artifacts\\compact_u_fast_20261108\\arc_helix_fast",
+      "low_force_front_geometry_audit": [
+        {
+          "time_s": 94.35000000008645,
+          "main_links": [],
+          "support_n": 26.308870992820427,
+          "front_geometry": [
+            [
+              6,
+              -7.312378258952837e-06
+            ]
+          ]
+        }
+      ]
+    },
+    "arc_helix_1p3": {
+      "full_review": {
+        "case": "ctrl4_ctrl5",
+        "controller_passed": true,
+        "failure": null,
+        "final_stage": "complete",
+        "frames": 2919,
+        "stage_intervals": [
+          {
+            "stage": "feeding",
+            "start_s": 2.5009999999998356,
+            "end_s": 24.700000000007204
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 24.750000000007265,
+            "end_s": 26.30000000000916
+          },
+          {
+            "stage": "front",
+            "start_s": 26.35000000000922,
+            "end_s": 34.70000000000983
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 34.75000000000971,
+            "end_s": 36.3000000000061
+          },
+          {
+            "stage": "front",
+            "start_s": 36.350000000005984,
+            "end_s": 39.69999999999818
+          },
+          {
+            "stage": "front_finish",
+            "start_s": 39.74999999999806,
+            "end_s": 80.10000000001841
+          },
+          {
+            "stage": "front_seat",
+            "start_s": 80.15000000001865,
+            "end_s": 81.30000000002414
+          },
+          {
+            "stage": "front_hold",
+            "start_s": 81.35000000002438,
+            "end_s": 81.900000000027
+          },
+          {
+            "stage": "return_seat",
+            "start_s": 81.95000000002725,
+            "end_s": 91.90000000007475
+          },
+          {
+            "stage": "return_wind",
+            "start_s": 91.950000000075,
+            "end_s": 134.8000000002796
+          },
+          {
+            "stage": "return_finish",
+            "start_s": 134.85000000027983,
+            "end_s": 137.10000000029058
+          },
+          {
+            "stage": "recover",
+            "start_s": 137.15000000029082,
+            "end_s": 142.1500000003147
+          },
+          {
+            "stage": "helix_normalize",
+            "start_s": 142.20000000031493,
+            "end_s": 142.90000000031827
+          },
+          {
+            "stage": "complete",
+            "start_s": 142.9500000003185,
+            "end_s": 145.9000000003326
+          }
+        ],
+        "commands": [
+          {
+            "time_s": 2.4999999999998357,
+            "key": "Ctrl+4",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": null
+          },
+          {
+            "time_s": 2.4999999999998357,
+            "key": "Ctrl+H",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": null
+          },
+          {
+            "time_s": 24.72000000000723,
+            "key": "Ctrl+5",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": "arc_settle"
+          },
+          {
+            "time_s": 24.72000000000723,
+            "key": "Ctrl+G",
+            "stage_before": "arc_settle",
+            "result": "accepted",
+            "stage": "arc_settle"
+          },
+          {
+            "time_s": 81.9200000000271,
+            "key": "Ctrl+N",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "front_hold"
+          },
+          {
+            "time_s": 81.9200000000271,
+            "key": "Ctrl+L",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "return_seat"
+          },
+          {
+            "time_s": 81.9200000000271,
+            "key": "Ctrl+G",
+            "stage_before": "return_seat",
+            "result": "accepted",
+            "stage": "return_seat"
+          }
+        ],
+        "front_before_tail": true,
+        "actual_helix_shape_passed": true,
+        "helix_shape_frames": 60,
+        "final_min_turns": 1.977321259675664,
+        "final_max_radius_m": 0.10691077768563235,
+        "preparation_max_near_pipe_coverage_deg": 236.50251123767455,
+        "actual_mode4_material_change_m": -0.07020769257771386,
+        "passive_actuator_force_max_nm": 0.0,
+        "self_contact_events": [],
+        "floor_frames": 0,
+        "low_total_force_frames": 2,
+        "maximum_actual_joint_deg": 74.68242719667948,
+        "maximum_tracking_deg": 20.184759901729986,
+        "saturated_frames": 186,
+        "right_u_confirmations": [],
+        "recovery": {
+          "passed": false,
+          "reason": "recovery not reached"
+        },
+        "gravity_drop": null,
+        "passed": true
+      },
+      "source_review": {
+        "case": "ctrl4_ctrl5",
+        "controller_passed": true,
+        "actual_final_shape_passed": true,
+        "frames": 2919,
+        "final_min_turns": 1.977321259675664,
+        "final_max_radius_m": 0.10691077768563235,
+        "preparation_max_near_pipe_coverage_deg": 236.50251123767455,
+        "source_front_target_change_rad": 1.7428657873841358,
+        "source_head_advance_m": 0.1836200645555544,
+        "source_intake_supported": true,
+        "passive_force_max_nm": 0.0,
+        "self_contact_frames": 0,
+        "first_self_contact": [],
+        "floor_frames": 0,
+        "saturated_frames": 186,
+        "max_joint_deg": 74.68242719667948,
+        "failure": null,
+        "passed": true
+      },
+      "raw_directory": "artifacts\\compact_u_fast_20261108\\arc_helix_1p3"
+    }
+  },
+  "scope": "ARC->Helix speed and software allocation; new U physical release and full Tee crossing not rerun"
+}

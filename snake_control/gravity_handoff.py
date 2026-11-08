@@ -1,5 +1,6 @@
 """实机 T 管越障。几何事件由操作者确认，进给只使用全身实测关节角。"""
 from dataclasses import dataclass
+from typing import Optional
 import math
 
 import numpy as np
@@ -16,8 +17,9 @@ from .posture_initialization import choose_feeding_arc
 class GravityFrontTransition(ArcHelixTransition):
     """保持承载 ARC，只延长头端螺旋，直至操作者确认贴管。"""
 
-    def __init__(self, *args, minimum_front_turns=1., **kwargs):
+    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., **kwargs):
         self.minimum_front_turns = minimum_front_turns
+        self.speed_scale = speed_scale
         super().__init__(*args, **kwargs)
 
     def _check_front_entry(self):
@@ -49,7 +51,8 @@ class GravityFrontTransition(ArcHelixTransition):
         goal = self.desired_start-first
         options = ContinuousFeedingOptions(first_joint=first, last_joint=last,
             amplitude_deg=math.degrees(self.amplitude), requested_transfer_m=goal*self.l,
-            automatic_return=False, tracking_tolerance_deg=8.)
+            automatic_return=False, tracking_tolerance_deg=8.,
+            maximum_position_rate_joints_s=.1*self.speed_scale)
         self.transfer = ContinuousFeeding(self.lengths, options)
         self.transfer.phase = self.phase
         self.transfer.targets = self.measured.copy()
@@ -76,7 +79,7 @@ class GravityFrontTransition(ArcHelixTransition):
             remaining = abs(self.transfer_goal-helper.position)
             if remaining > 1e-9:
                 pace = float(np.clip((math.radians(23.)-error)/math.radians(17.), .1, 1.))
-                increment = min(remaining, .1*pace*dt)
+                increment = min(remaining, .1*self.speed_scale*pace*dt)
                 _, focus, _, _ = helper.profile(helper.position, helper.bias)
                 required = helper.required_mask(focus, np.degrees(self.measured), helper.position)
                 entering = required & ~helper.enabled
@@ -100,20 +103,21 @@ class GravityFrontTransition(ArcHelixTransition):
         first, last = self.window
         pace = self._tracking_pace()
         self.shift_time += dt
-        self.leading_extension = min(self.curve.head_length, self.leading_extension+.035*pace*dt)
+        self.leading_extension = min(self.curve.head_length, self.leading_extension+.035*self.speed_scale*pace*dt)
         # 承载 ARC 的相位保持，前部只沿拼接曲线逐渐成形。
         leading_helix = helix(0., self.options.radius_m, self.options.pitch_m, -self.direction)
         goal, self.head_phase, _ = self.curve.shifted_window(0., self.curve.arc_length, self.phase+self.roll,
                                                           self.leading_extension, leading_helix)
         coverage = np.clip(self.leading_extension/self.l+np.arange(1, self.n+1)-first+1., 0., 1.)
         coverage[last:] = 0.
-        self._apply_curve(goal, coverage, 23., dt)
+        self._apply_curve(goal, coverage, 23.*self.speed_scale, dt)
 
 
 @dataclass(frozen=True)
 class GravityCrossingOptions:
-    retain_joints: int = 8
+    retain_joints: Optional[int] = 8  # None: derive the prefix from the current curve boundary.
     release_line_m: float = .32201388
+    release_arc_rad: float = math.pi
     release_radius_m: float = .09554165
     alignment_rate_rad_s: float = .14
     shift_rate_m_s: float = .012
@@ -123,6 +127,7 @@ class GravityCrossingOptions:
     min_front_turns: float = 1.
     front_seat_rad: float = .14
     grip_radius_rate_m_s: float = .002
+    transition_speed_scale: float = 1.
 
 
 class GravityCrossing:
@@ -134,11 +139,18 @@ class GravityCrossing:
         self.n, self.l = len(lengths)-1, float(np.mean(lengths))
         if not np.allclose(lengths, self.l):
             raise ValueError('T 管模式的曲线积分需要等间距关节')
-        if not 4 <= options.retain_joints < self.n:
+        if options.retain_joints is not None and not 4 <= options.retain_joints < self.n:
             raise ValueError('请检查 T 管模式的前部保留关节数')
+        if not math.isfinite(options.transition_speed_scale) or options.transition_speed_scale<=0.:
+            raise ValueError('切换速度倍率必须为有限正数')
         self.gait = GravityMomentGait(self.n, gait_options, self.l)
-        self.gait.segments(options.release_radius_m, ls=options.release_line_m, th1=math.pi)
+        _,self.planned_unwind_helix_m=self.gait.segments(options.release_radius_m,
+            ls=options.release_line_m,th1=options.release_arc_rad)
         self.options = options
+        self.unwind_angle_rad = self.unwind_straight_m = 0.
+        self.unwind_helix_m = self.gait.L
+        self.unwind_target_started = False
+        self.release_retain_joints = self.unwind_retain_count(self.planned_unwind_helix_m)
         self.grip_radius_m = self.grip_radius_target_m = gait_options.r_h1
         self.helix_only = helix_only
         self._enabled = np.asarray(enabled, bool).copy()
@@ -175,7 +187,15 @@ class GravityCrossing:
     def _make_front(self, lengths, window):
         return GravityFrontTransition(lengths, window, np.degrees(self.measured),
             options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
-            minimum_front_turns=self.options.min_front_turns)
+            minimum_front_turns=self.options.min_front_turns,speed_scale=self.options.transition_speed_scale)
+
+    def unwind_retain_count(self, helix_length=None):
+        """Complete helical joint neighbourhoods; no MuJoCo support estimate."""
+        if self.options.retain_joints is not None:
+            return self.options.retain_joints
+        if helix_length is None:
+            helix_length=self.unwind_helix_m if self.unwind_target_started else self.planned_unwind_helix_m
+        return int(self.gait.helix_joints(helix_length).sum())
 
     @staticmethod
     def _section_radius(q, lengths, window):
@@ -217,7 +237,7 @@ class GravityCrossing:
 
     def _advance_arc_reference(self, dt, fresh):
         reference = self.arc_reference
-        self._set_targets(reference['target'], dt, rate=15.)
+        self._set_targets(reference['target'], dt, rate=15.*self.options.transition_speed_scale)
         error = np.max(abs(reference['target'][self._enabled]-self.measured[self._enabled]))
         if fresh:
             ready = error <= math.radians(8.)
@@ -292,9 +312,10 @@ class GravityCrossing:
     def _advance_front_finish(self, dt, fresh):
         observed_error = np.max(abs(self._targets[self._enabled]-self.measured[self._enabled]))
         pace = float(np.clip((math.radians(23.)-observed_error)/math.radians(17.), .10, 1.))
-        self.offset = min(self.curve.shift_limit_m, self.offset+self.options.shift_rate_m_s*pace*dt)
+        self.offset = min(self.curve.shift_limit_m,
+            self.offset+self.options.shift_rate_m_s*self.options.transition_speed_scale*pace*dt)
         goal = self.curve.targets(self.offset, self.curve.torsion*self.offset)
-        self._set_targets(goal, dt)
+        self._set_targets(goal, dt, rate=18.*self.options.transition_speed_scale)
         if fresh:
             nominal = self.curve.helical_targets(self.offset, self.curve.torsion*self.offset)
             follows = np.max(abs(nominal[:self.front_count]-self.measured[:self.front_count])) <= math.radians(3.)
@@ -306,9 +327,10 @@ class GravityCrossing:
 
     def _advance_front_seat(self, dt, fresh):
         """只滚动前部一小段使其就位；后部仍失能，然后停下确认支撑。"""
-        travel = min(self.options.front_seat_rad, self.options.alignment_rate_rad_s*self.elapsed)
+        travel = min(self.options.front_seat_rad,
+            self.options.alignment_rate_rad_s*self.options.transition_speed_scale*self.elapsed)
         self.phase = self.seating_phase+travel
-        self._set_targets(self._helix(self.phase, self.gait.o.r_h1), dt)
+        self._set_targets(self._helix(self.phase, self.gait.o.r_h1),dt,rate=18.*self.options.transition_speed_scale)
         if fresh and travel >= self.options.front_seat_rad:
             follows = np.max(abs(self._targets[self._enabled]-self.measured[self._enabled])) <= math.radians(5.)
             self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if follows else None
@@ -344,7 +366,7 @@ class GravityCrossing:
 
     def _advance_helix_normalize(self, dt, fresh):
         goal = self._helix(self.phase, self.gait.o.r_h1)
-        self._set_targets(goal, dt)
+        self._set_targets(goal,dt,rate=18.*self.options.transition_speed_scale)
         if not fresh:
             return
         targets_done = np.max(abs(goal-self._targets)) < 1e-9
@@ -370,8 +392,7 @@ class GravityCrossing:
                 self.front_confirm_requested and self.stage in ('front_finish','front_seat')):
             return False
         front_ready = self.stage in ('front_finish', 'front_seat', 'front_hold')
-        release_ready = (self.stage == 'right_u_hold' or
-                         (self.stage == 'unwind' and self.elapsed >= 3.))
+        release_ready = self.stage in ('right_u_hold','unwind')
         if not (front_ready or release_ready or self.stage in ('align', 'grip_adjust', 'drop_hold')):
             raise ValueError(f'当前阶段={self.stage}，尚无可确认的交接；Ctrl+J/G推进，Ctrl+K查看具体阶段')
         before = self.stage
@@ -389,9 +410,14 @@ class GravityCrossing:
         elif self.stage in ('align', 'grip_adjust'):
             # L确认当前已执行到的半径，不在开始小U后追赶剩余调节。
             self.grip_radius_target_m = self.grip_radius_m
+            self.unwind_angle_rad = self.unwind_straight_m = 0.
+            self.unwind_helix_m = self.gait.L
+            self.unwind_target_started = False
             self.anchor = self._targets.copy()
             self._enter('unwind')
-        elif self.stage == 'right_u_hold' or (self.stage == 'unwind' and self.elapsed >= 3.):
+        elif release_ready:
+            self.release_retain_joints=self.unwind_retain_count(
+                self.unwind_helix_m if self.stage=='unwind' or self.unwind_target_started else self.planned_unwind_helix_m)
             self.anchor = self._targets.copy()
             self._enter('drop')
         elif self.stage == 'drop_hold':
@@ -468,7 +494,7 @@ class GravityCrossing:
         elif self.stage == 'unwind':
             self._advance_unwind(dt)
         elif self.stage == 'drop':
-            self._enabled[self.options.retain_joints:] = False
+            self._enabled[self.release_retain_joints:] = False
             opened = self._helix(self.phase, self.gait.o.r_h2)
             self._targets = self.anchor+smooth(self.elapsed/.40)*(opened-self.anchor)
             self._targets[~self._enabled] = self.measured[~self._enabled]
@@ -486,8 +512,11 @@ class GravityCrossing:
         t, opt, gait = self.elapsed, self.options, self.gait
         # 手调只保持到小U/直尾形成；随后恢复原放松半径，释放及回卷参数不改。
         radius = self.grip_radius_m+(opt.release_radius_m-self.grip_radius_m)*smooth((t-7.)/.85)
-        goal = gait.targets(self.phase, radius, ls=opt.release_line_m*smooth((t-3.)/4.),
-                            th1=math.pi*smooth(t/3.))[0]
+        self.unwind_angle_rad=opt.release_arc_rad*smooth(t/3.)
+        self.unwind_straight_m=opt.release_line_m*smooth((t-3.)/4.)
+        goal,self.unwind_helix_m=gait.targets(self.phase,radius,ls=self.unwind_straight_m,
+                                            th1=self.unwind_angle_rad)
+        self.unwind_target_started=True
         residual = self.anchor-self._helix(self.phase, self.grip_radius_m)
         self._set_targets(goal+(1.-smooth(t))*residual, dt, rate=30.)
         if t >= 7.85:
@@ -496,7 +525,7 @@ class GravityCrossing:
 
     def _start_source_return(self, retain_joints=None, initial=False):
         """原实机版2：逐个接管直尾，再缩短直线段，补偿前部螺旋相位。"""
-        self.return_retain = self.options.retain_joints if retain_joints is None else retain_joints
+        self.return_retain = self.release_retain_joints if retain_joints is None else retain_joints
         self.initial_source_return = initial
         self.return_straight = (self.n-self.return_retain+1)*self.l
         self.return_lead = self.gait.lead_angle(self.gait.o.r_h2)
@@ -510,8 +539,10 @@ class GravityCrossing:
     def _advance_source_return(self, dt):
         keep = self.return_retain-4
         gait, radius = self.gait, self.gait.o.r_h2
+        speed=self.options.transition_speed_scale if self.initial_source_return else 1.
+        clock=self.elapsed*speed
         if self.stage == 'return_seat':
-            end = min(self.n, keep+int(self.elapsed)+1)
+            end = min(self.n,keep+int(clock)+1)
             entering = ~self._enabled[:end]
             self._targets[:end][entering] = self.measured[:end][entering]
             self._enabled[:end] = True
@@ -519,21 +550,21 @@ class GravityCrossing:
             goal = self._targets.copy()
             goal[keep:end] = self.return_seating[keep:end]
             goal[:keep] = self.return_fixed
-            self._set_targets(goal, dt)
-            if self.elapsed >= self.n-keep:
+            self._set_targets(goal,dt,rate=18.*speed)
+            if clock >= self.n-keep:
                 self._enter('return_wind')
         elif self.stage == 'return_wind':
-            self.offset = min(self.return_straight, self.options.shift_rate_m_s*self.elapsed)
+            self.offset = min(self.return_straight,self.options.shift_rate_m_s*clock)
             straight = self.return_straight-self.offset
             # 初次ARC接尾和重力矩回卷均推进前部相位，直尾材料逐渐进入螺旋。
-            self.phase += self.options.return_roll_rad_s*dt
-            self._set_targets(gait.targets(self.phase, radius, ls=straight, th2=self.return_lead)[0], dt)
-            if self.elapsed >= self.return_straight/self.options.shift_rate_m_s+2.:
+            self.phase += self.options.return_roll_rad_s*speed*dt
+            self._set_targets(gait.targets(self.phase,radius,ls=straight,th2=self.return_lead)[0],dt,rate=18.*speed)
+            if clock >= self.return_straight/self.options.shift_rate_m_s+2.:
                 self._enter('return_finish')
         else:
-            lead = self.return_lead*(1.-min(1., self.elapsed/3.))
-            self._set_targets(gait.targets(self.phase, radius, th2=lead)[0], dt)
-            if self.elapsed >= 3.:
+            lead = self.return_lead*(1.-min(1.,clock/3.))
+            self._set_targets(gait.targets(self.phase,radius,th2=lead)[0],dt,rate=18.*speed)
+            if clock >= 3.:
                 self.recover_phase, self.anchor = self.phase, self._targets.copy()
                 self._enter('recover')
 
@@ -565,4 +596,11 @@ class GravityCrossing:
                     grip_radius_target_m=self.grip_radius_target_m,
                     unwind_release_radius_m=self.options.release_radius_m,
                     return_radius_m=self.gait.o.r_h2,
+                    transition_speed_scale=self.options.transition_speed_scale,
+                    planned_u_angle_deg=math.degrees(self.options.release_arc_rad),
+                    planned_u_length_m=self.gait.o.r_c*self.options.release_arc_rad,
+                    planned_straight_m=self.options.release_line_m,
+                    planned_front_length_m=self.planned_unwind_helix_m,
+                    planned_retain_joints=self.unwind_retain_count(self.planned_unwind_helix_m),
+                    release_retain_joints=self.release_retain_joints,
                     front=front, events=self.events.copy())
