@@ -101,6 +101,21 @@ class CurveGait:
             out[j - 1] = cos_part if j % 2 else self.direction * sin_part
         return out
 
+    def sampled_targets(self,bounds,components,roll=0.):
+        """Exact interval integral of a piecewise constant Bishop curvature field.
+
+        This accepts a sampled bent-axis reference using the same adjacent-link
+        integral and parity as targets(). No joint inverse-kinematic placement.
+        """
+        bounds=np.asarray(bounds);components=np.asarray(components)
+        integrated=np.vstack([np.zeros(2),np.cumsum(np.diff(bounds)[:,None]*components,axis=0)])
+        lo,hi=self.s[:-2],self.s[2:]
+        turn=np.column_stack([np.interp(hi,bounds,integrated[:,k])-np.interp(lo,bounds,integrated[:,k]) for k in (0,1)])
+        c,s=math.cos(roll),math.sin(roll)
+        rotated=np.column_stack([c*turn[:,0]-s*turn[:,1],s*turn[:,0]+c*turn[:,1]])
+        odd=np.arange(self.joints)%2==0
+        return np.where(odd,rotated[:,0],self.direction*rotated[:,1])
+
     def window_arc(self, first, last, amplitude_rad, extra_links=0.):
         """ARC as one arc segment covering joints first..last (plus optional extra links)."""
         start = self.s[first-1]-extra_links*self.l

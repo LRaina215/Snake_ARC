@@ -78,13 +78,14 @@ class HelixArcTransition:
     Outputs are target angles and a binary torque-enable mask. A fitting error
     is not a contact/load measurement; all physical acceptance lives outside.
     """
-    def __init__(self,angles_rad,lengths,options=HelixArcOptions(),feeding_settings=None):
+    def __init__(self,angles_rad,lengths,options=HelixArcOptions(),feeding_settings=None,fit_count=None):
         self.lengths=np.asarray(lengths,float);self.n=len(angles_rad)
         self.l=float(np.median(self.lengths[1:-1]));self.L=float(sum(lengths));self.o=options
         if not math.isfinite(options.speed_scale) or options.speed_scale<=0.:
             raise ValueError('Ctrl+7速度倍率必须为有限正数')
         self.curve=CurveGait(self.n,self.l,lengths=self.lengths)
-        self.fit=fit_helix(np.asarray(angles_rad),self.l,self.lengths)
+        count=self.n if fit_count is None else fit_count
+        self.fit=fit_helix(np.asarray(angles_rad)[:count],self.l,self.lengths[:count+1])
         self.phase=self.fit['phase'];self.kappa=self.fit['kappa'];self.tau=self.fit['tau'];self.radius=self.fit['radius']
         self.lead=math.atan(self.fit['pitch']/(2*math.pi*self.radius))+options.exit_extra_rad
         self.targets=np.asarray(angles_rad,float).copy();self.enabled=np.ones(self.n,bool)
@@ -156,6 +157,10 @@ class HelixArcTransition:
             mask=np.zeros(self.n,bool)
             for i,s in enumerate(segments):
                 if s.kappa>1e-8:mask|=(hi>bounds[i]+1e-6)&(lo<bounds[i+1]-1e-6)
+        self.apply_reference(desired,dt,mask)
+
+    def apply_reference(self,desired,dt,mask):
+        """Shared measured-angle preload and slew limiting for any curve reference."""
         entering=mask&~self.enabled
         self.targets[entering]=self.measured[entering]
         self.enabled=mask
@@ -316,8 +321,8 @@ class HelixArcManual:
     Centering completion pauses once. A further J/G explicitly starts ARC rolling.
     """
     def __init__(self,measured_deg,lengths,options=HelixArcOptions(),step_s=1.,max_feedback_age_s=.8,
-                 end_reset_options=None,feeding_settings=None):
-        self.core=HelixArcTransition(np.radians(measured_deg),lengths,options,feeding_settings)
+                 end_reset_options=None,feeding_settings=None,fit_count=None):
+        self.core=HelixArcTransition(np.radians(measured_deg),lengths,options,feeding_settings,fit_count)
         self.step_s=step_s;self.max_feedback_age_s=max_feedback_age_s
         self.running=False;self.started=False;self.step_left=0.;self.control_time=0.
         self.feedback_time=None;self.completed=False;self.feedback_wait=False
