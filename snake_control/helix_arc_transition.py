@@ -52,6 +52,7 @@ def circle_frame(points):
 
 @dataclass(frozen=True)
 class HelixArcOptions:
+    speed_scale: float=1.                     # Motion multiplier; feedback and settling keep real time.
     retained_turns: float=1.                  # Leave this helical budget before forming the semicircle.
     exit_extra_rad: float=math.radians(30.)    # Exit bend beyond the helix lead angle; separates the falling tail.
     head_clearance_rad: float=math.radians(40.)# Temporary orthogonal head bend, removed before release.
@@ -76,6 +77,8 @@ class HelixArcTransition:
     def __init__(self,angles_rad,lengths,options=HelixArcOptions()):
         self.lengths=np.asarray(lengths,float);self.n=len(angles_rad)
         self.l=float(np.mean(lengths));self.L=float(sum(lengths));self.o=options
+        if not math.isfinite(options.speed_scale) or options.speed_scale<=0.:
+            raise ValueError('Ctrl+7速度倍率必须为有限正数')
         self.curve=CurveGait(self.n,self.l)
         self.fit=fit_helix(np.asarray(angles_rad),self.l)
         self.phase=self.fit['phase'];self.kappa=self.fit['kappa'];self.tau=self.fit['tau'];self.radius=self.fit['radius']
@@ -150,7 +153,7 @@ class HelixArcTransition:
         entering=mask&~self.enabled
         self.targets[entering]=self.measured[entering]
         self.enabled=mask
-        limit=math.radians(self.o.target_rate_deg_s)*dt
+        limit=math.radians(self.o.target_rate_deg_s)*self.o.speed_scale*dt
         self.targets+=np.clip(desired-self.targets,-limit,limit)
         self.targets=np.clip(self.targets,-math.radians(88),math.radians(88))
         self.targets[~mask]=self.measured[~mask]
@@ -164,13 +167,14 @@ class HelixArcTransition:
 
     def step(self,dt,time_s,angles_rad,fresh=False):
         self.time=time_s;self.elapsed+=dt;self.measured=np.asarray(angles_rad,float)
+        motion_dt=dt*self.o.speed_scale
         if fresh:self.geometry=self.measured_geometry(self.measured)
         if self.stage=='exit_transition':
-            self.set_curve(self.reverse_segments(self.lead*smooth(self.elapsed/self.o.lead_s)),self.phase,dt)
-            if self.elapsed>=self.o.lead_s:self.enter('reverse_unwrap')
+            self.set_curve(self.reverse_segments(self.lead*smooth(self.elapsed*self.o.speed_scale/self.o.lead_s)),self.phase,dt)
+            if self.elapsed*self.o.speed_scale>=self.o.lead_s:self.enter('reverse_unwrap')
         elif self.stage=='reverse_unwrap':
-            self.straight+=self.o.reverse_feed_m_s*dt
-            self.phase-=self.o.reverse_roll_rad_s*dt
+            self.straight+=self.o.reverse_feed_m_s*motion_dt
+            self.phase-=self.o.reverse_roll_rad_s*motion_dt
             self.set_curve(self.reverse_segments(self.lead),self.phase,dt)
             if self.helix_length<=self.o.retained_turns*math.hypot(2*math.pi*self.radius,self.fit['pitch']):self.enter('crown_align')
         elif self.stage=='crown_align':
@@ -192,23 +196,23 @@ class HelixArcTransition:
                         scores.append((float(np.linalg.norm(head[:,None]-tail[None,:],axis=2).min()),sign))
                     self.clearance_sign=max(scores)[1];self.enter('flatten')
                 else:
-                    self.phase+=self.align_sign*.20*dt
-            else:self.phase+=self.align_sign*.20*dt
+                    self.phase+=self.align_sign*.20*motion_dt
+            else:self.phase+=self.align_sign*.20*motion_dt
             self.set_curve(self.reverse_segments(self.lead),self.phase,dt)
         elif self.stage=='flatten':
-            w=smooth(self.elapsed/self.o.flatten_s)
+            w=smooth(self.elapsed*self.o.speed_scale/self.o.flatten_s)
             segments,phase=self.flatten_segments(w,self.clearance_sign)
             # Guide the short head prefix to the opposite side before letting
             # gravity take it. Early head torque-off sweeps it across the tail.
             self.set_curve(segments,phase,dt,mask=self.flatten_mask)
-            if self.elapsed>=self.o.flatten_s:
+            if self.elapsed*self.o.speed_scale>=self.o.flatten_s:
                 self.head=self.crown-self.arc_length/2;self.phase=self.start_phase+self.tau*self.crown
                 self.release_mask=self.enabled.copy();self.enter('arc_release')
         elif self.stage=='arc_release':
             centers=(np.arange(self.n)+1)*self.l
             curved=(centers+self.l>self.head+1e-6)&(centers-self.l<self.head+self.arc_length-1e-6)
             leaving=np.flatnonzero(self.release_mask&~curved)
-            allowed=min(len(leaving),int(self.elapsed/.2))
+            allowed=min(len(leaving),int(self.elapsed*self.o.speed_scale/.2))
             mask=self.release_mask.copy();mask[leaving[:allowed]]=False
             self.arc_targets(dt,mask=mask)
             if allowed==len(leaving):self.enter('arc_settle')
@@ -218,7 +222,7 @@ class HelixArcTransition:
         elif self.stage=='auto_center':
             self.center_error=self.geometry.get('difference_m')
             if self.geometry.get('valid') and self.center_error is not None:
-                self.head+=float(np.clip(.2*self.center_error,-self.o.center_rate_m_s,self.o.center_rate_m_s))*dt
+                self.head+=float(np.clip(.2*self.center_error,-self.o.center_rate_m_s,self.o.center_rate_m_s))*motion_dt
                 self.head=float(np.clip(self.head,self.l/2,self.L-self.arc_length-self.l/2))
             self.arc_targets(dt)
             if self.center_error is not None and abs(self.center_error)<self.o.center_tolerance_m:
@@ -229,7 +233,7 @@ class HelixArcTransition:
             self.arc_targets(dt)
             if self.elapsed>=3.:self.enter('arc_roll')
         elif self.stage=='arc_roll':
-            self.phase+=self.o.roll_rate_rad_s*dt;self.arc_targets(dt)
+            self.phase+=self.o.roll_rate_rad_s*motion_dt;self.arc_targets(dt)
         return self.targets.copy(),self.enabled.copy()
 
     def arc_targets(self,dt,mask=None):
@@ -251,6 +255,7 @@ class HelixArcTransition:
 
     def status(self):
         return dict(stage=self.stage,phase=self.phase,helix_length_m=self.helix_length,
+                    speed_scale=self.o.speed_scale,
                     straight_m=self.straight,arc_head_m=self.head,arc_length_m=self.arc_length,
                     crown_m=self.crown,fit=self.fit,geometry=self.geometry,center_error_m=self.center_error,
                     enabled_joints=(np.flatnonzero(self.enabled)+1).tolist())

@@ -43,7 +43,7 @@ python .\codes\Rolling_Arc_Real.py
 
 **不需要反复按J。常用切换操作：Ctrl+5 → Ctrl+G → 观察前部搭稳后Ctrl+L → Ctrl+G连续逐段送尾 → 完成后自动保持。**
 
-**Helix→ARC→自动归中**：已稳定搭管的Helix按 **Ctrl+7** 选择并保持，再 **Ctrl+J** 单步（每次最多1秒）或 **Ctrl+G** 连续／暂停。归中完成自动保持，再J/G继续ARC滚动；空格暂停，K查看阶段，X全部失能。两端同键位，4/5/6保留。参数直接改实机文件顶部 `HELIX_ARC_OPTIONS`。[操作与参数说明](docs/Helix_ARC实机与热键调试说明.md)。
+**Helix→ARC→自动归中**：已稳定搭管的Helix按 **Ctrl+7** 选择并保持，再 **Ctrl+J** 单步（每次最多1秒）或 **Ctrl+G** 连续／暂停。归中完成自动保持，再J/G继续ARC滚动；空格暂停，K查看阶段，X全部失能。两端同键位，4/5/6保留。整体速度直接改实机文件顶部 `HELIX_ARC_SPEED_SCALE`（默认1.0）；阶段基础参数在 `HELIX_ARC_OPTIONS`。[操作与参数说明](docs/Helix_ARC实机与热键调试说明.md)。
 
 当前送尾复用原重力矩回卷：前部继续螺旋推进，直尾缩短并逐段上管。新版已通过三种直管起态仿真，实机等待验收。[本轮结果与适用范围](validation/reports/source_entry_20261107/README.md)。
 
