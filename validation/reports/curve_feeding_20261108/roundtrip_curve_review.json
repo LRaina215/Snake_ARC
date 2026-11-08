@@ -1,0 +1,113 @@
+{
+  "label": "roundtrip_curve",
+  "acceptance": {
+    "task_complete": true,
+    "actual_length_direction": true,
+    "actual_length_error_le12mm": false,
+    "open_arc": true,
+    "whole_positive_turn_le218": true,
+    "continuous_sampled_contact": true,
+    "no_floor_or_self_contact": true,
+    "no_limit_excess": true,
+    "passive_motor_torque_zero": true,
+    "entering_preloaded_measured_angle": true,
+    "slew_limit": true
+  },
+  "all_passed": false,
+  "length_completions": [
+    {
+      "action": 0,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 79.20736341440737,
+      "true_tail_change_mm": -85.07459882706958,
+      "true_transfer_mm": 82.14098112073847,
+      "encoder_delta_mm": 65.14512778599979,
+      "true_error_mm": 17.640981120738473
+    },
+    {
+      "action": 1,
+      "requested_mm": -64.5,
+      "true_head_change_mm": -62.00731668305487,
+      "true_tail_change_mm": 66.18869894995483,
+      "true_transfer_mm": -64.09800781650485,
+      "encoder_delta_mm": -62.6692578468942,
+      "true_error_mm": 0.4019921834951532
+    }
+  ],
+  "upper_turn_deg": [
+    175.34842751028688,
+    180.65393984262
+  ],
+  "minimum_open_gap": 0.5859697942925619,
+  "whole_positive_turn_max_deg": 193.19168796027742,
+  "curvature_polyline_max_per_m": 16.912237222005608,
+  "active_count": [
+    6,
+    14
+  ],
+  "enable_events_per_joint": [
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0
+  ],
+  "disable_events_per_joint": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0
+  ],
+  "preload_error_max_deg": 0.0,
+  "saturated_joint_step_fraction": 2.6006836082627432e-05,
+  "max_axis_drift_mm": 0.15257004124626106,
+  "final_hold_length_range_mm": [
+    11.922677752554844,
+    13.244381600200805,
+    12.3540080477198
+  ],
+  "final_hold_axis_drift_mm": 0.12367848021938022,
+  "max_tracking_error_deg": 0.5253750993646698,
+  "angle_down_vs_world_gravity_max_deg": 6.816993131384022,
+  "feedback_rigid_fit_residual_max_m": 0.0011555497986380945,
+  "worst_open_shape_time_s": 26.80000000000977,
+  "review_samples": 898,
+  "actual_duration_s": 44.83999999998615,
+  "measured_link_length_range_m": [
+    0.06449999999999963,
+    0.06450000000000035
+  ],
+  "scope": "full saved trajectory and 3s final physical hold; contact sampled at 50ms, torque/limits/collisions at 1ms; no hardware",
+  "notes": [
+    "Motor-off still has the original model passive damping 1.5; this is not proof of hardware friction.",
+    "World-z shoulder crossings evaluate actual hanging length, independent of the angle-only controller.",
+    "No T crossing or compliance change in this experiment."
+  ]
+}

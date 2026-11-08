@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "parameter_profiles": 4500,
+  "max_profile_error_rad": 2.0020565384223396e-15,
+  "real_log_replay": [
+    {
+      "source": "validation\\reports\\feeding_reference_recovery_20261021\\rolling_arc_20261021_132633_104913.fresh.jsonl.gz",
+      "frames": 925,
+      "replay_blocks": 21,
+      "max_target_error_rad": 2.220446049250313e-16,
+      "scope": "same recorded feedback replay; resets at actions/gaps; not a hardware experiment"
+    },
+    {
+      "source": "validation\\reports\\feeding_reference_recovery_20261021\\rolling_arc_20261021_133912_480257.fresh.jsonl.gz",
+      "frames": 1594,
+      "replay_blocks": 81,
+      "max_target_error_rad": 2.220446049250313e-16,
+      "scope": "same recorded feedback replay; resets at actions/gaps; not a hardware experiment"
+    }
+  ],
+  "forced_stall_frames": 4,
+  "inherited_state_machine": true,
+  "legacy_generator_disabled_check": true,
+  "hardware_run": false
+}

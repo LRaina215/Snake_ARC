@@ -1,0 +1,104 @@
+{
+  "label": "boundary_legacy",
+  "acceptance": {
+    "task_complete": true,
+    "actual_length_direction": true,
+    "actual_length_error_le12mm": false,
+    "open_arc": true,
+    "whole_positive_turn_le218": true,
+    "continuous_sampled_contact": true,
+    "no_floor_or_self_contact": true,
+    "no_limit_excess": true,
+    "passive_motor_torque_zero": true,
+    "entering_preloaded_measured_angle": true,
+    "slew_limit": true
+  },
+  "all_passed": false,
+  "length_completions": [
+    {
+      "action": 1,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 109.25546114498435,
+      "true_tail_change_mm": -117.78928129102617,
+      "true_transfer_mm": 113.52237121800526,
+      "encoder_delta_mm": 67.94939550248297,
+      "true_error_mm": 49.02237121800526
+    }
+  ],
+  "upper_turn_deg": [
+    179.2673752339061,
+    198.85777677941238
+  ],
+  "minimum_open_gap": 0.41511716377827756,
+  "whole_positive_turn_max_deg": 198.85777684939774,
+  "curvature_polyline_max_per_m": 16.74929005896245,
+  "active_count": [
+    6,
+    14
+  ],
+  "enable_events_per_joint": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    2,
+    1,
+    1,
+    0,
+    0,
+    0
+  ],
+  "disable_events_per_joint": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0
+  ],
+  "preload_error_max_deg": 0.0,
+  "saturated_joint_step_fraction": 0.0076392719249862105,
+  "max_axis_drift_mm": 0.29068529634776463,
+  "final_hold_length_range_mm": [
+    0.3666165806699151,
+    0.4169377663780782,
+    0.39177717352401054
+  ],
+  "final_hold_axis_drift_mm": 0.03488488246658483,
+  "max_tracking_error_deg": 5.580183728802673,
+  "angle_down_vs_world_gravity_max_deg": 20.937712630027423,
+  "feedback_rigid_fit_residual_max_m": 0.00018025564427894846,
+  "worst_open_shape_time_s": 12.499999999998511,
+  "review_samples": 726,
+  "actual_duration_s": 36.24000000000619,
+  "measured_link_length_range_m": [
+    0.06449999999999964,
+    0.06450000000000035
+  ],
+  "scope": "full saved trajectory and 3s final physical hold; contact sampled at 50ms, torque/limits/collisions at 1ms; no hardware",
+  "notes": [
+    "Motor-off still has the original model passive damping 1.5; this is not proof of hardware friction.",
+    "World-z shoulder crossings evaluate actual hanging length, independent of the angle-only controller.",
+    "No T crossing or compliance change in this experiment."
+  ]
+}
