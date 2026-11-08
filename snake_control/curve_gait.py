@@ -1,7 +1,7 @@
 """Piecewise backbone curves (line / arc / helix) mapped to joint angles.
 
 The curve is parametrized by body arc length u from the head tip (u=0) to the
-tail. Joint j (1-based) sits at u_j = j*l. Its target integrates curvature over
+tail. Joint j (1-based) sits at u_j = sum(lengths[:j]). Its target integrates curvature over
 its neighbouring links [u_{j-1}, u_{j+1}] exactly for piecewise-constant
 curvature and torsion (Yamada's method):
 
@@ -64,11 +64,16 @@ def helix_turn_length(radius, pitch):
 
 
 class CurveGait:
-    def __init__(self, joints, link_length=.0645, direction=1):
+    def __init__(self, joints, link_length=.0645, direction=1, lengths=None):
         if joints < 3 or link_length <= 0 or direction not in (-1, 1):
             raise ValueError('invalid robot')
-        self.joints, self.l, self.direction = joints, link_length, direction
-        self.body_length = (joints + 1) * link_length
+        self.lengths=np.full(joints+1,link_length) if lengths is None else np.asarray(lengths,float).copy()
+        if self.lengths.shape!=(joints+1,) or not np.isfinite(self.lengths).all() or np.min(self.lengths)<=0:
+            raise ValueError('Expected positive head, adjacent-axis and tail lengths')
+        self.joints,self.direction=joints,direction
+        self.l=link_length if lengths is None else float(np.median(self.lengths[1:-1]))
+        self.s=np.r_[0.,np.cumsum(self.lengths)]
+        self.body_length=float(self.s[-1])
 
     def targets(self, segments, roll=0., offset=0.):
         """Joint angles (rad). `offset` shifts the body along the curve (shift control):
@@ -82,7 +87,7 @@ class CurveGait:
             psi0 += s.tau * s.length
         out = np.zeros(self.joints)
         for j in range(1, self.joints + 1):
-            lo, hi = offset + (j - 1) * self.l, offset + (j + 1) * self.l
+            lo, hi = offset+self.s[j-1],offset+self.s[j+1]
             cos_part = sin_part = 0.
             for k, s in enumerate(segments):
                 a, b = max(lo, bounds[k]), min(hi, bounds[k + 1])
@@ -98,7 +103,7 @@ class CurveGait:
 
     def window_arc(self, first, last, amplitude_rad, extra_links=0.):
         """ARC as one arc segment covering joints first..last (plus optional extra links)."""
-        start = (first - 1) * self.l - extra_links * self.l
-        stop = (last + 1) * self.l + extra_links * self.l
+        start = self.s[first-1]-extra_links*self.l
+        stop = self.s[last+1]+extra_links*self.l
         kappa = amplitude_rad / (2 * self.l)
         return [line(max(start, 0.)), arc(stop - max(start, 0.), kappa), line(max(self.body_length - stop, 0.))]

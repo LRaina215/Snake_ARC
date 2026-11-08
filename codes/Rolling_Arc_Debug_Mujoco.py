@@ -71,9 +71,21 @@ def decode_sim_release(vk, is_control):
     return {65: 'push_left_stop', 68: 'push_right_stop'}.get(vk)
 
 
+def configure_sim_geometry(sim):
+    """Use the loaded model's dimensions in this process; never rewrite the real entry."""
+    if not hasattr(sim,'model') or not hasattr(sim,'data'):
+        return
+    lengths=np.linalg.norm(np.diff(backbone(sim.model,sim.data),axis=0),axis=1)
+    real.LINK_LENGTHS_M=lengths.tolist()
+    # Keep a custom task distance; only replace the hardware's one-axis default.
+    if math.isclose(real.FEED_DISTANCE_M,real.JOINT_AXIS_SPACING_M,abs_tol=1e-10):
+        real.FEED_DISTANCE_M=float(np.median(lengths[1:-1]))
+
+
 class DebugArcController(real.RollingArcController):
     """三种仅角度模式共用实机控制；保留历史接触控制供已有实验复现。"""
     def __init__(self, bus, session):
+        configure_sim_geometry(session.sim)
         super().__init__(bus)
         self.session = session
         self.first, self.last = session.sim.p.first_joint, session.sim.p.last_joint
@@ -460,9 +472,7 @@ class DebugSession:
         self.scene_key = scene
         real.validate_setup()
         self.sim = make_manual_simulation(scene, start_x)
-        lengths = np.linalg.norm(np.diff(backbone(self.sim.model, self.sim.data), axis=0), axis=1)
-        if not np.allclose(lengths, real.LINK_LENGTHS_M, atol=1e-8):
-            raise ValueError('当前模型骨架与实机代码LINK_LENGTHS_M不同，请先核对机械尺寸')
+        configure_sim_geometry(self.sim)
         steps = real.CONTROL_PERIOD_S / self.sim.model.opt.timestep
         if abs(steps-round(steps)) > 1e-8:
             raise ValueError('控制周期须是MuJoCo时间步长的整数倍')

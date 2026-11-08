@@ -15,8 +15,8 @@ class ArcHelixShift:
     def __init__(self, gait, window, amplitude, radius, pitch, handed):
         self.gait = gait
         first, last = window
-        self.head_length = (first-1)*gait.l
-        self.tail_length = gait.body_length-(last+1)*gait.l
+        self.head_length = gait.s[first-1]
+        self.tail_length = gait.body_length-gait.s[last+1]
         self.arc_length = gait.body_length-self.head_length-self.tail_length
         self.arc_curvature = amplitude/(2.*gait.l)
         self.helix = helix(0., radius, pitch, handed)
@@ -60,9 +60,9 @@ class ArcHelixShift:
             phase = anchor_phase-(front_helix.tau*front_helix.length+self.helix.tau*rear_overlap)
         q = self.gait.targets(segments, phase, offset=head-origin)
         head_phase = phase+front_helix.tau*float(np.clip(head-front_join, 0., front_helix.length))
-        centers = head+np.arange(1, self.gait.joints+1)*self.gait.l
-        overlap = np.minimum(centers+self.gait.l, rear_join)-np.maximum(centers-self.gait.l, front_join)
-        stiffness = np.clip(overlap/self.gait.l-1., 0., 1.)
+        lo,hi=head+self.gait.s[:-2],head+self.gait.s[2:]
+        overlap=np.minimum(hi,rear_join)-np.maximum(lo,front_join)
+        stiffness=np.clip(overlap/((hi-lo)/2)-1.,0.,1.)
         return q, head_phase, stiffness
 
 
@@ -112,23 +112,23 @@ class MeasuredGravityShift:
             raise ValueError('Expected one valid hanging pose and a nonempty support and tail')
         if not math.isfinite(upstream_m) or upstream_m < 0:
             raise ValueError('Upstream extension must be finite and non-negative')
-        self.shift_limit_m = (n-support_count)*self.link+upstream_m
-        self.support_end_m = (support_count+1)*self.link
-        self.joint_coordinates = (np.arange(n)+1)*self.link
+        self.support_end_m = gait.gait.s[support_count+1]
+        self.shift_limit_m = gait.L-self.support_end_m+upstream_m
+        self.joint_coordinates = gait.gait.s[1:-1].copy()
+        self.lo,self.hi=gait.gait.s[:-2].copy(),gait.gait.s[2:].copy()
         self.phase_rad = phase_rad
         self.direction = gait.gait.direction
         segment = helix(1., radius_m, gait.o.pitch, gait.o.handed)
         self.torsion = segment.tau
-        self.angle_scale = segment.kappa*2*self.link*np.sinc(segment.tau*self.link/math.pi)
+        self.angle_scale = segment.kappa*(self.hi-self.lo)*np.sinc(segment.tau*(self.hi-self.lo)/(2*math.pi))
         residual = angles-self.helical_targets(0.)
         self.corrections = []
         for axis in (0, 1):
-            coords = self.joint_coordinates[axis::2]
-            boundaries = np.r_[coords-self.link, coords[-1]+self.link]
+            boundaries=np.r_[self.lo[axis::2],self.hi[axis::2][-1]]
             self.corrections.append((boundaries, np.r_[0., np.cumsum(residual[axis::2])]))
 
     def helical_targets(self, shift_m, roll_rad=0.):
-        phase = self.phase_rad+self.torsion*(self.joint_coordinates-shift_m)+roll_rad
+        phase = self.phase_rad+self.torsion*((self.lo+self.hi)/2-shift_m)+roll_rad
         angles = np.cos(phase)
         angles[1::2] = self.direction*np.sin(phase[1::2])
         return self.angle_scale*angles
@@ -138,9 +138,8 @@ class MeasuredGravityShift:
             raise ValueError('Shift lies outside the available measured curve')
         q = self.helical_targets(shift_m)
         for axis, (boundaries, integral) in enumerate(self.corrections):
-            centers = self.joint_coordinates[axis::2]-shift_m
-            q[axis::2] += np.interp(centers+self.link, boundaries, integral)
-            q[axis::2] -= np.interp(centers-self.link, boundaries, integral)
+            q[axis::2] += np.interp(self.hi[axis::2]-shift_m,boundaries,integral)
+            q[axis::2] -= np.interp(self.lo[axis::2]-shift_m,boundaries,integral)
         if front_roll_rad:
             # Tie the transition to the curve coordinate. The hanging tail
             # follows the measured curve until it reaches the supported part.

@@ -57,11 +57,11 @@ def smooth(x):
 
 
 class GravityMomentGait:
-    def __init__(self, joints=18, options=GravityMomentOptions(), link_length=.0645):
+    def __init__(self, joints=18, options=GravityMomentOptions(), link_length=.0645, lengths=None):
         self.o = options
-        self.gait = CurveGait(joints, link_length)
-        self.l = link_length
-        self.L = (joints + 1) * link_length
+        self.gait = CurveGait(joints,link_length,lengths=lengths)
+        self.l = self.gait.l
+        self.L = self.gait.body_length
 
     def turn_length(self, r):
         return math.hypot(2 * math.pi * r, self.o.pitch)
@@ -99,8 +99,7 @@ class GravityMomentGait:
 
     def helix_joints(self, lh):
         """Joints whose two neighbouring links lie entirely on the helix part."""
-        j = np.arange(1, self.gait.joints + 1)
-        return (j + 1) * self.l <= lh + 1e-9
+        return self.gait.s[2:] <= lh+1e-9
 
 
 class ContactDetector:

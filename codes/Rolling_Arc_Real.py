@@ -66,7 +66,11 @@ SECTION_MIN_GAP_FRACTION = .4   # 端距/主动骨架长度的最低开口比例
 SECTION_MIN_ACTUAL_TURN_DEG = 150.0
 SECTION_MAX_ACTUAL_TURN_DEG = 218.0
 SECTION_MAX_PLANE_RMS_M = .015
-LINK_LENGTHS_M = [.0645] * (NUM_JOINTS + 1)  # 旧仿真尺寸；新连接件转轴中心距／头尾段仍待核对，不能用102mm外形长度代替
+# 手量近似：按头→尾记录端点/相邻转轴距离，不是模块外形长度。
+JOINT_AXIS_SPACING_M = .072
+HEAD_AXIS_TO_TIP_M = .025
+TAIL_AXIS_TO_TIP_M = .091
+LINK_LENGTHS_M = [HEAD_AXIS_TO_TIP_M] + [JOINT_AXIS_SPACING_M]*(NUM_JOINTS-1) + [TAIL_AXIS_TO_TIP_M]
 COMPLIANCE_FEEDBACK_PERIOD_S = .20  # 全关节读角；不把重复计算当20 Hz新实测
 MAX_FEEDBACK_AGE_S = .8
 
@@ -84,7 +88,7 @@ POSTURE_EXPANSION_TURN_ERROR_DEG = -5.0
 POSTURE_CONTRACTION_TURN_ERROR_DEG = 5.0
 
 # 主动送链：只用角度/时间，暂停滚动；目标由拼接曲线积分生成，操作与交接不变。
-FEED_DISTANCE_M = .0645        # Ctrl+J/H一次任务的材料量；四连杆试验改为.258
+FEED_DISTANCE_M = JOINT_AXIS_SPACING_M  # Ctrl+J/H一次任务的材料量，默认一个身体轴距
 FEED_RATE_JOINTS_S = .10       # 左右调长速度上限：关节间距/秒；模式4直接用，模式5/6自动调长再乘HELIX_TRANSITION_SPEED_SCALE
 FEED_AMPLITUDE_DEG = 60.0      # 送链起态自己的幅值，不覆盖你的基础/顺应参数
 FEED_PREPARATION_S = 6.0       # 首次形成；之后另等接管展直稳定才标定本步基线
@@ -98,6 +102,7 @@ FEED_DIAGNOSTIC_PERIOD_S = 2.0 # 自动显示两侧判断数值；Ctrl+K随时�
 
 # Ctrl+U：ARC形成并静置后，两端临时使能到0，再失能。关闭此项可跳过。
 END_ZERO_ON_U = True
+END_ZERO_ON_HELIX_ARC = True    # Ctrl+7半圆形成后、自动归中前，两端短时归零再失能
 END_ZERO_RATE_DEG_S = 60.
 END_ZERO_HOLD_S = .25
 END_ZERO_MAX_S = 2.
@@ -3093,7 +3098,7 @@ class ContinuousFeeding:
         # Equal relative settling speed for one-link and larger actions.
         # This is a motor-proxy gate, not a claim of true length stability.
         self.goal_speed_tolerance_m_s = options.speed_tolerance_m_s*max(
-            1., abs(options.requested_transfer_m)/float(np.mean(self.lengths)))
+            1., abs(options.requested_transfer_m)/float(np.median(self.lengths[1:-1])))
         self.enabled = self.helper.mask(self.origin)
         self.window = self.origin
         self.targets = self.helper.template(self.origin, 0., options.amplitude_deg)
@@ -3129,7 +3134,7 @@ class ContinuousFeeding:
         self.forced_step = None
         self.options = replace(self.options, requested_transfer_m=distance_m)
         self.goal_speed_tolerance_m_s = self.options.speed_tolerance_m_s*max(
-            1., abs(distance_m)/float(np.mean(self.lengths)))
+            1., abs(distance_m)/float(np.median(self.lengths[1:-1])))
         self.stage, self.stage_since = 'acquire', control_time_s
         self.completed, self.fault = False, None
         self.baseline = self.goal_m = None
@@ -3251,7 +3256,7 @@ class ContinuousFeeding:
                     points = forward(np.radians(angles), self.lengths)
                     heights = -points @ np.array(self.observation['down_head'])
                     first, last = focus
-                    self.release_below_peak_m = float(heights.max()-heights[first:last+2].min()+.5*np.mean(self.lengths))
+                    self.release_below_peak_m = float(heights.max()-heights[first:last+2].min()+.5*np.median(self.lengths[1:-1]))
                     self.stage, self.stage_since = 'feed_out', control_time
                     self.acquisition_reason = None
                     self.events.append(dict(kind='start_feeding', time_s=control_time,
@@ -3424,7 +3429,7 @@ class ContinuousFeeding:
                     heights = -points @ np.array(self.observation['down_head'])
                     first, last = self.origin
                     arc_depth = float(heights.max()-heights[first:last+2].min())
-                    self.release_below_peak_m = arc_depth+.5*float(np.mean(self.lengths))
+                    self.release_below_peak_m = arc_depth+.5*float(np.median(self.lengths[1:-1]))
                     self.stage, self.stage_since = 'acquire', control_time_s
                     desired = self.acquire_start(angles, feedback_time_s, control_time_s, fresh)
         elif self.stage == 'acquire':
@@ -3437,7 +3442,7 @@ class ContinuousFeeding:
             if self.observation['valid']:
                 error = self.goal_m-self.observation['transfer_coordinate_m']
                 speed = opt.length_gain_s*error-opt.speed_damping*self.velocity_m_s
-                rate = np.clip(speed/np.mean(self.lengths),
+                rate = np.clip(speed/np.median(self.lengths[1:-1]),
                                -opt.maximum_position_rate_joints_s, opt.maximum_position_rate_joints_s)
                 proposed_position = float(np.clip(self.position+rate*dt, *self.position_bounds))
                 current, _, _, _ = self.profile(self.position, self.bias)
@@ -3602,11 +3607,16 @@ def helix(length, radius, pitch, handed=1, psi=0.):
 
 
 class CurveGait:
-    def __init__(self, joints, link_length=.0645, direction=1):
+    def __init__(self, joints, link_length=.0645, direction=1, lengths=None):
         if joints < 3 or link_length <= 0 or direction not in (-1, 1):
             raise ValueError('invalid robot')
-        self.joints, self.l, self.direction = joints, link_length, direction
-        self.body_length = (joints + 1) * link_length
+        self.lengths=np.full(joints+1,link_length) if lengths is None else np.asarray(lengths,float).copy()
+        if self.lengths.shape!=(joints+1,) or not np.isfinite(self.lengths).all() or np.min(self.lengths)<=0:
+            raise ValueError('Expected positive head, adjacent-axis and tail lengths')
+        self.joints,self.direction=joints,direction
+        self.l=link_length if lengths is None else float(np.median(self.lengths[1:-1]))
+        self.s=np.r_[0.,np.cumsum(self.lengths)]
+        self.body_length=float(self.s[-1])
 
     def targets(self, segments, roll=0., offset=0.):
         """Joint angles (rad). `offset` shifts the body along the curve (shift control):
@@ -3620,7 +3630,7 @@ class CurveGait:
             psi0 += s.tau * s.length
         out = np.zeros(self.joints)
         for j in range(1, self.joints + 1):
-            lo, hi = offset + (j - 1) * self.l, offset + (j + 1) * self.l
+            lo, hi = offset+self.s[j-1],offset+self.s[j+1]
             cos_part = sin_part = 0.
             for k, s in enumerate(segments):
                 a, b = max(lo, bounds[k]), min(hi, bounds[k + 1])
@@ -3636,8 +3646,8 @@ class CurveGait:
 
     def window_arc(self, first, last, amplitude_rad, extra_links=0.):
         """ARC as one arc segment covering joints first..last (plus optional extra links)."""
-        start = (first - 1) * self.l - extra_links * self.l
-        stop = (last + 1) * self.l + extra_links * self.l
+        start = self.s[first-1]-extra_links*self.l
+        stop = self.s[last+1]+extra_links*self.l
         kappa = amplitude_rad / (2 * self.l)
         return [line(max(start, 0.)), arc(stop - max(start, 0.), kappa), line(max(self.body_length - stop, 0.))]
 
@@ -3650,8 +3660,8 @@ class ArcHelixShift:
     def __init__(self, gait, window, amplitude, radius, pitch, handed):
         self.gait = gait
         first, last = window
-        self.head_length = (first-1)*gait.l
-        self.tail_length = gait.body_length-(last+1)*gait.l
+        self.head_length = gait.s[first-1]
+        self.tail_length = gait.body_length-gait.s[last+1]
         self.arc_length = gait.body_length-self.head_length-self.tail_length
         self.arc_curvature = amplitude/(2.*gait.l)
         self.helix = helix(0., radius, pitch, handed)
@@ -3695,9 +3705,9 @@ class ArcHelixShift:
             phase = anchor_phase-(front_helix.tau*front_helix.length+self.helix.tau*rear_overlap)
         q = self.gait.targets(segments, phase, offset=head-origin)
         head_phase = phase+front_helix.tau*float(np.clip(head-front_join, 0., front_helix.length))
-        centers = head+np.arange(1, self.gait.joints+1)*self.gait.l
-        overlap = np.minimum(centers+self.gait.l, rear_join)-np.maximum(centers-self.gait.l, front_join)
-        stiffness = np.clip(overlap/self.gait.l-1., 0., 1.)
+        lo,hi=head+self.gait.s[:-2],head+self.gait.s[2:]
+        overlap=np.minimum(hi,rear_join)-np.maximum(lo,front_join)
+        stiffness=np.clip(overlap/((hi-lo)/2)-1.,0.,1.)
         return q, head_phase, stiffness
 
 
@@ -3718,23 +3728,23 @@ class MeasuredGravityShift:
             raise ValueError('Expected one valid hanging pose and a nonempty support and tail')
         if not math.isfinite(upstream_m) or upstream_m < 0:
             raise ValueError('Upstream extension must be finite and non-negative')
-        self.shift_limit_m = (n-support_count)*self.link+upstream_m
-        self.support_end_m = (support_count+1)*self.link
-        self.joint_coordinates = (np.arange(n)+1)*self.link
+        self.support_end_m = gait.gait.s[support_count+1]
+        self.shift_limit_m = gait.L-self.support_end_m+upstream_m
+        self.joint_coordinates = gait.gait.s[1:-1].copy()
+        self.lo,self.hi=gait.gait.s[:-2].copy(),gait.gait.s[2:].copy()
         self.phase_rad = phase_rad
         self.direction = gait.gait.direction
         segment = helix(1., radius_m, gait.o.pitch, gait.o.handed)
         self.torsion = segment.tau
-        self.angle_scale = segment.kappa*2*self.link*np.sinc(segment.tau*self.link/math.pi)
+        self.angle_scale = segment.kappa*(self.hi-self.lo)*np.sinc(segment.tau*(self.hi-self.lo)/(2*math.pi))
         residual = angles-self.helical_targets(0.)
         self.corrections = []
         for axis in (0, 1):
-            coords = self.joint_coordinates[axis::2]
-            boundaries = np.r_[coords-self.link, coords[-1]+self.link]
+            boundaries=np.r_[self.lo[axis::2],self.hi[axis::2][-1]]
             self.corrections.append((boundaries, np.r_[0., np.cumsum(residual[axis::2])]))
 
     def helical_targets(self, shift_m, roll_rad=0.):
-        phase = self.phase_rad+self.torsion*(self.joint_coordinates-shift_m)+roll_rad
+        phase = self.phase_rad+self.torsion*((self.lo+self.hi)/2-shift_m)+roll_rad
         angles = np.cos(phase)
         angles[1::2] = self.direction*np.sin(phase[1::2])
         return self.angle_scale*angles
@@ -3744,9 +3754,8 @@ class MeasuredGravityShift:
             raise ValueError('Shift lies outside the available measured curve')
         q = self.helical_targets(shift_m)
         for axis, (boundaries, integral) in enumerate(self.corrections):
-            centers = self.joint_coordinates[axis::2]-shift_m
-            q[axis::2] += np.interp(centers+self.link, boundaries, integral)
-            q[axis::2] -= np.interp(centers-self.link, boundaries, integral)
+            q[axis::2] += np.interp(self.hi[axis::2]-shift_m,boundaries,integral)
+            q[axis::2] -= np.interp(self.lo[axis::2]-shift_m,boundaries,integral)
         if front_roll_rad:
             # Tie the transition to the curve coordinate. The hanging tail
             # follows the measured curve until it reaches the supported part.
@@ -4045,7 +4054,7 @@ class ArcHelixTransition:
     def __init__(self, lengths, window, measured_deg, direction=1, options=ArcHelixOptions()):
         self.lengths = np.asarray(lengths, float)
         self.n = len(self.lengths)-1
-        self.l = float(np.mean(self.lengths))
+        self.l = float(np.median(self.lengths[1:-1]))
         self.options = options
         self.direction = direction
         mask = self._mask(window)
@@ -4195,7 +4204,7 @@ class ArcHelixTransition:
         self.confirmed = 0
         self.ready = 0
         opt = self.options
-        self.curve = ArcHelixShift(CurveGait(self.n, self.l), self.window, self.amplitude,
+        self.curve = ArcHelixShift(CurveGait(self.n,self.l,lengths=self.lengths),self.window,self.amplitude,
                                    opt.radius_m, opt.pitch_m, self.direction if self.reversed else -self.direction)
         self.curve.front_extension_rate = max(1.75, 1.+self.curve.head_length/max(.40,self.curve.tail_length))
         nominal, _, _ = self.curve.shifted_window(0., self.curve.arc_length, self.phase)
@@ -4290,7 +4299,7 @@ class ArcHelixTransition:
         if self.leading_extension < curve.head_length:
             self.leading_extension = min(curve.head_length, self.leading_extension+distance)
             goal, _ = curve.targets(self.leading_extension, 0., curve.arc_length, phase)
-            coverage = np.clip(self.leading_extension/self.l+np.arange(1,self.n+1)-first+.999, 0., 1.)
+            coverage = np.clip((self.leading_extension+curve.gait.s[1:-1]-curve.gait.s[first])/self.l+.999,0.,1.)
         else:
             self.shift = min(1.7*self.l, self.shift+distance)
             arc_length = curve.arc_length*(1.-ease(self.shift/.16))
@@ -4357,9 +4366,9 @@ class ArcHelixTransition:
         # is converted. Shorten the ARC as the second arm enters the curve.
         arc_length = curve.arc_length*(1.-ease(self.receive_shift/min(.12,curve.tail_length)))
         goal, _ = curve.targets(self.shift, self.receive_shift, arc_length, self.phase+self.roll)
-        j = np.arange(1,self.n+1)
-        coverage = np.clip(np.where(j < first, self.shift/self.l+j-first,
-                                    np.where(j > last, self.receive_shift/self.l+last-j, 1.))+.999, 0., 1.)
+        coords=curve.gait.s[1:-1]
+        coverage=np.clip(np.where(np.arange(1,self.n+1)<first,(self.shift+coords-curve.gait.s[first])/self.l,
+                                  np.where(np.arange(1,self.n+1)>last,(self.receive_shift+curve.gait.s[last]-coords)/self.l,1.))+.999,0.,1.)
         goal = self._apply_curve(goal, coverage, opt.staged_target_rate_deg_s, dt)
         if not fresh:
             return
@@ -4380,7 +4389,7 @@ class ArcHelixTransition:
     def _advance_shift(self, dt, fresh):
         opt, curve = self.options, self.curve
         pace = self._tracking_pace()
-        limit = (self.accepted-self.window[1]+1.5)*self.l if self.accepted < self.n else math.inf
+        limit = curve.gait.s[self.accepted+1]-curve.gait.s[self.window[1]]+.5*self.l if self.accepted < self.n else math.inf
         self.shift_time += dt
         if opt.prepare_front:
             self.shift += min(max(0., limit-self.shift), opt.shift_m_s*pace*dt)
@@ -4470,11 +4479,11 @@ def smooth(x):
 
 
 class GravityMomentGait:
-    def __init__(self, joints=18, options=GravityMomentOptions(), link_length=.0645):
+    def __init__(self, joints=18, options=GravityMomentOptions(), link_length=.0645, lengths=None):
         self.o = options
-        self.gait = CurveGait(joints, link_length)
-        self.l = link_length
-        self.L = (joints + 1) * link_length
+        self.gait = CurveGait(joints,link_length,lengths=lengths)
+        self.l = self.gait.l
+        self.L = self.gait.body_length
 
     def turn_length(self, r):
         return math.hypot(2 * math.pi * r, self.o.pitch)
@@ -4512,8 +4521,7 @@ class GravityMomentGait:
 
     def helix_joints(self, lh):
         """Joints whose two neighbouring links lie entirely on the helix part."""
-        j = np.arange(1, self.gait.joints + 1)
-        return (j + 1) * self.l <= lh + 1e-9
+        return self.gait.s[2:] <= lh+1e-9
 
 
 class GravityFrontTransition(ArcHelixTransition):
@@ -4530,17 +4538,18 @@ class GravityFrontTransition(ArcHelixTransition):
         head, tail, _, _ = self.estimate_end_geometry(self.measured, self.lengths, section, self.window)
         self.events.append(dict(stage='front_check', head_length_m=head, tail_length_m=tail))
         turn_length = math.hypot(2.*math.pi*self.options.radius_m, self.options.pitch_m)
-        front_count = math.ceil(self.minimum_front_turns*turn_length/self.l)-1
+        coordinates=np.r_[0.,np.cumsum(self.lengths)]
+        front_count=int(np.searchsorted(coordinates,self.minimum_front_turns*turn_length)-1)
         self.support_joint_count = front_count
         width = self.window[1]-self.window[0]+1
         # 留出两种交替转轴所需的头端长度，已有较短头端不再被无谓拉长。
         minimum_start = 3
-        first_turn_count = math.ceil(turn_length/self.l)-1
+        first_turn_count=int(np.searchsorted(coordinates,turn_length)-1)
         maximum_start = max(minimum_start, first_turn_count-width+1)
         start = int(np.clip(self.window[0], minimum_start, min(self.n-width, maximum_start)))
         self.desired_start = start
         self.events.append(dict(stage='front_plan', desired_window=[start, start+width-1],
-                                front_material_m=(front_count+1)*self.l))
+                                front_material_m=float(coordinates[front_count+1])))
         if self.window[0] < start:
             self._prepare_transfer(1)
         elif self.window[0] > start:
@@ -4611,7 +4620,8 @@ class GravityFrontTransition(ArcHelixTransition):
         leading_helix = helix(0., self.options.radius_m, self.options.pitch_m, -self.direction)
         goal, self.head_phase, _ = self.curve.shifted_window(0., self.curve.arc_length, self.phase+self.roll,
                                                           self.leading_extension, leading_helix)
-        coverage = np.clip(self.leading_extension/self.l+np.arange(1, self.n+1)-first+1., 0., 1.)
+        coordinates=np.r_[0.,np.cumsum(self.lengths)]
+        coverage=np.clip((self.leading_extension+coordinates[1:-1]-coordinates[first-1])/self.l,0.,1.)
         coverage[last:] = 0.
         self._apply_curve(goal, coverage, 23.*self.speed_scale, dt)
 
@@ -4640,14 +4650,12 @@ class GravityCrossing:
     def __init__(self, lengths, enabled, measured_deg, gait_options=GravityMomentOptions(r_h1=.094, r_h2=.098),
                  options=GravityCrossingOptions(), from_helix=False, helix_only=False):
         lengths = np.asarray(lengths, float)
-        self.n, self.l = len(lengths)-1, float(np.mean(lengths))
-        if not np.allclose(lengths, self.l):
-            raise ValueError('T 管模式的曲线积分需要等间距关节')
+        self.n,self.l=len(lengths)-1,float(np.median(lengths[1:-1]))
         if options.retain_joints is not None and not 4 <= options.retain_joints < self.n:
             raise ValueError('请检查 T 管模式的前部保留关节数')
         if not math.isfinite(options.transition_speed_scale) or options.transition_speed_scale<=0.:
             raise ValueError('切换速度倍率必须为有限正数')
-        self.gait = GravityMomentGait(self.n, gait_options, self.l)
+        self.gait = GravityMomentGait(self.n,gait_options,self.l,lengths=lengths)
         _,self.planned_unwind_helix_m=self.gait.segments(options.release_radius_m,
             ls=options.release_line_m,th1=options.release_arc_rad)
         self.options = options
@@ -4807,7 +4815,7 @@ class GravityCrossing:
         phase_count = max(2, self.front.window[0]-1)
         self.phase = self.front.head_phase
         self.curve = MeasuredGravityShift(self.gait, self.gait.o.r_h1, self.phase, self.measured, phase_count,
-                                         upstream_m=(phase_count+1)*self.l)
+                                         upstream_m=self.gait.gait.s[phase_count+1])
         self.front_count = count
         self._enabled = np.arange(self.n) < count
         self.offset = 0.
@@ -4831,13 +4839,15 @@ class GravityCrossing:
                 self._enter('front_seat')
 
     def _advance_front_seat(self, dt, fresh):
-        """只滚动前部一小段使其就位；后部仍失能，然后停下确认支撑。"""
+        """自动路径等待就位；操作者在此按L可直接交接，不再等待名义误差。"""
         travel = min(self.options.front_seat_rad,
             self.options.alignment_rate_rad_s*self.options.transition_speed_scale*self.elapsed)
         self.phase = self.seating_phase+travel
         self._set_targets(self._helix(self.phase, self.gait.o.r_h1),dt,rate=18.*self.options.transition_speed_scale)
         if fresh and travel >= self.options.front_seat_rad:
-            follows = np.max(abs(self._targets[self._enabled]-self.measured[self._enabled])) <= math.radians(5.)
+            self.front_tracking_error_deg = float(np.degrees(np.max(
+                abs(self._targets[self._enabled]-self.measured[self._enabled]))))
+            follows = self.front_tracking_error_deg <= 5.
             self.tracking_since = (self.elapsed if self.tracking_since is None else self.tracking_since) if follows else None
             if self.tracking_since is not None and self.elapsed-self.tracking_since >= .4:
                 if self.front_confirm_requested:
@@ -4894,7 +4904,7 @@ class GravityCrossing:
     def confirm(self, feedback_time, measured_deg):
         """Ctrl+L 确认实物支撑并保持，下一次 J/G 才运动；重复确认不重置送尾。"""
         if self.stage in ('return_seat','return_wind','return_finish','recover') or (
-                self.front_confirm_requested and self.stage in ('front_finish','front_seat')):
+                self.front_confirm_requested and self.stage == 'front_finish'):
             return False
         front_ready = self.stage in ('front_finish', 'front_seat', 'front_hold')
         release_ready = self.stage in ('right_u_hold','unwind')
@@ -4907,11 +4917,11 @@ class GravityCrossing:
         self.started = True
         if front_ready:
             self.front_confirm_requested = True
-            if self.stage == 'front_hold':
+            if self.stage in ('front_seat','front_hold'):
                 self._start_tail_intake()
-            # Earlier physical confirmation is remembered, not mistaken for a
-            # completed geometric transition. J/G finishes front preparation
-            # before entering the same source return automatically.
+            # front_finish still has an unfinished curve join. In front_seat
+            # that join is complete: trust L as the physical support decision,
+            # even when nominal tracking cannot satisfy the automatic gate.
         elif self.stage in ('align', 'grip_adjust'):
             # L确认当前已执行到的半径，不在开始小U后追赶剩余调节。
             self.grip_radius_target_m = self.grip_radius_m
@@ -5032,7 +5042,7 @@ class GravityCrossing:
         """原实机版2：逐个接管直尾，再缩短直线段，补偿前部螺旋相位。"""
         self.return_retain = self.release_retain_joints if retain_joints is None else retain_joints
         self.initial_source_return = initial
-        self.return_straight = (self.n-self.return_retain+1)*self.l
+        self.return_straight = self.gait.L-self.gait.gait.s[self.return_retain]
         self.return_lead = self.gait.lead_angle(self.gait.o.r_h2)
         self.return_seating = self.gait.targets(self.phase, self.gait.o.r_h2,
             ls=self.return_straight, th2=self.return_lead)[0]
@@ -5094,6 +5104,7 @@ class GravityCrossing:
                         [self.front.desired_start, self.front.desired_start+self.front.window[1]-self.front.window[0]],
                     front_count=getattr(self, 'front_count', None),
                     helix_only=self.helix_only, front_tracking_error_deg=self.front_tracking_error_deg,
+                    front_confirm_requested=self.front_confirm_requested,
                     accepted_joint=self.accepted, shift_m=self.offset, step_remaining_s=self.step_left,
                     initial_source_return=self.initial_source_return,
                     return_retain_joints=getattr(self, 'return_retain', None),
@@ -5112,15 +5123,19 @@ class GravityCrossing:
                     front=front, events=self.events.copy())
 
 
-def fit_helix(q, link):
+def fit_helix(q, link, lengths=None):
     """Fit the two alternating curvature-integral families, including signed torsion."""
     from scipy.optimize import least_squares
-    s=(np.arange(len(q))+1)*link
+    lengths=np.full(len(q)+1,link) if lengths is None else np.asarray(lengths,float)
+    s=np.r_[0.,np.cumsum(lengths)]
+    lo,hi=s[:-2],s[2:]
+    mid=(lo+hi)/2
     odd=np.arange(len(q))%2==0
     def basis(tau):
-        a=tau*s
-        return np.column_stack((np.where(odd,np.cos(a),np.sin(a)),
-                                np.where(odd,-np.sin(a),np.cos(a))))
+        a=tau*mid
+        weight=(hi-lo)*np.sinc(tau*(hi-lo)/(2*math.pi))
+        return weight[:,None]*np.column_stack((np.where(odd,np.cos(a),np.sin(a)),
+                                              np.where(odd,-np.sin(a),np.cos(a))))
     seeds=[]
     for tau in np.linspace(-10.,10.,101):
         c=np.linalg.lstsq(basis(tau),q,rcond=None)[0]
@@ -5130,7 +5145,7 @@ def fit_helix(q, link):
     x=fit.x;amplitude=float(np.hypot(*x[:2]));tau=float(x[2])
     if not math.isfinite(amplitude) or amplitude<1e-8:
         raise ValueError('当前角反馈没有可计算的螺旋曲率；Ctrl+7用于已搭管的Helix')
-    kappa=amplitude/(2*link*np.sinc(tau*link/math.pi))
+    kappa=amplitude
     radius=kappa/(kappa*kappa+tau*tau)
     return dict(kappa=kappa,tau=tau,radius=radius,phase=math.atan2(x[1],x[0]),
                 pitch=2*math.pi*abs(tau)/(kappa*kappa+tau*tau),
@@ -5175,11 +5190,11 @@ class HelixArcTransition:
     """
     def __init__(self,angles_rad,lengths,options=HelixArcOptions()):
         self.lengths=np.asarray(lengths,float);self.n=len(angles_rad)
-        self.l=float(np.mean(lengths));self.L=float(sum(lengths));self.o=options
+        self.l=float(np.median(self.lengths[1:-1]));self.L=float(sum(lengths));self.o=options
         if not math.isfinite(options.speed_scale) or options.speed_scale<=0.:
             raise ValueError('Ctrl+7速度倍率必须为有限正数')
-        self.curve=CurveGait(self.n,self.l)
-        self.fit=fit_helix(np.asarray(angles_rad),self.l)
+        self.curve=CurveGait(self.n,self.l,lengths=self.lengths)
+        self.fit=fit_helix(np.asarray(angles_rad),self.l,self.lengths)
         self.phase=self.fit['phase'];self.kappa=self.fit['kappa'];self.tau=self.fit['tau'];self.radius=self.fit['radius']
         self.lead=math.atan(self.fit['pitch']/(2*math.pi*self.radius))+options.exit_extra_rad
         self.targets=np.asarray(angles_rad,float).copy();self.enabled=np.ones(self.n,bool)
@@ -5205,8 +5220,8 @@ class HelixArcTransition:
             if quality>.90:self.down=direction/quality
         if self.down is None:return dict(valid=False,reason='gravity reference not yet free',distal=distal)
         if self.stage in ('arc_release','arc_settle','auto_center','center_settle','arc_roll'):
-            lo=max(0,int(math.ceil(self.head/self.l)))
-            hi=min(self.n+1,int(math.floor((self.head+self.arc_length)/self.l)))
+            lo=max(0,int(np.searchsorted(self.curve.s,self.head)))
+            hi=min(self.n+1,int(np.searchsorted(self.curve.s,self.head+self.arc_length,side='right')-1))
             center,axis=circle_frame(points[lo:hi+1])
             up=-self.down+axis*(self.down@axis);up/=np.linalg.norm(up)
             heights=(points-center)@up
@@ -5215,20 +5230,20 @@ class HelixArcTransition:
                 for a,b in zip(indices[:-1],indices[1:]):
                     if heights[a]>=0 and heights[b]<=0:
                         f=heights[a]/max(heights[a]-heights[b],1e-12)
-                        return (a+f*(b-a))*self.l
+                        return self.curve.s[a]+f*(self.curve.s[b]-self.curve.s[a])
                 return None
             left=crossing(list(range(top,-1,-1)));right=crossing(list(range(top,self.n+2)))
             valid=left is not None and right is not None
             return dict(valid=valid,head_m=left,tail_m=None if right is None else self.L-right,
                         difference_m=None if not valid else self.L-right-left,
                         down=self.down.tolist(),distal=distal,reason=None if valid else 'both hanging crossings not found')
-        count=max(5,min(self.n+1,int(self.helix_length/self.l)))
+        count=max(5,min(self.n+1,int(np.searchsorted(self.curve.s,self.helix_length,side='right')-1)))
         try:
             center,axis=circle_frame(points[:count+1])
             up=-self.down+axis*(self.down@axis);up/=np.linalg.norm(up)
             side=np.cross(axis,up)
             angle=np.unwrap(np.arctan2((points[:count+1]-center)@side,(points[:count+1]-center)@up))
-            coords=np.arange(count+1)*self.l
+            coords=self.curve.s[:count+1]
             crossings=[]
             for level in np.arange(-4,5)*2*math.pi:
                 for i in range(len(angle)-1):
@@ -5244,11 +5259,11 @@ class HelixArcTransition:
     def set_curve(self,segments,phase,dt,mask=None):
         desired=self.curve.targets(segments,phase)
         if mask is None:
-            centers=(np.arange(self.n)+1)*self.l
+            lo,hi=self.curve.s[:-2],self.curve.s[2:]
             bounds=np.r_[0.,np.cumsum([s.length for s in segments])]
             mask=np.zeros(self.n,bool)
             for i,s in enumerate(segments):
-                if s.kappa>1e-8:mask|=(centers+self.l>bounds[i]+1e-6)&(centers-self.l<bounds[i+1]-1e-6)
+                if s.kappa>1e-8:mask|=(hi>bounds[i]+1e-6)&(lo<bounds[i+1]-1e-6)
         entering=mask&~self.enabled
         self.targets[entering]=self.measured[entering]
         self.enabled=mask
@@ -5290,8 +5305,10 @@ class HelixArcTransition:
                         segments,phase=self.flatten_segments(.5,sign)
                         predicted=self.measured.copy();predicted[self.flatten_mask]=self.curve.targets(segments,phase)[self.flatten_mask]
                         pts=forward(predicted,self.lengths)
-                        head=pts[:max(2,int((self.crown-self.arc_length/2)/self.l)+1)]
-                        tail=pts[int(self.helix_length/self.l)+2:]
+                        head_end=np.searchsorted(self.curve.s,self.crown-self.arc_length/2,side='right')
+                        tail_start=np.searchsorted(self.curve.s,self.helix_length,side='right')+1
+                        head=pts[:max(2,head_end)]
+                        tail=pts[tail_start:]
                         scores.append((float(np.linalg.norm(head[:,None]-tail[None,:],axis=2).min()),sign))
                     self.clearance_sign=max(scores)[1];self.enter('flatten')
                 else:
@@ -5308,8 +5325,7 @@ class HelixArcTransition:
                 self.head=self.crown-self.arc_length/2;self.phase=self.start_phase+self.tau*self.crown
                 self.release_mask=self.enabled.copy();self.enter('arc_release')
         elif self.stage=='arc_release':
-            centers=(np.arange(self.n)+1)*self.l
-            curved=(centers+self.l>self.head+1e-6)&(centers-self.l<self.head+self.arc_length-1e-6)
+            curved=(self.curve.s[2:]>self.head+1e-6)&(self.curve.s[:-2]<self.head+self.arc_length-1e-6)
             leaving=np.flatnonzero(self.release_mask&~curved)
             allowed=min(len(leaving),int(self.elapsed*self.o.speed_scale/.2))
             mask=self.release_mask.copy();mask[leaving[:allowed]]=False
@@ -5366,20 +5382,23 @@ class HelixArcManual:
     Angle samples are degrees at the entry boundary, radians inside the core.
     Centering completion pauses once. A further J/G explicitly starts ARC rolling.
     """
-    def __init__(self,measured_deg,lengths,options=HelixArcOptions(),step_s=1.,max_feedback_age_s=.8):
+    def __init__(self,measured_deg,lengths,options=HelixArcOptions(),step_s=1.,max_feedback_age_s=.8,
+                 end_reset_options=None):
         self.core=HelixArcTransition(np.radians(measured_deg),lengths,options)
         self.step_s=step_s;self.max_feedback_age_s=max_feedback_age_s
         self.running=False;self.started=False;self.step_left=0.;self.control_time=0.
         self.feedback_time=None;self.completed=False;self.feedback_wait=False
+        self.end_reset_options=end_reset_options
+        self.end_reset=None;self.end_reset_done=False;self.end_reset_last=None;self.reset_suspended=False
 
     @property
-    def targets(self):return self.core.targets
+    def targets(self):return self.core.targets if self.end_reset is None else np.radians(self.end_reset.targets)
 
     @property
-    def enabled(self):return self.core.enabled
+    def enabled(self):return self.core.enabled if self.end_reset is None else self.end_reset.enabled
 
     @property
-    def stage(self):return self.core.stage
+    def stage(self):return self.core.stage if self.end_reset is None else 'arc_end_reset'
 
     @property
     def phase(self):return self.core.phase
@@ -5390,6 +5409,29 @@ class HelixArcManual:
     def step_once(self):
         self.running=False;self.step_left=self.step_s
 
+    def suspend_end_reset(self):
+        """Release temporary end torque on pause; resume will preload fresh angles."""
+        if self.end_reset is None or self.reset_suspended:return False
+        self.end_reset.enabled=self.end_reset.bearing.copy()
+        self.reset_suspended=True
+        return True
+
+    def _advance_end_reset(self,dt,measured_deg):
+        reset=self.end_reset
+        if self.reset_suspended:
+            reset.targets=np.asarray(measured_deg,float).copy()
+            reset.targets[reset.bearing]=np.degrees(self.core.targets)[reset.bearing]
+            reset.enabled=np.ones(len(reset.bearing),bool)
+            reset.zero_hold=0.
+            self.reset_suspended=False
+        reset.advance(dt,measured_deg)
+        if reset.done:
+            self.core.targets=np.radians(reset.targets)
+            self.core.enabled=reset.bearing.copy()
+            self.end_reset_last=reset.status()
+            self.end_reset=None;self.end_reset_done=True
+            self.core.down=None;self.core.geometry={};self.core.elapsed=0.
+
     def advance(self,dt,now,feedback_time,measured_deg):
         if not self.running and self.step_left<=0.:return False
         self.feedback_wait=feedback_time is None or now-feedback_time>self.max_feedback_age_s
@@ -5397,18 +5439,27 @@ class HelixArcManual:
         fresh=self.feedback_time is None or feedback_time>self.feedback_time
         self.feedback_time=feedback_time;self.started=True
         used=dt if self.running else min(dt,self.step_left)
-        self.core.step(used,self.control_time,np.radians(measured_deg),fresh)
+        if self.end_reset is not None:
+            self._advance_end_reset(used,measured_deg)
+        else:
+            self.core.step(used,self.control_time,np.radians(measured_deg),fresh)
+            if (self.core.stage=='arc_settle' and self.end_reset_options is not None and not self.end_reset_done):
+                self.end_reset=PassiveEndReset(measured_deg,np.degrees(self.core.targets),self.core.enabled,
+                                              **self.end_reset_options)
         self.control_time+=used
         self.step_left=max(0.,self.step_left-used)
         if self.step_left<1e-9:self.step_left=0.
+        if not self.running and self.step_left<=0.:self.suspend_end_reset()
         if self.stage=='arc_roll' and not self.completed:
             self.completed=True;self.pause()
         return True
 
     def status(self):
-        return dict(self.core.status(),running=self.running,step_remaining_s=self.step_left,
+        return dict(self.core.status(),stage=self.stage,running=self.running,step_remaining_s=self.step_left,
                     control_time_s=self.control_time,started=self.started,completed=self.completed,
-                    feedback_wait=self.feedback_wait)
+                    feedback_wait=self.feedback_wait,reset_suspended=self.reset_suspended,
+                    end_reset=None if self.end_reset is None else self.end_reset.status(),
+                    end_reset_last=self.end_reset_last,end_reset_done=self.end_reset_done)
 # END ARC_HELIX_CORE
 
 # BEGIN CURVE_FEEDING_CORE
@@ -5806,11 +5857,24 @@ class RollingArcController:
         self.refresh_compliance_feedback()
         return HelixArcManual(self.measured_angles(), LINK_LENGTHS_M,
             replace(HelixArcOptions(**HELIX_ARC_OPTIONS),speed_scale=HELIX_ARC_SPEED_SCALE),step_s=HELIX_ARC_STEP_S,
-            max_feedback_age_s=MAX_FEEDBACK_AGE_S)
+            max_feedback_age_s=MAX_FEEDBACK_AGE_S,
+            end_reset_options=dict(rate_deg_s=END_ZERO_RATE_DEG_S*HELIX_ARC_SPEED_SCALE,
+                hold_s=END_ZERO_HOLD_S,max_s=END_ZERO_MAX_S) if END_ZERO_ON_HELIX_ARC else None)
+
+    def pause_helix_arc(self):
+        core=self.helix_arc_transition
+        core.pause()
+        if core.suspend_end_reset():
+            self.enabled=core.enabled.tolist()
+            self.targets=np.degrees(core.targets).tolist()
+            self.bus.set_enabled(self.enabled)
+            active=np.flatnonzero(self.enabled)+1
+            self.first,self.last=int(active[0]),int(active[-1])
+        self.mode,self.freeze_targets='hold',True
 
     def select_helix_arc(self):
         if self.helix_arc_transition is not None:
-            self.helix_arc_transition.pause()
+            self.pause_helix_arc()
         else:
             candidate = self.read_helix_arc_entry()
             self.helix_transition = None
@@ -5826,8 +5890,7 @@ class RollingArcController:
         if command in ('release', 'quit', 'exit', 'status'):
             return False
         if command in ('pause', 'hold') or (command == 'toggle' and core.running):
-            core.pause()
-            self.mode, self.freeze_targets = 'hold', True
+            self.pause_helix_arc()
             return True
         if command not in ('step', 'run', 'toggle'):
             raise ValueError('Ctrl+7流程：J单步、G连续/暂停、空格暂停、K状态、X全部失能；4/5/6可切换模式')
@@ -5979,8 +6042,11 @@ class RollingArcController:
             changed = core.confirm(sample_time, self.measured_angles())
             if changed:
                 self.mode, self.freeze_targets = 'hold', True
-                if core.stage in ('front_finish','front_seat'):
+                if core.stage == 'front_finish':
                     print(f'已收到前部支撑确认，阶段={core.stage}；J/G完成前部曲线衔接后自动接入原回卷。', flush=True)
+                elif core.stage == 'return_seat' and core.initial_source_return:
+                    print('已确认前部搭稳，已进入尾部接管准备return_seat；当前目标/使能保持，'
+                          'Ctrl+J单步或Ctrl+G连续逐段上管。',flush=True)
                 else:
                     print(f'Ctrl+L确认成功：阶段={core.stage}；当前目标保持，Ctrl+J单步或Ctrl+G连续推进。', flush=True)
                 if core.stage=='drop':
@@ -6089,7 +6155,7 @@ class RollingArcController:
             now, _ = self.motor_sample_clock()
             core.request_step(self.feed_direction*self.feed_distance_m, now-self.feeding_clock_origin)
             core.options = replace(core.options, automatic_return=FEED_AUTOMATIC_RETURN,
-                maximum_feed_s=60. if self.feed_distance_m<=float(np.mean(LINK_LENGTHS_M))+1e-9 else 100.)
+                maximum_feed_s=60. if self.feed_distance_m<=float(np.median(LINK_LENGTHS_M[1:-1]))+1e-9 else 100.)
             self.feeding_action_id += 1
             self.feeding_inputs = None
             self.feeding_last_stage = None
@@ -6099,7 +6165,7 @@ class RollingArcController:
         options = ContinuousFeedingOptions(first_joint=self.feeding_origin[0], last_joint=self.feeding_origin[1],
             amplitude_deg=FEED_AMPLITUDE_DEG, requested_transfer_m=self.feed_direction*self.feed_distance_m,
             preparation_s=FEED_PREPARATION_S, maximum_position_rate_joints_s=FEED_RATE_JOINTS_S,
-            maximum_feed_s=60. if self.feed_distance_m<=float(np.mean(LINK_LENGTHS_M))+1e-9 else 100.)
+            maximum_feed_s=60. if self.feed_distance_m<=float(np.median(LINK_LENGTHS_M[1:-1]))+1e-9 else 100.)
         options = replace(options, **FEED_OPTIONS_OVERRIDE)
         options = replace(options, automatic_return=FEED_AUTOMATIC_RETURN)
         core = ContinuousFeeding(LINK_LENGTHS_M, options)
@@ -6793,8 +6859,7 @@ class RollingArcController:
         if self.helix_arc_transition is not None:
             if command.startswith('gait_'):
                 previous = self.helix_arc_transition
-                previous.pause()
-                self.mode, self.freeze_targets = 'hold', True
+                self.pause_helix_arc()
                 self.helix_arc_transition = None
                 try:
                     return self.command(command)
@@ -7006,7 +7071,8 @@ class RollingArcController:
             h = self.helix_arc_transition.status()
             stages = {'exit_transition':'尾端建立出管过渡', 'reverse_unwrap':'逆向送链，逐段解缠/失能',
                 'crown_align':'选择顶部承载弧', 'flatten':'导出头端并形成半圆', 'arc_release':'逐节释放已导出的端部',
-                'arc_settle':'半圆静置', 'auto_center':'角反馈自动调长归中', 'center_settle':'归中后静置',
+                'arc_end_reset':'承载半圆保持，两端临时归零再失能',
+                'arc_settle':'两端已失能，半圆静置', 'auto_center':'角反馈自动调长归中', 'center_settle':'归中后静置',
                 'arc_roll':'归中完成；保持时J/G继续ARC滚动'}
             difference = h['geometry'].get('difference_m')
             difference = '--' if difference is None else f'{difference*1000:+.1f}'
@@ -7022,6 +7088,10 @@ class RollingArcController:
                     'both hanging crossings not found':'尚未识别两侧悬垂边界'}.get(
                         h['geometry']['reason'],h['geometry']['reason'])
                 print(f"角反馈几何：{reason} | 尾侧连续失能关节={h['geometry'].get('distal','--')}",flush=True)
+            if h['end_reset'] is not None or h['end_reset_last'] is not None:
+                reset=h['end_reset'] if h['end_reset'] is not None else h['end_reset_last']
+                print(f"ARC两端归零：{reset['reason'] or '进行中'} | 用时={reset['elapsed_s']:.2f}s | "
+                      f"实测端部最大角={reset['actual_max_deg']}° | 暂停已释放端部={h['reset_suspended']}",flush=True)
         if gravity:
             h = self.helix_transition.status()
             instruction = {
@@ -7029,7 +7099,7 @@ class RollingArcController:
                 'front': '自动调长并前卷；尾部保持失能',
                 'front_finish': '尾部失能，前部形成螺旋；L记录搭稳确认，J/G完成衔接后接原回卷',
                 'front_hold': '前部目标保持、尾部未接入；实物搭稳后Ctrl+L确认，再Ctrl+J/G送尾',
-                'front_seat': '仅前部小幅就位；L记录搭稳确认，J/G完成衔接后接原回卷',
+                'front_seat': '前部就位；实物搭稳后L直接进入尾部接管准备，再J/G逐段上管，不等5度跟踪门槛',
                 'helix_normalize': '全身归到同一条Helix；Ctrl+J单步/Ctrl+G连续，结束后保持；空格暂停',
                 'align': 'Ctrl+J/H 微调。确认前部过支管、螺旋已对准后按 Ctrl+L',
                 'grip_adjust': '正在手调初始抱管半径，相位固定；完成后保持，L确认当前半径再J/G形成小U',
@@ -7048,6 +7118,9 @@ class RollingArcController:
                   f"已接收边界={h['accepted_joint']} | 相位={h['phase_rad']:.3f} rad | "
                   f"首次切换速度={h['transition_speed_scale']:g}倍 | {instruction}", flush=True)
             print(f"自动调长速度上限={h['auto_feed_rate_joints_s']:g}关节间距/s（已含首次切换倍率）",flush=True)
+            if h['stage'] in ('front_finish','front_seat','front_hold'):
+                error = '--' if h['front_tracking_error_deg'] is None else f"{h['front_tracking_error_deg']:.2f}°"
+                print(f"前部最近跟踪误差={error} | 已记录搭稳确认={h['front_confirm_requested']}",flush=True)
             if not self.helix_transition.helix_only:
                 print(f"小U前抱管R={h['grip_radius_m']*1000:.2f} → {h['grip_radius_target_m']*1000:.2f} mm | "
                       f"原放松R={h['unwind_release_radius_m']*1000:.2f} mm | "
@@ -7338,7 +7411,7 @@ def preview_payload(controller):
             observed_time is not None and observed_time == sample_time):
         hint = dict(down_head=list(observation['down_head']),
                     source=observation.get('end_quality', {}).get('source', 'passive_end'))
-    if (reverse_transition is not None and reverse_transition.feedback_time == sample_time and
+    if (reverse_transition is not None and reverse_transition.end_reset is None and reverse_transition.feedback_time == sample_time and
             reverse_transition.core.geometry.get('down') is not None):
         hint = dict(down_head=reverse_transition.core.geometry['down'], source='helix_arc_passive_tail')
     return dict(angles_deg=angles, target_deg=target, enabled=enabled,

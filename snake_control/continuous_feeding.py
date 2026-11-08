@@ -77,7 +77,7 @@ class ContinuousFeeding:
         # Equal relative settling speed for one-link and larger actions.
         # This is a motor-proxy gate, not a claim of true length stability.
         self.goal_speed_tolerance_m_s = options.speed_tolerance_m_s*max(
-            1., abs(options.requested_transfer_m)/float(np.mean(self.lengths)))
+            1., abs(options.requested_transfer_m)/float(np.median(self.lengths[1:-1])))
         self.enabled = self.helper.mask(self.origin)
         self.window = self.origin
         self.targets = self.helper.template(self.origin, 0., options.amplitude_deg)
@@ -113,7 +113,7 @@ class ContinuousFeeding:
         self.forced_step = None
         self.options = replace(self.options, requested_transfer_m=distance_m)
         self.goal_speed_tolerance_m_s = self.options.speed_tolerance_m_s*max(
-            1., abs(distance_m)/float(np.mean(self.lengths)))
+            1., abs(distance_m)/float(np.median(self.lengths[1:-1])))
         self.stage, self.stage_since = 'acquire', control_time_s
         self.completed, self.fault = False, None
         self.baseline = self.goal_m = None
@@ -235,7 +235,7 @@ class ContinuousFeeding:
                     points = forward(np.radians(angles), self.lengths)
                     heights = -points @ np.array(self.observation['down_head'])
                     first, last = focus
-                    self.release_below_peak_m = float(heights.max()-heights[first:last+2].min()+.5*np.mean(self.lengths))
+                    self.release_below_peak_m = float(heights.max()-heights[first:last+2].min()+.5*np.median(self.lengths[1:-1]))
                     self.stage, self.stage_since = 'feed_out', control_time
                     self.acquisition_reason = None
                     self.events.append(dict(kind='start_feeding', time_s=control_time,
@@ -408,7 +408,7 @@ class ContinuousFeeding:
                     heights = -points @ np.array(self.observation['down_head'])
                     first, last = self.origin
                     arc_depth = float(heights.max()-heights[first:last+2].min())
-                    self.release_below_peak_m = arc_depth+.5*float(np.mean(self.lengths))
+                    self.release_below_peak_m = arc_depth+.5*float(np.median(self.lengths[1:-1]))
                     self.stage, self.stage_since = 'acquire', control_time_s
                     desired = self.acquire_start(angles, feedback_time_s, control_time_s, fresh)
         elif self.stage == 'acquire':
@@ -421,7 +421,7 @@ class ContinuousFeeding:
             if self.observation['valid']:
                 error = self.goal_m-self.observation['transfer_coordinate_m']
                 speed = opt.length_gain_s*error-opt.speed_damping*self.velocity_m_s
-                rate = np.clip(speed/np.mean(self.lengths),
+                rate = np.clip(speed/np.median(self.lengths[1:-1]),
                                -opt.maximum_position_rate_joints_s, opt.maximum_position_rate_joints_s)
                 proposed_position = float(np.clip(self.position+rate*dt, *self.position_bounds))
                 current, _, _, _ = self.profile(self.position, self.bias)

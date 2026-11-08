@@ -72,10 +72,12 @@ def run(beta,output,duration=150.,hotkeys=False):
                 controller.tick(.02)
                 core=controller.helix_arc_transition.core
                 target=np.radians(controller.targets);mask=np.asarray(controller.enabled,bool)
-            if core.stage!=printed_stage:
-                print(json.dumps(dict(t=round(float(d.time-start),2),stage=core.stage,
+            current_status=core.status() if controller is None else controller.helix_arc_transition.status()
+            display_stage=current_status['stage']
+            if display_stage!=printed_stage:
+                print(json.dumps(dict(t=round(float(d.time-start),2),stage=display_stage,
                     enabled=int(mask.sum()),head_m=core.head,center_error_m=core.center_error),ensure_ascii=False),flush=True)
-                printed_stage=core.stage
+                printed_stage=display_stage
             next_control+=.02
         sim.drive.apply_targets(d,target,mask);mujoco.mj_step(m,d)
         if d.time+1e-8<next_sample:continue
@@ -94,7 +96,7 @@ def run(beta,output,duration=150.,hotkeys=False):
         for c in d.contact:
             a,b=m.geom_bodyid[[c.geom1,c.geom2]]-h
             if min(a,b)>=0 and abs(a-b)>2 and c.dist<=0:collision.append([int(a),int(b)])
-        row=dict(time_s=float(d.time-start),stage=core.stage,reference_roll_rad=core.phase,
+        row=dict(time_s=float(d.time-start),stage=display_stage,reference_roll_rad=core.phase,
             x_min_m=float(pts[:,0].min()),center_x_m=float(pts[:,0].mean()),head_x_m=float(pts[0,0]),
             front_angle_deg=float(np.degrees(np.arctan2(yz[4,1],yz[4,0]))),
             tail_z_m=float(pts[-1,2]),min_height_m=float(pts[:,2].min()),
@@ -107,7 +109,7 @@ def run(beta,output,duration=150.,hotkeys=False):
             active_coverage_deg=float(np.degrees(np.ptp(angles))),active_plane_rms_m=plane_rms,
             head_passive_m=headlength,tail_passive_m=taillength,
             active_end_height_m=arcpts[[0,-1],1].tolist(),self_contacts=collision)
-        rows.append(row);states.append(d.qpos.copy());vel.append(d.qvel.copy());targets.append(target.copy());masks.append(mask.copy());forces.append(d.actuator_force.copy());statuses.append(core.status())
+        rows.append(row);states.append(d.qpos.copy());vel.append(d.qvel.copy());targets.append(target.copy());masks.append(mask.copy());forces.append(d.actuator_force.copy());statuses.append(current_status)
         if metrics['ground_contact_force_n']>1. or pts[:,2].max()<.9:
             failure='floor contact or whole body lost pipe';break
         if core.stage=='arc_roll' and (controller is None or roll_commanded):

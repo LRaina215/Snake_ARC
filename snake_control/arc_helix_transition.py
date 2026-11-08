@@ -34,7 +34,7 @@ class ArcHelixTransition:
     def __init__(self, lengths, window, measured_deg, direction=1, options=ArcHelixOptions()):
         self.lengths = np.asarray(lengths, float)
         self.n = len(self.lengths)-1
-        self.l = float(np.mean(self.lengths))
+        self.l = float(np.median(self.lengths[1:-1]))
         self.options = options
         self.direction = direction
         mask = self._mask(window)
@@ -184,7 +184,7 @@ class ArcHelixTransition:
         self.confirmed = 0
         self.ready = 0
         opt = self.options
-        self.curve = ArcHelixShift(CurveGait(self.n, self.l), self.window, self.amplitude,
+        self.curve = ArcHelixShift(CurveGait(self.n,self.l,lengths=self.lengths),self.window,self.amplitude,
                                    opt.radius_m, opt.pitch_m, self.direction if self.reversed else -self.direction)
         self.curve.front_extension_rate = max(1.75, 1.+self.curve.head_length/max(.40,self.curve.tail_length))
         nominal, _, _ = self.curve.shifted_window(0., self.curve.arc_length, self.phase)
@@ -279,7 +279,7 @@ class ArcHelixTransition:
         if self.leading_extension < curve.head_length:
             self.leading_extension = min(curve.head_length, self.leading_extension+distance)
             goal, _ = curve.targets(self.leading_extension, 0., curve.arc_length, phase)
-            coverage = np.clip(self.leading_extension/self.l+np.arange(1,self.n+1)-first+.999, 0., 1.)
+            coverage = np.clip((self.leading_extension+curve.gait.s[1:-1]-curve.gait.s[first])/self.l+.999,0.,1.)
         else:
             self.shift = min(1.7*self.l, self.shift+distance)
             arc_length = curve.arc_length*(1.-ease(self.shift/.16))
@@ -346,9 +346,9 @@ class ArcHelixTransition:
         # is converted. Shorten the ARC as the second arm enters the curve.
         arc_length = curve.arc_length*(1.-ease(self.receive_shift/min(.12,curve.tail_length)))
         goal, _ = curve.targets(self.shift, self.receive_shift, arc_length, self.phase+self.roll)
-        j = np.arange(1,self.n+1)
-        coverage = np.clip(np.where(j < first, self.shift/self.l+j-first,
-                                    np.where(j > last, self.receive_shift/self.l+last-j, 1.))+.999, 0., 1.)
+        coords=curve.gait.s[1:-1]
+        coverage=np.clip(np.where(np.arange(1,self.n+1)<first,(self.shift+coords-curve.gait.s[first])/self.l,
+                                  np.where(np.arange(1,self.n+1)>last,(self.receive_shift+curve.gait.s[last]-coords)/self.l,1.))+.999,0.,1.)
         goal = self._apply_curve(goal, coverage, opt.staged_target_rate_deg_s, dt)
         if not fresh:
             return
@@ -369,7 +369,7 @@ class ArcHelixTransition:
     def _advance_shift(self, dt, fresh):
         opt, curve = self.options, self.curve
         pace = self._tracking_pace()
-        limit = (self.accepted-self.window[1]+1.5)*self.l if self.accepted < self.n else math.inf
+        limit = curve.gait.s[self.accepted+1]-curve.gait.s[self.window[1]]+.5*self.l if self.accepted < self.n else math.inf
         self.shift_time += dt
         if opt.prepare_front:
             self.shift += min(max(0., limit-self.shift), opt.shift_m_s*pace*dt)

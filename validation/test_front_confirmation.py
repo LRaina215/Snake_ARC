@@ -43,6 +43,28 @@ def recorded_controller(stage='front_hold'):
 
 
 class FrontConfirmationTests(unittest.TestCase):
+    def test_front_seat_l_starts_tail_even_with_tracking_error_and_earlier_confirmation(self):
+        for module in (library,real):
+            for already_confirmed in (False,True):
+                with self.subTest(module=module.__name__,already_confirmed=already_confirmed):
+                    core=recorded_core(module,'front_finish')
+                    core.stage='front_seat';core.elapsed=.1
+                    core.front_confirm_requested=already_confirmed
+                    core.measured[0]=core.targets[0]+np.radians(12.)
+                    targets,mask,phase=core.targets,core.enabled,core.phase
+                    self.assertTrue(core.confirm(1.,np.degrees(core.measured)))
+                    self.assertEqual(core.stage,'return_seat')
+                    np.testing.assert_array_equal(core.targets,targets)
+                    np.testing.assert_array_equal(core.enabled,mask)
+                    self.assertEqual(core.phase,phase)
+                    self.assertFalse(core.running)
+                    # Poor tracking must not keep the acknowledged handoff in
+                    # front_seat; the existing gradual tail acquisition follows.
+                    core.running=True
+                    for i in range(1,211):
+                        core.advance(.02,1.+i*.02,1.+i*.02,np.degrees(core.measured))
+                    self.assertTrue(core.enabled[core.front_count])
+
     def test_recorded_pose_accepts_l_during_step_and_repeated_l_does_not_reset(self):
         for stage in ('front_finish', 'front_seat', 'front_hold'):
             for module in (library, real):
@@ -52,7 +74,7 @@ class FrontConfirmationTests(unittest.TestCase):
                     core.step_once()  # L must not depend on whether a one-second step just ended.
                     before = core.targets.copy()
                     self.assertTrue(core.confirm(1., np.degrees(core.measured)))
-                    self.assertEqual(core.stage, 'return_seat' if stage=='front_hold' else stage)
+                    self.assertEqual(core.stage, 'front_finish' if stage=='front_finish' else 'return_seat')
                     self.assertFalse(core.running)
                     self.assertEqual(core.step_left, 0.)
                     np.testing.assert_array_equal(core.targets, before)
@@ -156,25 +178,34 @@ class FrontConfirmationTests(unittest.TestCase):
     def test_manual_mujoco_entry_uses_the_same_l_then_j_handoff(self):
         from codes import Rolling_Arc_Debug_Mujoco as debug
         with patch.object(debug.real, 'open_robot_serial', side_effect=AssertionError('no hardware')):
-            session = debug.DebugSession()
-            try:
-                c = session.controller
-                c.helix_transition = core = recorded_core(debug.real)
-                c.enabled, c.targets = core.enabled.tolist(), np.degrees(core.targets).tolist()
-                c.first, c.last, c.mode = 1, core.front_count, 'hold'
-                measured = np.degrees(core.measured).tolist()
-                with contextlib.redirect_stdout(io.StringIO()), \
-                        patch.object(c, 'refresh_compliance_feedback'), \
-                        patch.object(c, 'motor_sample_clock', return_value=(1., 1.)), \
-                        patch.object(c, 'measured_angles', return_value=measured):
-                    c.command(debug.real.decode_hotkey(ord('L'), True))
-                    c.command(debug.real.decode_hotkey(ord('J'), True))
-                    c.tick(.02)
-                self.assertEqual(core.stage, 'return_seat')
-                self.assertEqual(sum(c.enabled), 9)
-                np.testing.assert_array_equal(core.targets[:5], np.radians(DATA['states']['front_hold']['target_controller_deg'][:5]))
-            finally:
-                session.close()
+            for stage in ('front_hold','front_seat'):
+                with self.subTest(stage=stage):
+                    session = debug.DebugSession()
+                    try:
+                        c = session.controller
+                        c.helix_transition = core = recorded_core(debug.real,'front_finish' if stage=='front_seat' else stage)
+                        core.stage=stage
+                        if stage=='front_seat':
+                            core.front_confirm_requested=True
+                            core.measured[0]=core.targets[0]+np.radians(12.)
+                        c.enabled, c.targets = core.enabled.tolist(), np.degrees(core.targets).tolist()
+                        c.first, c.last, c.mode = 1, core.front_count, 'run'
+                        measured = np.degrees(core.measured).tolist()
+                        held=core.targets.copy()
+                        with contextlib.redirect_stdout(io.StringIO()), \
+                                patch.object(c, 'refresh_compliance_feedback'), \
+                                patch.object(c, 'motor_sample_clock', return_value=(1., 1.)), \
+                                patch.object(c, 'measured_angles', return_value=measured):
+                            c.command(debug.real.decode_hotkey(ord('L'), True))
+                            self.assertEqual(c.mode,'hold')
+                            self.assertEqual(core.stage,'return_seat')
+                            c.command(debug.real.decode_hotkey(ord('J'), True))
+                            c.tick(.02)
+                        self.assertEqual(core.stage, 'return_seat')
+                        self.assertEqual(sum(c.enabled), 9)
+                        np.testing.assert_array_equal(core.targets[:5],held[:5])
+                    finally:
+                        session.close()
 
 
 if __name__ == '__main__':

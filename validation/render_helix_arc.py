@@ -15,6 +15,7 @@ from snake_control.tee_simulation import TeeSimulation
 
 STAGES=dict(exit_transition='尾端建立出管过渡',reverse_unwrap='逆向Shift，逐段解缠与失能',
     crown_align='选择顶部承载弧',flatten='导出头端，消除螺距形成半圆',arc_release='逐节释放已导出的端部',
+    arc_end_reset='承载半圆保持，两端短时归零再失能',
     arc_settle='开放半圆保持',auto_center='角反馈自动送链归中',center_settle='归中后保持',arc_roll='开放半圆ARC持续滚动')
 
 
@@ -50,7 +51,9 @@ def render(folder,speed=4.,fps=15):
             image=Image.new('RGB',(2*width,height+240),'#f4f7fa');image.paste(Image.fromarray(np.hstack(images)),(0,65));draw=ImageDraw.Draw(image)
             r=rows[i];st=status[i];g=st['geometry']
             draw.text((12,5),f"18关节 | Helix→ARC→自动归中 | 周向起态 {summary['beta_deg']:g}° | t={r['time_s']:.1f}s",font=font,fill='#17354b')
-            draw.text((12,33),f"{STAGES.get(r['stage'],r['stage'])} | {speed:g}倍速 | 蓝=使能 紫=失能 | 自动仿真流程，尚未绑定实机热键",font=small,fill='#385264')
+            commands=[c for c in summary.get('commands',[]) if c['time_s']<=r['time_s']]
+            recent=' → '.join(c['key'] for c in commands[-4:]) if commands else '自动仿真控制'
+            draw.text((12,33),f"{STAGES.get(r['stage'],r['stage'])} | {speed:g}倍速 | 蓝=使能 紫=失能 | {recent}",font=small,fill='#385264')
             draw.text((12,75),'斜视',font=small,fill='#253b49');draw.text((width+12,75),'端视（沿主管轴）',font=small,fill='white')
             y=height+72
             diff=g.get('difference_m');label='尚未形成两侧悬垂参考' if diff is None else f'角反馈长度差 尾−头={diff*1000:+.1f} mm'
