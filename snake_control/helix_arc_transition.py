@@ -3,7 +3,7 @@
 No MuJoCo, pipe coordinates, contact forces or root orientation enter this module.
 Units: metres, radians, seconds. The same declarations are bundled into the real entry.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass,replace
 import math
 
 import numpy as np
@@ -12,6 +12,7 @@ from .curve_gait import CurveGait, Segment, line, arc
 from .gravity_moment import smooth
 from .section_geometry import forward
 from .passive_end_reset import PassiveEndReset
+from .feeding_controller import FeedingSettings,create_feeding_controller
 
 
 def fit_helix(q, link, lengths=None):
@@ -67,8 +68,6 @@ class HelixArcOptions:
     feedback_period_s: float=.2                # Caller sampling period; repeated calculations are not fresh angles.
     lead_s: float=1.5
     flatten_s: float=6.
-    center_rate_m_s: float=.010                # Maximum material-coordinate speed during centering.
-    center_tolerance_m: float=.025             # Observed tail length minus head length.
     roll_rate_rad_s: float=.35
 
 
@@ -79,7 +78,7 @@ class HelixArcTransition:
     Outputs are target angles and a binary torque-enable mask. A fitting error
     is not a contact/load measurement; all physical acceptance lives outside.
     """
-    def __init__(self,angles_rad,lengths,options=HelixArcOptions()):
+    def __init__(self,angles_rad,lengths,options=HelixArcOptions(),feeding_settings=None):
         self.lengths=np.asarray(lengths,float);self.n=len(angles_rad)
         self.l=float(np.median(self.lengths[1:-1]));self.L=float(sum(lengths));self.o=options
         if not math.isfinite(options.speed_scale) or options.speed_scale<=0.:
@@ -93,6 +92,8 @@ class HelixArcTransition:
         self.helix_length=self.L;self.crown=None;self.down=None;self.geometry={}
         self.events=[];self.align_sign=1.
         self.arc_length=math.pi*self.radius;self.center_error=None;self.complete_since=None
+        self.feeding_settings=FeedingSettings() if feeding_settings is None else feeding_settings
+        self.center_feeding=None;self.center_clock=0.;self.center_feedback_time=None
 
     def enter(self,stage):
         self.events.append(dict(time_s=self.time,stage=stage));self.stage=stage;self.elapsed=0.
@@ -226,20 +227,36 @@ class HelixArcTransition:
             self.arc_targets(dt)
             if self.elapsed>=2.:self.enter('auto_center')
         elif self.stage=='auto_center':
-            self.center_error=self.geometry.get('difference_m')
-            if self.geometry.get('valid') and self.center_error is not None:
-                self.head+=float(np.clip(.2*self.center_error,-self.o.center_rate_m_s,self.o.center_rate_m_s))*motion_dt
-                self.head=float(np.clip(self.head,self.l/2,self.L-self.arc_length-self.l/2))
-            self.arc_targets(dt)
-            if self.center_error is not None and abs(self.center_error)<self.o.center_tolerance_m:
-                self.complete_since=self.time if self.complete_since is None else self.complete_since
-                if self.time-self.complete_since>=.8:self.enter('center_settle')
-            else:self.complete_since=None
+            if self.center_feeding is None:
+                active=np.flatnonzero(self.enabled)+1
+                window=(int(active[0]),int(active[-1]))
+                seed=[line(self.head),arc(self.arc_length,1/self.radius),line(self.L-self.head-self.arc_length)]
+                self.center_head_start=self.head
+                self.center_feeding=create_feeding_controller(self.lengths,window,self.feeding_settings,
+                    phase_rad=self.phase,seed_curve=seed,measured_deg=np.degrees(self.measured),
+                    enabled=self.enabled,speed_scale=self.o.speed_scale)
+                self.center_feeding.request_center()
+            self.center_clock+=dt
+            if fresh or self.center_feedback_time is None:self.center_feedback_time=self.center_clock
+            feeder=self.center_feeding
+            self.targets,self.enabled=feeder.advance(np.degrees(self.measured),self.center_feedback_time,self.center_clock)
+            self.head=self.center_head_start+feeder.position*self.l
+            self.center_error=(-2*feeder.observation['transfer_coordinate_m'] if feeder.observation.get('valid') else None)
+            if feeder.fault:raise ValueError('Center feeding: '+feeder.fault)
+            if feeder.completed:
+                curved=(self.curve.s[2:]>self.head+1e-6)&(self.curve.s[:-2]<self.head+self.arc_length-1e-6)
+                self.enabled=curved
+                self.enter('center_settle')
         elif self.stage=='center_settle':
-            self.arc_targets(dt)
+            if self.center_feeding is None:self.arc_targets(dt)
             if self.elapsed>=3.:self.enter('arc_roll')
         elif self.stage=='arc_roll':
-            self.phase+=self.o.roll_rate_rad_s*motion_dt;self.arc_targets(dt)
+            self.phase+=self.o.roll_rate_rad_s*motion_dt
+            if self.center_feeding is None:self.arc_targets(dt)
+            else:
+                self.center_feeding.phase=self.phase
+                desired=self.center_feeding.profile(self.center_feeding.position,self.center_feeding.bias)[0]
+                self.targets[self.enabled]=desired[self.enabled]
         return self.targets.copy(),self.enabled.copy()
 
     def arc_targets(self,dt,mask=None):
@@ -261,6 +278,7 @@ class HelixArcTransition:
 
     def status(self):
         return dict(stage=self.stage,phase=self.phase,helix_length_m=self.helix_length,
+                    feeding=None if self.center_feeding is None else self.center_feeding.snapshot(),
                     speed_scale=self.o.speed_scale,
                     straight_m=self.straight,arc_head_m=self.head,arc_length_m=self.arc_length,
                     crown_m=self.crown,fit=self.fit,geometry=self.geometry,center_error_m=self.center_error,
@@ -269,13 +287,19 @@ class HelixArcTransition:
 
 class ArcCurveReference:
     """Keep the completed ARC's material interval when normal rolling takes over."""
-    def __init__(self,lengths,head_m,arc_length_m,radius_m,amplitude_deg):
+    def __init__(self,lengths,head_m,arc_length_m,radius_m,amplitude_deg,feeding=None):
         self.curve=CurveGait(len(lengths)-1,lengths=lengths)
         self.head_m,self.arc_length_m,self.radius_m=head_m,arc_length_m,radius_m
         self.amplitude_deg=amplitude_deg
+        self.feeding=feeding
+        self.feeding_amplitude=None if feeding is None else feeding.options.amplitude_deg
 
     def targets(self,phase,amplitude_deg):
         scale=amplitude_deg/self.amplitude_deg if self.amplitude_deg else 1.
+        if self.feeding is not None:
+            self.feeding.phase=phase
+            self.feeding.options=replace(self.feeding.options,amplitude_deg=self.feeding_amplitude*scale)
+            return np.clip(self.feeding.profile(self.feeding.position,self.feeding.bias)[0],-math.radians(88),math.radians(88))
         target=self.curve.targets([line(self.head_m),arc(self.arc_length_m,scale/self.radius_m),
             line(self.curve.body_length-self.head_m-self.arc_length_m)],phase)
         return np.clip(target,-math.radians(88),math.radians(88))
@@ -292,8 +316,8 @@ class HelixArcManual:
     Centering completion pauses once. A further J/G explicitly starts ARC rolling.
     """
     def __init__(self,measured_deg,lengths,options=HelixArcOptions(),step_s=1.,max_feedback_age_s=.8,
-                 end_reset_options=None):
-        self.core=HelixArcTransition(np.radians(measured_deg),lengths,options)
+                 end_reset_options=None,feeding_settings=None):
+        self.core=HelixArcTransition(np.radians(measured_deg),lengths,options,feeding_settings)
         self.step_s=step_s;self.max_feedback_age_s=max_feedback_age_s
         self.running=False;self.started=False;self.step_left=0.;self.control_time=0.
         self.feedback_time=None;self.completed=False;self.feedback_wait=False

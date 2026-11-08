@@ -16,18 +16,20 @@ BEGIN, END = '# BEGIN CURVE_FEEDING_CORE', '# END CURVE_FEEDING_CORE'
 
 
 def embed(source):
-    shape = declaration(ROOT/'experiments/curve_feeding/curve_profile.py')
+    shape = declaration(ROOT/'snake_control/feeding_curve.py')
     shape = re.sub(r'\bSegment\b', 'HelixCurveSegment', shape)
-    adapter = declaration(ROOT/'experiments/curve_feeding/backend.py',
+    adapter = declaration(ROOT/'snake_control/feeding_controller.py',
                           {'_CurveTemplateHelper', 'curve_feeding_class'})
+    factory=declaration(ROOT/'snake_control/feeding_controller.py',{'FeedingSettings','create_feeding_controller'})
     block = (BEGIN+'\n'
-        '# 模式4目标生成：拼接曲率子段 → 相邻连杆积分 → 目标角。\n'
-        '# J/H任务、角反馈、长度估计、预置使能与退出逻辑继承前面的原控制器。\n'
+        '# 模式4、5/6调长准备、7归中共用：曲线积分、参数工厂与同一个调长执行器。\n'
+        '# 相对调长、准备位置、归中只改变目标；角反馈、预置使能与退出逻辑统一。\n'
         '# 改形状分配看FeedingCurveBuilder；改速度/步长仍看顶部FEED_*。\n'
         +shape+'\n\n\n'+adapter+'\n\n'
         '# 保存旧类仅用于离线对照；实机所有调长实例默认用曲线积分。\n'
         'LegacyContinuousFeeding = ContinuousFeeding\n'
         'ContinuousFeeding = curve_feeding_class(LegacyContinuousFeeding)\n'
+        'CurveContinuousFeeding = ContinuousFeeding\n\n'+factory+'\n'
         +END)
     if BEGIN in source:
         before, rest = source.split(BEGIN, 1)

@@ -37,9 +37,17 @@ class HelixArcSpeedTests(unittest.TestCase):
         for module in (library,real):
             fast,q=make_core(module,2.);reference,_=make_core(module,1.)
             for core in (fast,reference):
-                core.stage='auto_center';core.head=.27;core.geometry={'valid':True,'difference_m':.4}
-                core.step(.02,0.,q)
+                core.stage='auto_center';core.head=.27
+                core.targets=core.curve.targets([module.line(.27),module.arc(core.arc_length,1/core.radius),
+                    module.line(core.L-.27-core.arc_length)],core.phase)
+                core.enabled=(core.curve.s[2:]>.27)&(core.curve.s[:-2]<.27+core.arc_length)
+                core.step(.02,0.,core.targets.copy())
+                core.center_feeding.length_observer.observe=lambda *a:dict(valid=True,
+                    transfer_coordinate_m=-.25,down_head=[1.,0.,0.])
+                core.step(.02,.02,core.targets.copy(),fresh=True)
             self.assertAlmostEqual(fast.head-.27,2*(reference.head-.27))
+            self.assertAlmostEqual(fast.center_feeding.options.maximum_position_rate_joints_s,
+                                   2*reference.center_feeding.options.maximum_position_rate_joints_s)
             for core in (fast,reference):
                 core.stage='arc_roll';before=core.phase;core.step(.02,.02,q)
                 core.roll_change=core.phase-before

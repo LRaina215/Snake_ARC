@@ -89,14 +89,14 @@ POSTURE_CONTRACTION_TURN_ERROR_DEG = 5.0
 
 # 主动送链：只用角度/时间，暂停滚动；目标由拼接曲线积分生成，操作与交接不变。
 FEED_DISTANCE_M = JOINT_AXIS_SPACING_M  # Ctrl+J/H一次任务的材料量，默认一个身体轴距
-FEED_RATE_JOINTS_S = .10       # 左右调长速度上限：关节间距/秒；模式4直接用，模式5/6自动调长再乘HELIX_TRANSITION_SPEED_SCALE
+FEED_RATE_JOINTS_S = .10       # 公共调长速度：模式4直接用，5/6乘HELIX_TRANSITION_SPEED_SCALE，7归中乘HELIX_ARC_SPEED_SCALE
 FEED_AMPLITUDE_DEG = 60.0      # 送链起态自己的幅值，不覆盖你的基础/顺应参数
 FEED_PREPARATION_S = 6.0       # 首次形成；之后另等接管展直稳定才标定本步基线
 FEED_AUTOMATIC_RETURN = False  # 手调默认单程，到位保持；不自动反向
 FEED_FORCE_STEP_JOINTS = .05   # Ctrl+L强制推进的弯曲分布位移；单位关节间距，不是实测毫米
 FEED_OPTIONS_OVERRIDE = {
     'tracking_tolerance_deg': 8.0,  # 手调接管/运动跟踪容差；原5°，不改目标或使能交接逻辑
-}                             # 其他字段可覆盖；已有maximum_position_rate_joints_s覆盖项优先，模式4/5/6均读取
+}                             # 公共调长参数，模式4、5/6准备、7归中均读取；同名覆盖项优先
 FEED_DIRECTION_OVERRIDE = {}   # 第3C段ManualFeedingDirectionOptions：选段/直线度/稳定时间
 FEED_DIAGNOSTIC_PERIOD_S = 2.0 # 自动显示两侧判断数值；Ctrl+K随时查看
 
@@ -141,8 +141,6 @@ HELIX_ARC_OPTIONS = {
     'lead_s': 1.5,                        # 尾端建立出管过渡的时间
     'flatten_s': 6.0,                    # 消除扭率并形成半圆的时间
     'target_rate_deg_s': 35.0,            # 目标角最大变化率
-    'center_rate_m_s': .010,              # 自动归中最大送链速度，10 mm/s
-    'center_tolerance_m': .025,           # 角反馈估计的左右长度差目标，25 mm
     'roll_rate_rad_s': .35,               # 仅直接调用核心续滚；实机/手调7完成后使用OMEGA_RAD_S
 }
 
@@ -3122,6 +3120,28 @@ class ContinuousFeeding:
         self.acquisition_reason = None
         self.acquisition_metrics = {}
         self.forced_step = None
+        self.goal_kind='relative_length'
+        self.position_goal=None
+        self.goal_direction_pending=False
+
+    def request_position(self,position_joints,control_time_s=0.):
+        """Automatically request a profile location through the same feeding executor."""
+        self.position_goal=float(np.clip(position_joints,*self.position_bounds))
+        direction=1 if self.position_goal>=self.position else -1
+        self.options=replace(self.options,requested_transfer_m=direction*max(
+            abs(self.position_goal-self.position)*float(np.median(self.lengths[1:-1])),1e-9),automatic_return=False)
+        self.reference_direction=direction
+        self.goal_kind='position';self.goal_m=self.baseline=0.
+        self.stage='feed_out';self.stage_since=control_time_s
+        self.completed=False;self.fault=None;self.ready_since=None
+
+    def request_center(self,control_time_s=0.):
+        """Absolute zero differential length; same observation, movement and handover as manual feeding."""
+        self.goal_kind='balance';self.goal_m=self.baseline=0.
+        self.goal_direction_pending=True
+        self.options=replace(self.options,automatic_return=False)
+        self.stage='feed_out';self.stage_since=control_time_s
+        self.completed=False;self.fault=None;self.ready_since=None
 
     def request_step(self, distance_m, control_time_s):
         """Start one relative action without resetting the travelling profile.
@@ -3132,6 +3152,7 @@ class ContinuousFeeding:
         if not math.isfinite(distance_m) or distance_m == 0:
             raise ValueError('A finite nonzero feeding distance is required')
         self.forced_step = None
+        self.goal_kind='relative_length'
         self.options = replace(self.options, requested_transfer_m=distance_m)
         self.goal_speed_tolerance_m_s = self.options.speed_tolerance_m_s*max(
             1., abs(distance_m)/float(np.median(self.lengths[1:-1])))
@@ -3386,6 +3407,16 @@ class ContinuousFeeding:
             if self.observation['valid']:
                 self.untrusted_since = None
                 coordinate = self.observation['transfer_coordinate_m']
+                if self.goal_direction_pending:
+                    direction=1 if self.goal_m>=coordinate else -1
+                    self.reference_direction=direction
+                    self.options=opt=replace(opt,requested_transfer_m=direction*abs(opt.requested_transfer_m))
+                    self.goal_direction_pending=False
+                if self.release_below_peak_m is None and self.goal_kind!='relative_length':
+                    points=forward(np.radians(angles),self.lengths)
+                    heights=-points@np.array(self.observation['down_head'])
+                    first,last=self.origin
+                    self.release_below_peak_m=float(heights.max()-heights[first:last+2].min()+.5*np.median(self.lengths[1:-1]))
                 if self.last_length_time is not None:
                     sample_dt = feedback_time_s-self.last_length_time
                     raw_velocity = (coordinate-self.previous_coordinate)/sample_dt
@@ -3439,15 +3470,24 @@ class ContinuousFeeding:
             # joint at its preload angle. Finish the already commanded shape
             # while waiting for the length/gravity proxy to become usable.
             desired, _, _, _ = self.profile(self.position, self.bias)
-            if self.observation['valid']:
-                error = self.goal_m-self.observation['transfer_coordinate_m']
-                speed = opt.length_gain_s*error-opt.speed_damping*self.velocity_m_s
-                rate = np.clip(speed/np.median(self.lengths[1:-1]),
-                               -opt.maximum_position_rate_joints_s, opt.maximum_position_rate_joints_s)
+            if self.observation['valid'] or self.goal_kind=='position':
+                if self.goal_kind=='position':
+                    remaining=self.position_goal-self.position
+                    error=remaining*float(np.median(self.lengths[1:-1]))
+                    rate=float(np.clip(remaining/max(dt,1e-12),-opt.maximum_position_rate_joints_s,
+                                       opt.maximum_position_rate_joints_s))
+                else:
+                    error = self.goal_m-self.observation['transfer_coordinate_m']
+                    speed = opt.length_gain_s*error-opt.speed_damping*self.velocity_m_s
+                    rate = np.clip(speed/np.median(self.lengths[1:-1]),
+                                   -opt.maximum_position_rate_joints_s, opt.maximum_position_rate_joints_s)
                 proposed_position = float(np.clip(self.position+rate*dt, *self.position_bounds))
                 current, _, _, _ = self.profile(self.position, self.bias)
                 self.tracking_error_deg = float(np.max(abs(np.degrees(current[self.enabled])-angles[self.enabled])))
-                self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
+                # Pitch/yaw projections rotate with rolling phase; their vector
+                # norm retains the same turn budget at every phase.
+                self.actual_enabled_turn_deg=float(math.hypot(angles[self.enabled & (np.arange(self.n)%2==0)].sum(),
+                                                             angles[self.enabled & (np.arange(self.n)%2==1)].sum()))
                 blocked = (self.tracking_error_deg>opt.tracking_tolerance_deg or
                            self.actual_enabled_turn_deg>opt.tracked_turn_soft_limit_deg)
                 if blocked:
@@ -3482,7 +3522,9 @@ class ContinuousFeeding:
                 self.window = (int(active[0]), int(active[-1]))
                 desired = proposal
                 if fresh and self.stage in ('feed_out', 'feed_return'):
-                    reached = abs(error)<=opt.length_tolerance_m and abs(self.velocity_m_s)<=self.goal_speed_tolerance_m_s
+                    reached = (abs(self.position_goal-self.position)<=1e-9 and
+                               self.tracking_error_deg<=opt.tracking_tolerance_deg) if self.goal_kind=='position' else (
+                               abs(error)<=opt.length_tolerance_m and abs(self.velocity_m_s)<=self.goal_speed_tolerance_m_s)
                     self.ready_since = (feedback_time_s if self.ready_since is None else self.ready_since) if reached else None
                     if self.ready_since is not None and feedback_time_s-self.ready_since >= opt.persistence_s-1e-8:
                         self.stage = 'review_out' if self.stage == 'feed_out' else 'review_return'
@@ -3490,11 +3532,12 @@ class ContinuousFeeding:
                         if self.stage=='review_out' and not opt.automatic_return:
                             self.stage, self.completed = 'complete', True
                         self.events.append(dict(kind='length_goal_observed', time_s=control_time_s,
-                            goal_delta_m=self.goal_m-self.baseline, observed_delta_m=coordinate-self.baseline,
+                            goal_kind=self.goal_kind,goal_delta_m=self.goal_m-self.baseline,
+                            observed_delta_m=None if not self.observation['valid'] else self.observation['transfer_coordinate_m']-self.baseline,
                             velocity_m_s=self.velocity_m_s, position_joints=self.position))
             if self.tracking_blocked_since is not None and control_time_s-self.tracking_blocked_since>opt.maximum_tracking_wait_s:
                 self.fault = 'measured shape tracking did not recover within bounded handover'
-            elif self.untrusted_since is not None and control_time_s-self.untrusted_since > opt.maximum_untrusted_s:
+            elif self.goal_kind!='position' and self.untrusted_since is not None and control_time_s-self.untrusted_since > opt.maximum_untrusted_s:
                 self.fault = 'length observation did not recover during bounded shape completion'
             elif self.stage in ('feed_out', 'feed_return') and control_time_s-self.stage_since > opt.maximum_feed_s:
                 self.fault = 'length goal not reached within bounded feeding'
@@ -3513,6 +3556,7 @@ class ContinuousFeeding:
 
     def snapshot(self):
         return dict(stage=self.stage, route='continuous_feeding', window=list(self.window),
+            goal_kind=self.goal_kind,position_goal_joints=self.position_goal,
             forced_step=None if self.forced_step is None else dict(self.forced_step),
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),
@@ -4527,10 +4571,13 @@ class GravityMomentGait:
 class GravityFrontTransition(ArcHelixTransition):
     """保持承载 ARC，只延长头端螺旋，直至操作者确认贴管。"""
 
-    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., feed_rate_joints_s=.1, **kwargs):
+    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., feed_rate_joints_s=.1, feeding_settings=None, **kwargs):
         self.minimum_front_turns = minimum_front_turns
         self.speed_scale = speed_scale
         self.feed_rate_joints_s = feed_rate_joints_s
+        default_settings=FeedingSettings()
+        self.feeding_settings=(replace(default_settings,options=replace(default_settings.options,
+            maximum_position_rate_joints_s=feed_rate_joints_s)) if feeding_settings is None else feeding_settings)
         super().__init__(*args, **kwargs)
 
     def _check_front_entry(self):
@@ -4561,14 +4608,10 @@ class GravityFrontTransition(ArcHelixTransition):
         """自动调长复用模式4的曲线分配、相邻折弯接管与目标限速。"""
         first, last = self.window
         goal = self.desired_start-first
-        options = ContinuousFeedingOptions(first_joint=first, last_joint=last,
-            amplitude_deg=math.degrees(self.amplitude), requested_transfer_m=goal*self.l,
-            automatic_return=False, tracking_tolerance_deg=8.,
-            maximum_position_rate_joints_s=self.feed_rate_joints_s*self.speed_scale)
-        self.transfer = ContinuousFeeding(self.lengths, options)
-        self.transfer.phase = self.phase
-        self.transfer.targets = self.measured.copy()
-        self.transfer.enabled = self._enabled.copy()
+        self.transfer=create_feeding_controller(self.lengths,self.window,self.feeding_settings,
+            amplitude_deg=math.degrees(self.amplitude),phase_rad=self.phase,
+            measured_deg=np.degrees(self.measured),enabled=self._enabled,speed_scale=self.speed_scale)
+        self.transfer.request_position(float(goal))
         self.transfer_goal = float(goal)
         self.transfer_clock = 0.
         self.transfer_feedback_sample = None
@@ -4586,28 +4629,13 @@ class GravityFrontTransition(ArcHelixTransition):
             self.transfer_feedback_sample = self.feedback_time
             self.transfer_feedback_clock = clock
         helper.advance(np.degrees(self.measured), self.transfer_feedback_clock, clock)
-        if helper.forced_step is None:
-            error = np.max(abs(helper.targets[helper.enabled]-self.measured[helper.enabled]))
-            remaining = abs(self.transfer_goal-helper.position)
-            if remaining > 1e-9:
-                pace = float(np.clip((math.radians(23.)-error)/math.radians(17.), .1, 1.))
-                increment = min(remaining, helper.options.maximum_position_rate_joints_s*pace*dt)
-                _, focus, _, _ = helper.profile(helper.position, helper.bias)
-                required = helper.required_mask(focus, np.degrees(self.measured), helper.position)
-                entering = required & ~helper.enabled
-                helper.targets[entering] = self.measured[entering]
-                helper.enabled |= required
-                helper.start_forced_step(np.degrees(self.measured), increment, clock)
-            elif fresh:
-                follows = error <= math.radians(8.)
-                self.transfer_ready_since = (clock if self.transfer_ready_since is None else
-                                             self.transfer_ready_since) if follows else None
-                if self.transfer_ready_since is not None and clock-self.transfer_ready_since >= .4:
-                    _, focus, _, _ = helper.profile(helper.position, helper.bias)
-                    selection = choose_feeding_arc(np.degrees(self.measured), self.lengths, helper.enabled, focus)
-                    self.window = tuple(selection['chosen'])
-                    self.phase = helper.phase
-                    self.stage = 'transfer_done'
+        if helper.fault:
+            raise ValueError('Automatic feeding: '+helper.fault)
+        if helper.completed:
+            _,focus,_,_=helper.profile(helper.position,helper.bias)
+            selection=choose_feeding_arc(np.degrees(self.measured),self.lengths,helper.enabled,focus)
+            self.window=tuple(selection['chosen']);self.phase=helper.phase
+            self.stage='transfer_done'
         self._targets = helper.targets.copy()
         self._enabled = helper.enabled.copy()
 
@@ -4628,6 +4656,7 @@ class GravityFrontTransition(ArcHelixTransition):
 
 @dataclass(frozen=True)
 class GravityCrossingOptions:
+    feeding_settings: object = None
     retain_joints: Optional[int] = 8  # None: derive the prefix from the current curve boundary.
     release_line_m: float = .32201388
     release_arc_rad: float = math.pi
@@ -4700,7 +4729,7 @@ class GravityCrossing:
         return GravityFrontTransition(lengths, window, np.degrees(self.measured),
             options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
             minimum_front_turns=self.options.min_front_turns,speed_scale=self.options.transition_speed_scale,
-            feed_rate_joints_s=self.options.feed_rate_joints_s)
+            feed_rate_joints_s=self.options.feed_rate_joints_s,feeding_settings=self.options.feeding_settings)
 
     def unwind_retain_count(self, helix_length=None):
         """Complete helical joint neighbourhoods; no MuJoCo support estimate."""
@@ -5176,8 +5205,6 @@ class HelixArcOptions:
     feedback_period_s: float=.2                # Caller sampling period; repeated calculations are not fresh angles.
     lead_s: float=1.5
     flatten_s: float=6.
-    center_rate_m_s: float=.010                # Maximum material-coordinate speed during centering.
-    center_tolerance_m: float=.025             # Observed tail length minus head length.
     roll_rate_rad_s: float=.35
 
 
@@ -5188,7 +5215,7 @@ class HelixArcTransition:
     Outputs are target angles and a binary torque-enable mask. A fitting error
     is not a contact/load measurement; all physical acceptance lives outside.
     """
-    def __init__(self,angles_rad,lengths,options=HelixArcOptions()):
+    def __init__(self,angles_rad,lengths,options=HelixArcOptions(),feeding_settings=None):
         self.lengths=np.asarray(lengths,float);self.n=len(angles_rad)
         self.l=float(np.median(self.lengths[1:-1]));self.L=float(sum(lengths));self.o=options
         if not math.isfinite(options.speed_scale) or options.speed_scale<=0.:
@@ -5202,6 +5229,8 @@ class HelixArcTransition:
         self.helix_length=self.L;self.crown=None;self.down=None;self.geometry={}
         self.events=[];self.align_sign=1.
         self.arc_length=math.pi*self.radius;self.center_error=None;self.complete_since=None
+        self.feeding_settings=FeedingSettings() if feeding_settings is None else feeding_settings
+        self.center_feeding=None;self.center_clock=0.;self.center_feedback_time=None
 
     def enter(self,stage):
         self.events.append(dict(time_s=self.time,stage=stage));self.stage=stage;self.elapsed=0.
@@ -5335,20 +5364,36 @@ class HelixArcTransition:
             self.arc_targets(dt)
             if self.elapsed>=2.:self.enter('auto_center')
         elif self.stage=='auto_center':
-            self.center_error=self.geometry.get('difference_m')
-            if self.geometry.get('valid') and self.center_error is not None:
-                self.head+=float(np.clip(.2*self.center_error,-self.o.center_rate_m_s,self.o.center_rate_m_s))*motion_dt
-                self.head=float(np.clip(self.head,self.l/2,self.L-self.arc_length-self.l/2))
-            self.arc_targets(dt)
-            if self.center_error is not None and abs(self.center_error)<self.o.center_tolerance_m:
-                self.complete_since=self.time if self.complete_since is None else self.complete_since
-                if self.time-self.complete_since>=.8:self.enter('center_settle')
-            else:self.complete_since=None
+            if self.center_feeding is None:
+                active=np.flatnonzero(self.enabled)+1
+                window=(int(active[0]),int(active[-1]))
+                seed=[line(self.head),arc(self.arc_length,1/self.radius),line(self.L-self.head-self.arc_length)]
+                self.center_head_start=self.head
+                self.center_feeding=create_feeding_controller(self.lengths,window,self.feeding_settings,
+                    phase_rad=self.phase,seed_curve=seed,measured_deg=np.degrees(self.measured),
+                    enabled=self.enabled,speed_scale=self.o.speed_scale)
+                self.center_feeding.request_center()
+            self.center_clock+=dt
+            if fresh or self.center_feedback_time is None:self.center_feedback_time=self.center_clock
+            feeder=self.center_feeding
+            self.targets,self.enabled=feeder.advance(np.degrees(self.measured),self.center_feedback_time,self.center_clock)
+            self.head=self.center_head_start+feeder.position*self.l
+            self.center_error=(-2*feeder.observation['transfer_coordinate_m'] if feeder.observation.get('valid') else None)
+            if feeder.fault:raise ValueError('Center feeding: '+feeder.fault)
+            if feeder.completed:
+                curved=(self.curve.s[2:]>self.head+1e-6)&(self.curve.s[:-2]<self.head+self.arc_length-1e-6)
+                self.enabled=curved
+                self.enter('center_settle')
         elif self.stage=='center_settle':
-            self.arc_targets(dt)
+            if self.center_feeding is None:self.arc_targets(dt)
             if self.elapsed>=3.:self.enter('arc_roll')
         elif self.stage=='arc_roll':
-            self.phase+=self.o.roll_rate_rad_s*motion_dt;self.arc_targets(dt)
+            self.phase+=self.o.roll_rate_rad_s*motion_dt
+            if self.center_feeding is None:self.arc_targets(dt)
+            else:
+                self.center_feeding.phase=self.phase
+                desired=self.center_feeding.profile(self.center_feeding.position,self.center_feeding.bias)[0]
+                self.targets[self.enabled]=desired[self.enabled]
         return self.targets.copy(),self.enabled.copy()
 
     def arc_targets(self,dt,mask=None):
@@ -5370,6 +5415,7 @@ class HelixArcTransition:
 
     def status(self):
         return dict(stage=self.stage,phase=self.phase,helix_length_m=self.helix_length,
+                    feeding=None if self.center_feeding is None else self.center_feeding.snapshot(),
                     speed_scale=self.o.speed_scale,
                     straight_m=self.straight,arc_head_m=self.head,arc_length_m=self.arc_length,
                     crown_m=self.crown,fit=self.fit,geometry=self.geometry,center_error_m=self.center_error,
@@ -5378,13 +5424,19 @@ class HelixArcTransition:
 
 class ArcCurveReference:
     """Keep the completed ARC's material interval when normal rolling takes over."""
-    def __init__(self,lengths,head_m,arc_length_m,radius_m,amplitude_deg):
+    def __init__(self,lengths,head_m,arc_length_m,radius_m,amplitude_deg,feeding=None):
         self.curve=CurveGait(len(lengths)-1,lengths=lengths)
         self.head_m,self.arc_length_m,self.radius_m=head_m,arc_length_m,radius_m
         self.amplitude_deg=amplitude_deg
+        self.feeding=feeding
+        self.feeding_amplitude=None if feeding is None else feeding.options.amplitude_deg
 
     def targets(self,phase,amplitude_deg):
         scale=amplitude_deg/self.amplitude_deg if self.amplitude_deg else 1.
+        if self.feeding is not None:
+            self.feeding.phase=phase
+            self.feeding.options=replace(self.feeding.options,amplitude_deg=self.feeding_amplitude*scale)
+            return np.clip(self.feeding.profile(self.feeding.position,self.feeding.bias)[0],-math.radians(88),math.radians(88))
         target=self.curve.targets([line(self.head_m),arc(self.arc_length_m,scale/self.radius_m),
             line(self.curve.body_length-self.head_m-self.arc_length_m)],phase)
         return np.clip(target,-math.radians(88),math.radians(88))
@@ -5401,8 +5453,8 @@ class HelixArcManual:
     Centering completion pauses once. A further J/G explicitly starts ARC rolling.
     """
     def __init__(self,measured_deg,lengths,options=HelixArcOptions(),step_s=1.,max_feedback_age_s=.8,
-                 end_reset_options=None):
-        self.core=HelixArcTransition(np.radians(measured_deg),lengths,options)
+                 end_reset_options=None,feeding_settings=None):
+        self.core=HelixArcTransition(np.radians(measured_deg),lengths,options,feeding_settings)
         self.step_s=step_s;self.max_feedback_age_s=max_feedback_age_s
         self.running=False;self.started=False;self.step_left=0.;self.control_time=0.
         self.feedback_time=None;self.completed=False;self.feedback_wait=False
@@ -5498,8 +5550,8 @@ class HelixArcManual:
 # END ARC_HELIX_CORE
 
 # BEGIN CURVE_FEEDING_CORE
-# 模式4目标生成：拼接曲率子段 → 相邻连杆积分 → 目标角。
-# J/H任务、角反馈、长度估计、预置使能与退出逻辑继承前面的原控制器。
+# 模式4、5/6调长准备、7归中共用：曲线积分、参数工厂与同一个调长执行器。
+# 相对调长、准备位置、归中只改变目标；角反馈、预置使能与退出逻辑统一。
 # 改形状分配看FeedingCurveBuilder；改速度/步长仍看顶部FEED_*。
 @dataclass(frozen=True)
 class CurvePlan:
@@ -5507,6 +5559,7 @@ class CurvePlan:
     focus: tuple
     cell: int = 0
     fraction: float = 0.
+    roll_rad: float = 0.
 
     def targets(self, lengths):
         """Exact integral of k*cos(psi), k*sin(psi) over adjacent-link spans.
@@ -5518,7 +5571,7 @@ class CurvePlan:
         s = np.r_[0., np.cumsum(lengths)]
         lo, hi = s[:-2], s[2:]
         out = np.zeros(len(lengths)-1)
-        boundary = phase = 0.
+        boundary,phase=0.,self.roll_rad
         pitch = np.arange(len(out)) % 2 == 0
         for segment in self.segments:
             phase += segment.psi
@@ -5533,7 +5586,7 @@ class CurvePlan:
         return out
 
     def as_dict(self):
-        boundary = phase = 0.
+        boundary,phase=0.,self.roll_rad
         rows = []
         for segment in self.segments:
             phase += segment.psi
@@ -5543,7 +5596,7 @@ class CurvePlan:
                              torsion_per_m=segment.tau))
             boundary += segment.length
             phase += segment.tau*segment.length
-        return dict(focus=list(self.focus), cell=self.cell,
+        return dict(focus=list(self.focus), cell=self.cell,roll_rad=self.roll_rad,
                     fraction=self.fraction, segments=rows)
 
 
@@ -5554,6 +5607,28 @@ class FeedingCurveBuilder:
             raise ValueError('Positive finite individual link lengths required')
         self.n = len(self.lengths)-1
         self.s = np.r_[0., np.cumsum(self.lengths)]
+        self.reference_curve=None
+
+    def seed(self,segments,amplitude_deg):
+        """Accept the existing backbone curve as data, retaining its radius and shape."""
+        self.reference_curve=tuple(segments)
+        self.reference_amplitude=amplitude_deg
+
+    def _translated_reference(self,position,phase,amplitude_deg):
+        scale=amplitude_deg/self.reference_amplitude if self.reference_amplitude else 1.
+        segments=[HelixCurveSegment(s.length,s.kappa*scale,s.tau,s.psi) for s in self.reference_curve]
+        shift=position*float(np.median(self.lengths[1:-1]))
+        first,last=segments[0],segments[-1]
+        segments[0]=HelixCurveSegment(first.length+shift,first.kappa,first.tau,first.psi)
+        segments[-1]=HelixCurveSegment(last.length-shift,last.kappa,last.tau,last.psi)
+        bounds=np.r_[0.,np.cumsum([s.length for s in segments])]
+        active=np.zeros(self.n,bool)
+        for i,s in enumerate(segments):
+            if s.kappa>1e-9:
+                active|=(self.s[2:]>bounds[i]+1e-6)&(self.s[:-2]<bounds[i+1]-1e-6)
+        indices=np.flatnonzero(active)+1
+        return CurvePlan(tuple(segments),(int(indices[0]),int(indices[-1])),
+                         int(math.floor(position/2)),float(position/2%1),phase)
 
     def _basis(self, window, phase, amplitude_deg, bias):
         """Curvature densities keyed by axis and adjacent-link interval.
@@ -5601,9 +5676,11 @@ class FeedingCurveBuilder:
         return CurvePlan(tuple(segments), tuple(focus), cell, fraction)
 
     def template(self, window, phase, amplitude_deg, bias=0.):
+        if self.reference_curve is not None:return self._translated_reference(0.,phase,amplitude_deg)
         return self._stitch(self._basis(window, phase, amplitude_deg, bias), window)
 
     def travelling(self, origin, position, phase, bias, options, minimum_bin, maximum_bin):
+        if self.reference_curve is not None:return self._translated_reference(position,phase,options.amplitude_deg)
         cell = int(np.clip(math.floor(position/2), minimum_bin, maximum_bin))
         fraction = float(np.clip(position/2-cell, 0., 1.))
         old = tuple(j+2*cell for j in origin)
@@ -5654,9 +5731,12 @@ def curve_feeding_class(base):
 
     class CurveContinuousFeeding(base):
         trajectory_backend = 'stitched_curve_integral'
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, seed_curve=None,phase_rad=0., **kwargs):
             super().__init__(*args, **kwargs)
             self.curve_builder = FeedingCurveBuilder(self.lengths)
+            self.phase=phase_rad
+            if seed_curve is not None:
+                self.curve_builder.seed(seed_curve,self.options.amplitude_deg)
             self.last_curve = None
             self.helper = _CurveTemplateHelper(self.helper, self)
             self.targets = self.helper.template(self.origin, self.phase, self.options.amplitude_deg)
@@ -5679,6 +5759,27 @@ def curve_feeding_class(base):
 # 保存旧类仅用于离线对照；实机所有调长实例默认用曲线积分。
 LegacyContinuousFeeding = ContinuousFeeding
 ContinuousFeeding = curve_feeding_class(LegacyContinuousFeeding)
+CurveContinuousFeeding = ContinuousFeeding
+
+@dataclass(frozen=True)
+class FeedingSettings:
+    options: ContinuousFeedingOptions=ContinuousFeedingOptions(automatic_return=False)
+    direction: ManualFeedingDirectionOptions=ManualFeedingDirectionOptions()
+
+
+def create_feeding_controller(lengths,window,settings=None,*,amplitude_deg=None,phase_rad=0.,
+                              seed_curve=None,measured_deg=None,enabled=None,speed_scale=1.):
+    """The sole factory for manual transfer, switch preparation and final balancing."""
+    settings=FeedingSettings() if settings is None else settings
+    options=replace(settings.options,first_joint=window[0],last_joint=window[1],
+        maximum_position_rate_joints_s=settings.options.maximum_position_rate_joints_s*speed_scale,
+        target_rate_deg_s=settings.options.target_rate_deg_s*speed_scale)
+    if amplitude_deg is not None:options=replace(options,amplitude_deg=amplitude_deg)
+    core=CurveContinuousFeeding(lengths,options,seed_curve=seed_curve,phase_rad=phase_rad)
+    core.length_observer.options=settings.direction
+    if measured_deg is not None:core.targets=np.radians(measured_deg).copy()
+    if enabled is not None:core.enabled=np.asarray(enabled,bool).copy()
+    return core
 # END CURVE_FEEDING_CORE
 
 # BEGIN PASSIVE_END_RESET_CORE
@@ -5875,8 +5976,16 @@ class RollingArcController:
         self.end_reset_last = None
 
     @staticmethod
+    def make_feeding_settings():
+        options=ContinuousFeedingOptions(amplitude_deg=FEED_AMPLITUDE_DEG,preparation_s=FEED_PREPARATION_S,
+            maximum_position_rate_joints_s=FEED_RATE_JOINTS_S,automatic_return=FEED_AUTOMATIC_RETURN)
+        return FeedingSettings(replace(options,**FEED_OPTIONS_OVERRIDE),
+            replace(ManualFeedingDirectionOptions(),**FEED_DIRECTION_OVERRIDE))
+
+    @staticmethod
     def make_gravity_options():
-        return GravityCrossingOptions(retain_joints=GRAVITY_RETAIN_JOINTS,release_line_m=GRAVITY_RELEASE_LINE_M,
+        return GravityCrossingOptions(feeding_settings=RollingArcController.make_feeding_settings(),
+            retain_joints=GRAVITY_RETAIN_JOINTS,release_line_m=GRAVITY_RELEASE_LINE_M,
             release_arc_rad=math.radians(GRAVITY_U_ANGLE_DEG),release_radius_m=GRAVITY_RELEASE_RADIUS_M,
             alignment_rate_rad_s=GRAVITY_ALIGN_RATE_RAD_S,shift_rate_m_s=GRAVITY_SHIFT_RATE_M_S,
             return_roll_rad_s=GRAVITY_RETURN_ROLL_RAD_S,step_s=HELIX_STEP_S,
@@ -5895,6 +6004,7 @@ class RollingArcController:
         return HelixArcManual(self.measured_angles(), LINK_LENGTHS_M,
             replace(HelixArcOptions(**HELIX_ARC_OPTIONS),speed_scale=HELIX_ARC_SPEED_SCALE),step_s=HELIX_ARC_STEP_S,
             max_feedback_age_s=MAX_FEEDBACK_AGE_S,
+            feeding_settings=self.make_feeding_settings(),
             end_reset_options=dict(rate_deg_s=END_ZERO_RATE_DEG_S*HELIX_ARC_SPEED_SCALE,
                 hold_s=END_ZERO_HOLD_S,max_s=END_ZERO_MAX_S) if END_ZERO_ON_HELIX_ARC else None)
 
@@ -5986,7 +6096,7 @@ class RollingArcController:
         curve=manual.core
         self.helix_arc_last=copy.deepcopy(manual.status())
         self.basic_arc_reference=ArcCurveReference(curve.lengths,curve.head,curve.arc_length,
-                                                 curve.radius,self.amplitude)
+                                                 curve.radius,self.amplitude,feeding=curve.center_feeding)
         self.end_reset_last=copy.deepcopy(manual.end_reset_last)
         self.helix_arc_transition=None
         self.pending_phase,self.mode,self.freeze_targets=0.,'hold',True
@@ -6234,11 +6344,9 @@ class RollingArcController:
             return
         settings=self.make_feeding_settings()
         options = replace(settings.options,first_joint=self.feeding_origin[0], last_joint=self.feeding_origin[1],
-            amplitude_deg=FEED_AMPLITUDE_DEG, requested_transfer_m=self.feed_direction*self.feed_distance_m,
-            preparation_s=FEED_PREPARATION_S, maximum_position_rate_joints_s=FEED_RATE_JOINTS_S,
-            maximum_feed_s=60. if self.feed_distance_m<=float(np.median(LINK_LENGTHS_M[1:-1]))+1e-9 else 100.)
-        options = replace(options, **FEED_OPTIONS_OVERRIDE)
-        options = replace(options, automatic_return=FEED_AUTOMATIC_RETURN)
+            requested_transfer_m=self.feed_direction*self.feed_distance_m,
+            maximum_feed_s=FEED_OPTIONS_OVERRIDE.get('maximum_feed_s',
+                60. if self.feed_distance_m<=float(np.median(LINK_LENGTHS_M[1:-1]))+1e-9 else 100.))
         core = create_feeding_controller(LINK_LENGTHS_M,self.feeding_origin,replace(settings,options=options))
         measured = np.asarray(self.measured_angles())
         mask = core.enabled | np.asarray(self.enabled)

@@ -101,6 +101,28 @@ class ContinuousFeeding:
         self.acquisition_reason = None
         self.acquisition_metrics = {}
         self.forced_step = None
+        self.goal_kind='relative_length'
+        self.position_goal=None
+        self.goal_direction_pending=False
+
+    def request_position(self,position_joints,control_time_s=0.):
+        """Automatically request a profile location through the same feeding executor."""
+        self.position_goal=float(np.clip(position_joints,*self.position_bounds))
+        direction=1 if self.position_goal>=self.position else -1
+        self.options=replace(self.options,requested_transfer_m=direction*max(
+            abs(self.position_goal-self.position)*float(np.median(self.lengths[1:-1])),1e-9),automatic_return=False)
+        self.reference_direction=direction
+        self.goal_kind='position';self.goal_m=self.baseline=0.
+        self.stage='feed_out';self.stage_since=control_time_s
+        self.completed=False;self.fault=None;self.ready_since=None
+
+    def request_center(self,control_time_s=0.):
+        """Absolute zero differential length; same observation, movement and handover as manual feeding."""
+        self.goal_kind='balance';self.goal_m=self.baseline=0.
+        self.goal_direction_pending=True
+        self.options=replace(self.options,automatic_return=False)
+        self.stage='feed_out';self.stage_since=control_time_s
+        self.completed=False;self.fault=None;self.ready_since=None
 
     def request_step(self, distance_m, control_time_s):
         """Start one relative action without resetting the travelling profile.
@@ -111,6 +133,7 @@ class ContinuousFeeding:
         if not math.isfinite(distance_m) or distance_m == 0:
             raise ValueError('A finite nonzero feeding distance is required')
         self.forced_step = None
+        self.goal_kind='relative_length'
         self.options = replace(self.options, requested_transfer_m=distance_m)
         self.goal_speed_tolerance_m_s = self.options.speed_tolerance_m_s*max(
             1., abs(distance_m)/float(np.median(self.lengths[1:-1])))
@@ -365,6 +388,16 @@ class ContinuousFeeding:
             if self.observation['valid']:
                 self.untrusted_since = None
                 coordinate = self.observation['transfer_coordinate_m']
+                if self.goal_direction_pending:
+                    direction=1 if self.goal_m>=coordinate else -1
+                    self.reference_direction=direction
+                    self.options=opt=replace(opt,requested_transfer_m=direction*abs(opt.requested_transfer_m))
+                    self.goal_direction_pending=False
+                if self.release_below_peak_m is None and self.goal_kind!='relative_length':
+                    points=forward(np.radians(angles),self.lengths)
+                    heights=-points@np.array(self.observation['down_head'])
+                    first,last=self.origin
+                    self.release_below_peak_m=float(heights.max()-heights[first:last+2].min()+.5*np.median(self.lengths[1:-1]))
                 if self.last_length_time is not None:
                     sample_dt = feedback_time_s-self.last_length_time
                     raw_velocity = (coordinate-self.previous_coordinate)/sample_dt
@@ -418,15 +451,24 @@ class ContinuousFeeding:
             # joint at its preload angle. Finish the already commanded shape
             # while waiting for the length/gravity proxy to become usable.
             desired, _, _, _ = self.profile(self.position, self.bias)
-            if self.observation['valid']:
-                error = self.goal_m-self.observation['transfer_coordinate_m']
-                speed = opt.length_gain_s*error-opt.speed_damping*self.velocity_m_s
-                rate = np.clip(speed/np.median(self.lengths[1:-1]),
-                               -opt.maximum_position_rate_joints_s, opt.maximum_position_rate_joints_s)
+            if self.observation['valid'] or self.goal_kind=='position':
+                if self.goal_kind=='position':
+                    remaining=self.position_goal-self.position
+                    error=remaining*float(np.median(self.lengths[1:-1]))
+                    rate=float(np.clip(remaining/max(dt,1e-12),-opt.maximum_position_rate_joints_s,
+                                       opt.maximum_position_rate_joints_s))
+                else:
+                    error = self.goal_m-self.observation['transfer_coordinate_m']
+                    speed = opt.length_gain_s*error-opt.speed_damping*self.velocity_m_s
+                    rate = np.clip(speed/np.median(self.lengths[1:-1]),
+                                   -opt.maximum_position_rate_joints_s, opt.maximum_position_rate_joints_s)
                 proposed_position = float(np.clip(self.position+rate*dt, *self.position_bounds))
                 current, _, _, _ = self.profile(self.position, self.bias)
                 self.tracking_error_deg = float(np.max(abs(np.degrees(current[self.enabled])-angles[self.enabled])))
-                self.actual_enabled_turn_deg = float(abs(angles[self.enabled]).sum())
+                # Pitch/yaw projections rotate with rolling phase; their vector
+                # norm retains the same turn budget at every phase.
+                self.actual_enabled_turn_deg=float(math.hypot(angles[self.enabled & (np.arange(self.n)%2==0)].sum(),
+                                                             angles[self.enabled & (np.arange(self.n)%2==1)].sum()))
                 blocked = (self.tracking_error_deg>opt.tracking_tolerance_deg or
                            self.actual_enabled_turn_deg>opt.tracked_turn_soft_limit_deg)
                 if blocked:
@@ -461,7 +503,9 @@ class ContinuousFeeding:
                 self.window = (int(active[0]), int(active[-1]))
                 desired = proposal
                 if fresh and self.stage in ('feed_out', 'feed_return'):
-                    reached = abs(error)<=opt.length_tolerance_m and abs(self.velocity_m_s)<=self.goal_speed_tolerance_m_s
+                    reached = (abs(self.position_goal-self.position)<=1e-9 and
+                               self.tracking_error_deg<=opt.tracking_tolerance_deg) if self.goal_kind=='position' else (
+                               abs(error)<=opt.length_tolerance_m and abs(self.velocity_m_s)<=self.goal_speed_tolerance_m_s)
                     self.ready_since = (feedback_time_s if self.ready_since is None else self.ready_since) if reached else None
                     if self.ready_since is not None and feedback_time_s-self.ready_since >= opt.persistence_s-1e-8:
                         self.stage = 'review_out' if self.stage == 'feed_out' else 'review_return'
@@ -469,11 +513,12 @@ class ContinuousFeeding:
                         if self.stage=='review_out' and not opt.automatic_return:
                             self.stage, self.completed = 'complete', True
                         self.events.append(dict(kind='length_goal_observed', time_s=control_time_s,
-                            goal_delta_m=self.goal_m-self.baseline, observed_delta_m=coordinate-self.baseline,
+                            goal_kind=self.goal_kind,goal_delta_m=self.goal_m-self.baseline,
+                            observed_delta_m=None if not self.observation['valid'] else self.observation['transfer_coordinate_m']-self.baseline,
                             velocity_m_s=self.velocity_m_s, position_joints=self.position))
             if self.tracking_blocked_since is not None and control_time_s-self.tracking_blocked_since>opt.maximum_tracking_wait_s:
                 self.fault = 'measured shape tracking did not recover within bounded handover'
-            elif self.untrusted_since is not None and control_time_s-self.untrusted_since > opt.maximum_untrusted_s:
+            elif self.goal_kind!='position' and self.untrusted_since is not None and control_time_s-self.untrusted_since > opt.maximum_untrusted_s:
                 self.fault = 'length observation did not recover during bounded shape completion'
             elif self.stage in ('feed_out', 'feed_return') and control_time_s-self.stage_since > opt.maximum_feed_s:
                 self.fault = 'length goal not reached within bounded feeding'
@@ -492,6 +537,7 @@ class ContinuousFeeding:
 
     def snapshot(self):
         return dict(stage=self.stage, route='continuous_feeding', window=list(self.window),
+            goal_kind=self.goal_kind,position_goal_joints=self.position_goal,
             forced_step=None if self.forced_step is None else dict(self.forced_step),
             acquisition_reason=self.acquisition_reason,
             acquisition_samples=len(self.acquisition_samples),

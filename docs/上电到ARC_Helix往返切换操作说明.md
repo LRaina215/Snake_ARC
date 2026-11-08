@@ -25,9 +25,9 @@
 
 参数都在 codes/Rolling_Arc_Real.py 顶部；改文件后重启程序才生效。Ctrl+5与Ctrl+7的倍率独立，Ctrl+7完成后的普通ARC运动改OMEGA_RAD_S，不改切换倍率。
 
-- 第2行的自动调长若设置了FEED_OPTIONS_OVERRIDE中的maximum_position_rate_joints_s，以覆盖值为准，再乘Ctrl+5倍率。
+- Ctrl+4手动调长、Ctrl+5自动预调、Ctrl+7自动归中共用同一个调长执行器与FEED配置。调长速度统一改FEED_RATE_JOINTS_S；若在FEED_OPTIONS_OVERRIDE设置maximum_position_rate_joints_s，以覆盖值为准。Ctrl+5再乘自己的切换倍率，Ctrl+7归中再乘自己的回程倍率。
 - 第3行末尾仍有约5秒的recover过渡，目前没有顶部独立调速入口；最终统一Helix的目标限速为18×Ctrl+5倍率度/秒。因此提高倍率不代表整段耗时严格按比例缩短。
-- 第4行若只想调某一种动作，改HELIX_ARC_OPTIONS：reverse_feed_m_s / reverse_roll_rad_s控制解缠进给与滚动；lead_s / flatten_s控制过渡和半圆成形基础时长；center_rate_m_s控制归中速度上限；target_rate_deg_s控制目标变化速度。速度值实际乘Ctrl+7倍率，基础时长随倍率缩短；静置和反馈时间仍按实际时间。
+- 第4行若只想调某一种动作，改HELIX_ARC_OPTIONS：reverse_feed_m_s / reverse_roll_rad_s控制解缠进给与滚动；lead_s / flatten_s控制过渡和半圆成形基础时长；target_rate_deg_s控制这些阶段的目标变化速度。归中使用公共FEED参数：target_rate_deg_s是调长目标限速，length_tolerance_m是长度代理容差，均写在FEED_OPTIONS_OVERRIDE。速度实际乘Ctrl+7倍率，基础时长随倍率缩短；静置和反馈时间仍按实际时间。
 - 第5行每次单步太短，可把PHASE_STEP_RAD从0.10改成0.30，每次行程即原来的三倍；在线Ctrl+=增大、Ctrl+-减小。动作本身要更快则改OMEGA_RAD_S，在线Ctrl+右增加、Ctrl+左减小，每次0.05 rad/s。
 - 想对第2、3、4行改为单步观察，用Ctrl+J代替Ctrl+G。Ctrl+5／Ctrl+7切换中每次执行HELIX_STEP_S / HELIX_ARC_STEP_S规定的秒数，默认各1秒；只有返回第5行的基础ARC后，Ctrl+J／Ctrl+H才按PHASE_STEP_RAD累计正反行程。
 

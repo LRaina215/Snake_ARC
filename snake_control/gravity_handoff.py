@@ -1,5 +1,5 @@
 """实机 T 管越障。几何事件由操作者确认，进给只使用全身实测关节角。"""
-from dataclasses import dataclass
+from dataclasses import dataclass,replace
 from typing import Optional
 import math
 
@@ -7,7 +7,7 @@ import numpy as np
 
 from .arc_helix_transition import ArcHelixOptions, ArcHelixTransition
 from .curve_gait import helix
-from .continuous_feeding import ContinuousFeeding, ContinuousFeedingOptions
+from .feeding_controller import FeedingSettings, create_feeding_controller
 from .gravity_global_shift import MeasuredGravityShift
 from .gravity_moment import GravityMomentGait, GravityMomentOptions, smooth
 from .section_geometry import local_section
@@ -17,10 +17,13 @@ from .posture_initialization import choose_feeding_arc
 class GravityFrontTransition(ArcHelixTransition):
     """保持承载 ARC，只延长头端螺旋，直至操作者确认贴管。"""
 
-    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., feed_rate_joints_s=.1, **kwargs):
+    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., feed_rate_joints_s=.1, feeding_settings=None, **kwargs):
         self.minimum_front_turns = minimum_front_turns
         self.speed_scale = speed_scale
         self.feed_rate_joints_s = feed_rate_joints_s
+        default_settings=FeedingSettings()
+        self.feeding_settings=(replace(default_settings,options=replace(default_settings.options,
+            maximum_position_rate_joints_s=feed_rate_joints_s)) if feeding_settings is None else feeding_settings)
         super().__init__(*args, **kwargs)
 
     def _check_front_entry(self):
@@ -51,14 +54,10 @@ class GravityFrontTransition(ArcHelixTransition):
         """自动调长复用模式4的曲线分配、相邻折弯接管与目标限速。"""
         first, last = self.window
         goal = self.desired_start-first
-        options = ContinuousFeedingOptions(first_joint=first, last_joint=last,
-            amplitude_deg=math.degrees(self.amplitude), requested_transfer_m=goal*self.l,
-            automatic_return=False, tracking_tolerance_deg=8.,
-            maximum_position_rate_joints_s=self.feed_rate_joints_s*self.speed_scale)
-        self.transfer = ContinuousFeeding(self.lengths, options)
-        self.transfer.phase = self.phase
-        self.transfer.targets = self.measured.copy()
-        self.transfer.enabled = self._enabled.copy()
+        self.transfer=create_feeding_controller(self.lengths,self.window,self.feeding_settings,
+            amplitude_deg=math.degrees(self.amplitude),phase_rad=self.phase,
+            measured_deg=np.degrees(self.measured),enabled=self._enabled,speed_scale=self.speed_scale)
+        self.transfer.request_position(float(goal))
         self.transfer_goal = float(goal)
         self.transfer_clock = 0.
         self.transfer_feedback_sample = None
@@ -76,28 +75,13 @@ class GravityFrontTransition(ArcHelixTransition):
             self.transfer_feedback_sample = self.feedback_time
             self.transfer_feedback_clock = clock
         helper.advance(np.degrees(self.measured), self.transfer_feedback_clock, clock)
-        if helper.forced_step is None:
-            error = np.max(abs(helper.targets[helper.enabled]-self.measured[helper.enabled]))
-            remaining = abs(self.transfer_goal-helper.position)
-            if remaining > 1e-9:
-                pace = float(np.clip((math.radians(23.)-error)/math.radians(17.), .1, 1.))
-                increment = min(remaining, helper.options.maximum_position_rate_joints_s*pace*dt)
-                _, focus, _, _ = helper.profile(helper.position, helper.bias)
-                required = helper.required_mask(focus, np.degrees(self.measured), helper.position)
-                entering = required & ~helper.enabled
-                helper.targets[entering] = self.measured[entering]
-                helper.enabled |= required
-                helper.start_forced_step(np.degrees(self.measured), increment, clock)
-            elif fresh:
-                follows = error <= math.radians(8.)
-                self.transfer_ready_since = (clock if self.transfer_ready_since is None else
-                                             self.transfer_ready_since) if follows else None
-                if self.transfer_ready_since is not None and clock-self.transfer_ready_since >= .4:
-                    _, focus, _, _ = helper.profile(helper.position, helper.bias)
-                    selection = choose_feeding_arc(np.degrees(self.measured), self.lengths, helper.enabled, focus)
-                    self.window = tuple(selection['chosen'])
-                    self.phase = helper.phase
-                    self.stage = 'transfer_done'
+        if helper.fault:
+            raise ValueError('Automatic feeding: '+helper.fault)
+        if helper.completed:
+            _,focus,_,_=helper.profile(helper.position,helper.bias)
+            selection=choose_feeding_arc(np.degrees(self.measured),self.lengths,helper.enabled,focus)
+            self.window=tuple(selection['chosen']);self.phase=helper.phase
+            self.stage='transfer_done'
         self._targets = helper.targets.copy()
         self._enabled = helper.enabled.copy()
 
@@ -118,6 +102,7 @@ class GravityFrontTransition(ArcHelixTransition):
 
 @dataclass(frozen=True)
 class GravityCrossingOptions:
+    feeding_settings: object = None
     retain_joints: Optional[int] = 8  # None: derive the prefix from the current curve boundary.
     release_line_m: float = .32201388
     release_arc_rad: float = math.pi
@@ -190,7 +175,7 @@ class GravityCrossing:
         return GravityFrontTransition(lengths, window, np.degrees(self.measured),
             options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
             minimum_front_turns=self.options.min_front_turns,speed_scale=self.options.transition_speed_scale,
-            feed_rate_joints_s=self.options.feed_rate_joints_s)
+            feed_rate_joints_s=self.options.feed_rate_joints_s,feeding_settings=self.options.feeding_settings)
 
     def unwind_retain_count(self, helix_length=None):
         """Complete helical joint neighbourhoods; no MuJoCo support estimate."""

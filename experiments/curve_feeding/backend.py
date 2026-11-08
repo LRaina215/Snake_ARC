@@ -1,57 +1,6 @@
-"""Trajectory-only adapter; state machine and observation stay inherited."""
-from snake_control.continuous_feeding import ContinuousFeeding
-from .curve_profile import FeedingCurveBuilder
-
-
-class _CurveTemplateHelper:
-    def __init__(self, original, owner):
-        self.original, self.owner = original, owner
-
-    def __getattr__(self, name):
-        return getattr(object.__getattribute__(self, 'original'), name)
-
-    def template(self, window, phase, amplitude, bias=0.):
-        plan = self.owner.curve_builder.template(window, phase, amplitude, bias)
-        self.owner.last_curve = plan
-        return plan.targets(self.owner.lengths)
-
-
-def curve_feeding_class(base):
-    """Works with library or single-file embedded controller, unchanged above.
-
-    Super initializes the old bookkeeping; its unused seed is immediately
-    replaced before the object is exposed. Every returned motion reference,
-    including preparation, comes through the curve integral thereafter.
-    """
-    if getattr(base, 'trajectory_backend', None) == 'stitched_curve_integral':
-        return base
-
-    class CurveContinuousFeeding(base):
-        trajectory_backend = 'stitched_curve_integral'
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.curve_builder = FeedingCurveBuilder(self.lengths)
-            self.last_curve = None
-            self.helper = _CurveTemplateHelper(self.helper, self)
-            self.targets = self.helper.template(self.origin, self.phase, self.options.amplitude_deg)
-
-        def profile(self, position, bias):
-            plan = self.curve_builder.travelling(self.origin, position, self.phase, bias,
-                self.options, self.minimum_bin, self.maximum_bin)
-            self.last_curve = plan
-            return plan.targets(self.lengths), plan.focus, plan.cell, plan.fraction
-
-        def snapshot(self):
-            row = super().snapshot()
-            row['trajectory_backend'] = self.trajectory_backend
-            row['curve_reference'] = None if self.last_curve is None else self.last_curve.as_dict()
-            return row
-
-    CurveContinuousFeeding.__name__ = 'CurveContinuousFeeding'
-    return CurveContinuousFeeding
-
-
-CurveContinuousFeeding = curve_feeding_class(ContinuousFeeding)
+"""Research opt-in; all feeding math comes from the production module."""
+from snake_control.feeding_controller import (
+    _CurveTemplateHelper, curve_feeding_class, CurveContinuousFeeding)
 
 
 def install_in_debug_process():

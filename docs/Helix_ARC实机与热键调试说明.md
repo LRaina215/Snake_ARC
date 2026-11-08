@@ -44,13 +44,13 @@ Ctrl+4/5/6保持原功能。可以离开7选择其他模式；选择其他模式
 | `head_clearance_rad` | 40°的弧度值，头端临时正交绕行弯角，成形后消除 |
 | `lead_s / flatten_s` | 1.5／6.0 s，建立过渡／半圆成形时间 |
 | `target_rate_deg_s` | 35°/s，目标角最大变化率 |
-| `center_rate_m_s` | 0.010 m/s，自动归中最大材料坐标速度 |
-| `center_tolerance_m` | 0.025 m，角反馈估计的尾侧减头侧长度差目标 |
+| `FEED_RATE_JOINTS_S` | 与Ctrl+4/5共用的调长速度；归中时乘Ctrl+7倍率，同名底层覆盖项优先 |
+| `FEED_OPTIONS_OVERRIDE` | 公共调长参数；length_tolerance_m为长度代理容差，target_rate_deg_s为调长目标限速 |
 | `roll_rate_rad_s` | 0.35 rad/s，仅用于离线直接调用核心续滚；实机／手调完成后由基础`OMEGA_RAD_S`控制 |
 
-整体倍率覆盖解缠送链／相位、调相、过渡成形、头端导出、逐节释放和自动归中；各自目标角最大变化率也同比缩放。比如1.5倍时，基础16 mm/s与0.112 rad/s成为24 mm/s与0.168 rad/s，半圆成形6 s成为4 s。J单步秒数、200 ms反馈周期、2／3 s静置和0.8 s归中稳定等待仍按实际执行时间计算，所以全流程时间不一定严格反比于倍率。完成后滚动由基础`OMEGA_RAD_S`控制，不乘此倍率。暂停不推进任何阶段。
+整体倍率覆盖解缠送链／相位、调相、过渡成形、头端导出、逐节释放和自动归中；各自目标角最大变化率也同比缩放。比如1.5倍时，基础16 mm/s与0.112 rad/s成为24 mm/s与0.168 rad/s，半圆成形6 s成为4 s。J单步秒数、200 ms反馈周期、2／3 s静置和公共FEED配置中的稳定等待仍按实际执行时间计算，所以全流程时间不一定严格反比于倍率。完成后滚动由基础`OMEGA_RAD_S`控制，不乘此倍率。暂停不推进任何阶段。
 
-模式7不额外叠乘`HELIX_TRANSITION_SPEED_SCALE`或`FEED_RATE_JOINTS_S`；只有你显式设置上述别名时才共用5的数值。机械尺寸由`LINK_LENGTHS_M`提供，当前实机按用户手量近似为头端25 mm、17段相邻轴距72 mm、尾端91 mm。曲线积分与实测Helix拟合均使用各段实际配置距离。仿真手调按加载模型的骨架距离配置，不把新实机尺寸强加给旧模型。
+模式7不叠乘`HELIX_TRANSITION_SPEED_SCALE`。归中与Ctrl+4/5使用同一个`create_feeding_controller`和`ContinuousFeeding.advance`，读取相同FEED速度、观察器和交接参数，只把目标设为两侧等长；沿用已形成的连续圆弧半径和相位。旧的center_rate_m_s / center_tolerance_m独立选项已删除。机械尺寸由`LINK_LENGTHS_M`提供，当前实机按用户手量近似为头端25 mm、17段相邻轴距72 mm、尾端91 mm。曲线积分与实测Helix拟合均使用各段实际配置距离。仿真手调按加载模型的骨架距离配置，不把新实机尺寸强加给旧模型。
 
 `END_ZERO_ON_HELIX_ARC=True`在归中前`arc_end_reset`和归中后`arc_final_end_reset`各执行一次两端归零。第二次使用最终的承载掩码，包含归中中新释放的关节。保持承载弧目标，预置两端实测角后使能，再按`END_ZERO_RATE_DEG_S`逐步到零；保持`END_ZERO_HOLD_S`且实测角≤5°后失能，最长`END_ZERO_MAX_S`即2秒执行时间后也会失能并继续。实际归零速率乘模式7速度倍率。暂停或J预算用完会立即撤去临时端部使能，再J/G从最新角反馈接续。可设False关闭，不影响Ctrl+U的独立开关。
 

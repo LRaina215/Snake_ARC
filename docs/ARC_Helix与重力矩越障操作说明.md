@@ -136,6 +136,8 @@ L确认时保持目标；继续回卷后前部目标随曲线变化。现场对�
 
 当前分配和提速的检查结果见[实测候选说明](2026-11-08实测候选U分配与切换提速.md)。它们尚待新连接件实机验收，不能据此认定防滑已解决；修改文件后退出旧Python再启动。
 
+Ctrl+5/6的自动调长准备现与Ctrl+4手动调长、Ctrl+7归中共用`create_feeding_controller`及`ContinuousFeeding.advance`。三者只提出不同的目标，FEED_OPTIONS_OVERRIDE和FEED_DIRECTION_OVERRIDE统一传递；切换层不再另写调长步进、使能交接或退出控制。公共实现及本轮验证见[复用说明](../validation/reports/shared_feeding_20261108/README.md)。
+
 历史版本18关节、主管／支管110/60 mm的10类仿真见[旧报告](../validation/reports/sequential_handoff/README.md)。晚间替换首次送尾后，已验证近等长、头短、尾短三种直管起态，并续跑10 s；T管代表例完成前部支撑和原回卷接入，但停在自动操作者的对准判据，未完成完整T管回归。新连接件的实机与准确几何尚未验收，不继承旧版本的全场景通过结论。
 
 本机演示在 `artifacts/sequential_handoff/demos/`：`basic5_4x.mp4`、`tail_short5_4x.mp4`、`feed_h5_4x.mp4`、`direct6_4x.mp4`、`five_then6_4x.mp4`、`feed_h6_4x.mp4`。录像含阶段、最近热键、使能、已发目标角与实测角；MP4按仓库规则保留在本地，不随git push上传。
