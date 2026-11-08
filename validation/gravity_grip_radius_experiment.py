@@ -19,7 +19,7 @@ from validation.gm_replay_wrap_experiment import save
 from snake_control.simulation import backbone
 
 
-def run(source,output,adjusted):
+def run(source,output,adjusted,tighten_steps=None):
     record=json.loads((source/'locked_gait.json').read_text(encoding='utf-8'))
     rows=record['samples'];trace=np.load(source/'locked_gait_trace.npz')
     index=next(i for i,r in enumerate(rows) if r['stage']=='unwind')-1
@@ -36,6 +36,8 @@ def run(source,output,adjusted):
         from_helix=True)
     c.phase=c.command_phase=c.helix_transition.phase
     actions=[(.2,'O'),(.4,'O'),(.6,'P')] if adjusted else []
+    if adjusted and tighten_steps is not None:
+        actions=[(.2+.02*i,'O') for i in range(tighten_steps)]
     actions += [(3.,'L'),(3.,'G')]
     commands=[];control_rows=[];collisions=[];last_control=last_feedback=-1.
     def control(_):
@@ -76,7 +78,7 @@ def run(source,output,adjusted):
     original_radii=all(abs(r['unwind_release_radius_m']-.09554165)<1e-12 and abs(r['return_radius_m']-.098)<1e-12 for r in control_rows)
     trim=[r for r in control_rows if r['stage']=='grip_adjust']
     phase_spread=0. if not trim else float(np.ptp([r['phase_rad'] for r in trim]))
-    report=dict(adjusted=adjusted,source_record=str(source),source_index=index,source_time_s=float(trace['time'][index]),
+    report=dict(adjusted=adjusted,tighten_steps=tighten_steps,source_record=str(source),source_index=index,source_time_s=float(trace['time'][index]),
         dynamics_s=float(trial.data.time),final_stage=c.helix_transition.stage,
         grip_radius_m=c.helix_transition.grip_radius_m,original_later_radii_unchanged=original_radii,
         trim_phase_spread_rad=phase_spread,enabled_changed=any(not np.all(mask) for mask in trial.masks),
@@ -91,8 +93,9 @@ def run(source,output,adjusted):
         floor_frames=sum(r['ground_force_n']>1 for r in rows),self_contact_events=collisions[:1],
         pre_loosen_front_turn_min_deg=min(s['front_turn_deg'] for _,s in before),
         pre_loosen_front_axial_range_m=float(np.ptp([s['front_center_x_m'] for _,s in before])))
+    expected_radius=.094 if not adjusted else .094-.001*(1 if tighten_steps is None else tighten_steps)
     report['interface_passed']=bool(original_radii and phase_spread<1e-12 and not report['enabled_changed']
-        and abs(report['grip_radius_m']-(.093 if adjusted else .094))<1e-10 and report['final_stage']=='right_u_hold')
+        and abs(report['grip_radius_m']-expected_radius)<1e-10 and report['final_stage']=='right_u_hold')
     report['bounded_contact_check_passed']=bool(report['interface_passed'] and not collisions and not report['floor_frames']
         and not report['no_main_contact_frames'])
     report['dynamics_check_passed']=bool(report['bounded_contact_check_passed'] and report['actual_u_ready_frames']>0)

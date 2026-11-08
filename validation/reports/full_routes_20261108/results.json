@@ -1,0 +1,804 @@
+{
+  "hardware_run": false,
+  "production_controller_changed": false,
+  "all_requested_routes_completed": false,
+  "old_joint_spacing_m": 0.0645,
+  "main_diameter_m": 0.11,
+  "branch_diameter_m": 0.06,
+  "control_period_s": 0.02,
+  "motor_feedback_period_s": 0.2,
+  "operator": "20 ms actual-pose and contact confirmations, no fixed absolute motor-phase gate",
+  "selected": {
+    "ctrl4_ctrl5": {
+      "record": "artifacts\\full_routes_20261108\\round1\\ctrl4_ctrl5",
+      "review": {
+        "case": "ctrl4_ctrl5",
+        "controller_passed": true,
+        "failure": null,
+        "final_stage": "complete",
+        "frames": 3571,
+        "stage_intervals": [
+          {
+            "stage": "feeding",
+            "start_s": 2.5009999999998356,
+            "end_s": 24.700000000007204
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 24.750000000007265,
+            "end_s": 26.500000000009404
+          },
+          {
+            "stage": "front",
+            "start_s": 26.550000000009465,
+            "end_s": 37.30000000000377
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 37.350000000003654,
+            "end_s": 39.29999999999911
+          },
+          {
+            "stage": "front",
+            "start_s": 39.34999999999899,
+            "end_s": 43.699999999988854
+          },
+          {
+            "stage": "front_finish",
+            "start_s": 43.74999999998874,
+            "end_s": 96.10000000009481
+          },
+          {
+            "stage": "front_seat",
+            "start_s": 96.15000000009505,
+            "end_s": 97.5000000001015
+          },
+          {
+            "stage": "front_hold",
+            "start_s": 97.55000000010173,
+            "end_s": 98.10000000010436
+          },
+          {
+            "stage": "return_seat",
+            "start_s": 98.1500000001046,
+            "end_s": 111.10000000016643
+          },
+          {
+            "stage": "return_wind",
+            "start_s": 111.15000000016667,
+            "end_s": 166.85000000043263
+          },
+          {
+            "stage": "return_finish",
+            "start_s": 166.90000000043287,
+            "end_s": 169.85000000044695
+          },
+          {
+            "stage": "recover",
+            "start_s": 169.9000000004472,
+            "end_s": 174.90000000047107
+          },
+          {
+            "stage": "helix_normalize",
+            "start_s": 174.9500000004713,
+            "end_s": 175.50000000047393
+          },
+          {
+            "stage": "complete",
+            "start_s": 175.55000000047417,
+            "end_s": 178.50000000048826
+          }
+        ],
+        "commands": [
+          {
+            "time_s": 2.4999999999998357,
+            "key": "Ctrl+4",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": null
+          },
+          {
+            "time_s": 2.4999999999998357,
+            "key": "Ctrl+H",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": null
+          },
+          {
+            "time_s": 24.72000000000723,
+            "key": "Ctrl+5",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": "arc_settle"
+          },
+          {
+            "time_s": 24.72000000000723,
+            "key": "Ctrl+G",
+            "stage_before": "arc_settle",
+            "result": "accepted",
+            "stage": "arc_settle"
+          },
+          {
+            "time_s": 98.12000000010445,
+            "key": "Ctrl+N",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "front_hold"
+          },
+          {
+            "time_s": 98.12000000010445,
+            "key": "Ctrl+L",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "return_seat"
+          },
+          {
+            "time_s": 98.12000000010445,
+            "key": "Ctrl+G",
+            "stage_before": "return_seat",
+            "result": "accepted",
+            "stage": "return_seat"
+          }
+        ],
+        "front_before_tail": true,
+        "actual_helix_shape_passed": true,
+        "helix_shape_frames": 60,
+        "final_min_turns": 1.977938155703945,
+        "final_max_radius_m": 0.10682011142987326,
+        "preparation_max_near_pipe_coverage_deg": 235.88382596069366,
+        "actual_mode4_material_change_m": -0.07020769257771386,
+        "passive_actuator_force_max_nm": 0.0,
+        "self_contact_events": [],
+        "floor_frames": 0,
+        "low_total_force_frames": 2,
+        "maximum_actual_joint_deg": 74.69706261318555,
+        "maximum_tracking_deg": 8.17955424235251,
+        "saturated_frames": 85,
+        "right_u_confirmations": [],
+        "recovery": {
+          "passed": false,
+          "reason": "recovery not reached"
+        },
+        "gravity_drop": null,
+        "passed": true
+      },
+      "video": "artifacts\\full_routes_20261108\\demos\\ctrl4_ctrl5_4x.mp4",
+      "key_log": "artifacts\\full_routes_20261108\\demos\\ctrl4_ctrl5_keys.txt"
+    },
+    "ctrl4_ctrl5_ctrl6_failed": {
+      "record": "artifacts\\full_routes_20261108\\round2\\ctrl4_ctrl5_ctrl6",
+      "review": {
+        "case": "ctrl4_ctrl5_ctrl6",
+        "controller_passed": false,
+        "failure": "actual pose did not satisfy the operator confirmation at right_u_hold",
+        "final_stage": "right_u_hold",
+        "frames": 3961,
+        "stage_intervals": [
+          {
+            "stage": "feeding",
+            "start_s": 0.001,
+            "end_s": 21.40000000000317
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 21.450000000003232,
+            "end_s": 23.20000000000537
+          },
+          {
+            "stage": "front",
+            "start_s": 23.250000000005432,
+            "end_s": 34.00000000001146
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 34.050000000011345,
+            "end_s": 36.0000000000068
+          },
+          {
+            "stage": "front",
+            "start_s": 36.05000000000668,
+            "end_s": 40.399999999996545
+          },
+          {
+            "stage": "front_finish",
+            "start_s": 40.44999999999643,
+            "end_s": 92.80000000007905
+          },
+          {
+            "stage": "front_seat",
+            "start_s": 92.85000000007929,
+            "end_s": 94.20000000008574
+          },
+          {
+            "stage": "front_hold",
+            "start_s": 94.25000000008598,
+            "end_s": 94.8000000000886
+          },
+          {
+            "stage": "return_seat",
+            "start_s": 94.85000000008884,
+            "end_s": 107.80000000015067
+          },
+          {
+            "stage": "return_wind",
+            "start_s": 107.85000000015091,
+            "end_s": 163.55000000041687
+          },
+          {
+            "stage": "return_finish",
+            "start_s": 163.6000000004171,
+            "end_s": 166.5500000004312
+          },
+          {
+            "stage": "recover",
+            "start_s": 166.60000000043144,
+            "end_s": 171.6000000004553
+          },
+          {
+            "stage": "helix_normalize",
+            "start_s": 171.65000000045555,
+            "end_s": 172.20000000045818
+          },
+          {
+            "stage": "complete",
+            "start_s": 172.2500000004584,
+            "end_s": 175.2000000004725
+          },
+          {
+            "stage": "grip_adjust",
+            "start_s": 175.25000000047274,
+            "end_s": 175.7000000004749
+          },
+          {
+            "stage": "align",
+            "start_s": 175.75000000047513,
+            "end_s": 178.15000000048659
+          },
+          {
+            "stage": "unwind",
+            "start_s": 178.20000000048682,
+            "end_s": 186.00000000052407
+          },
+          {
+            "stage": "right_u_hold",
+            "start_s": 186.0500000005243,
+            "end_s": 198.00000000058137
+          }
+        ],
+        "commands": [
+          {
+            "time_s": 0.0,
+            "key": "Ctrl+4",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": null
+          },
+          {
+            "time_s": 0.0,
+            "key": "Ctrl+H",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": null
+          },
+          {
+            "time_s": 21.420000000003196,
+            "key": "Ctrl+5",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": "arc_settle"
+          },
+          {
+            "time_s": 21.420000000003196,
+            "key": "Ctrl+G",
+            "stage_before": "arc_settle",
+            "result": "accepted",
+            "stage": "arc_settle"
+          },
+          {
+            "time_s": 94.8200000000887,
+            "key": "Ctrl+N",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "front_hold"
+          },
+          {
+            "time_s": 94.8200000000887,
+            "key": "Ctrl+L",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "return_seat"
+          },
+          {
+            "time_s": 94.8200000000887,
+            "key": "Ctrl+G",
+            "stage_before": "return_seat",
+            "result": "accepted",
+            "stage": "return_seat"
+          },
+          {
+            "time_s": 175.2200000004726,
+            "key": "Ctrl+6",
+            "stage_before": "complete",
+            "result": "accepted",
+            "stage": "align"
+          },
+          {
+            "time_s": 175.2200000004726,
+            "key": "Ctrl+G",
+            "stage_before": "align",
+            "result": "accepted",
+            "stage": "align"
+          },
+          {
+            "time_s": 175.2400000004727,
+            "key": "Ctrl+O",
+            "stage_before": "align",
+            "result": "accepted",
+            "stage": "grip_adjust"
+          },
+          {
+            "time_s": 175.74000000047508,
+            "key": "Ctrl+G",
+            "stage_before": "align",
+            "result": "accepted",
+            "stage": "align"
+          },
+          {
+            "time_s": 178.16000000048663,
+            "key": "Ctrl+N",
+            "stage_before": "align",
+            "result": "accepted",
+            "stage": "align"
+          },
+          {
+            "time_s": 178.16000000048663,
+            "key": "Ctrl+L",
+            "stage_before": "align",
+            "result": "accepted",
+            "stage": "unwind"
+          },
+          {
+            "time_s": 178.16000000048663,
+            "key": "Ctrl+G",
+            "stage_before": "unwind",
+            "result": "accepted",
+            "stage": "unwind"
+          }
+        ],
+        "front_before_tail": true,
+        "actual_helix_shape_passed": true,
+        "helix_shape_frames": 60,
+        "final_min_turns": 1.9787267328746834,
+        "final_max_radius_m": 0.10685288535010148,
+        "preparation_max_near_pipe_coverage_deg": 263.5866638299936,
+        "actual_mode4_material_change_m": -0.07228836599491434,
+        "passive_actuator_force_max_nm": 0.0,
+        "self_contact_events": [],
+        "floor_frames": 0,
+        "low_total_force_frames": 3,
+        "maximum_actual_joint_deg": 82.11900295213526,
+        "maximum_tracking_deg": 78.38191332783093,
+        "saturated_frames": 459,
+        "right_u_confirmations": [],
+        "recovery": {
+          "passed": false,
+          "reason": "recovery not reached"
+        },
+        "gravity_drop": null,
+        "passed": false
+      },
+      "video": "artifacts\\full_routes_20261108\\demos\\ctrl4_ctrl5_ctrl6_failed_4x.mp4",
+      "key_log": "artifacts\\full_routes_20261108\\demos\\ctrl4_ctrl5_ctrl6_failed_keys.txt"
+    },
+    "ctrl6": {
+      "record": "artifacts\\full_routes_20261108\\round2\\ctrl6",
+      "review": {
+        "case": "ctrl6",
+        "controller_passed": true,
+        "failure": null,
+        "final_stage": "roll",
+        "frames": 4941,
+        "stage_intervals": [
+          {
+            "stage": "front",
+            "start_s": 0.001,
+            "end_s": 27.400000000010504
+          },
+          {
+            "stage": "front_finish",
+            "start_s": 27.450000000010565,
+            "end_s": 63.999999999941544
+          },
+          {
+            "stage": "front_seat",
+            "start_s": 64.04999999994178,
+            "end_s": 65.39999999994822
+          },
+          {
+            "stage": "front_hold",
+            "start_s": 65.44999999994846,
+            "end_s": 65.99999999995109
+          },
+          {
+            "stage": "return_seat",
+            "start_s": 66.04999999995132,
+            "end_s": 79.00000000001316
+          },
+          {
+            "stage": "return_wind",
+            "start_s": 79.0500000000134,
+            "end_s": 134.75000000027936
+          },
+          {
+            "stage": "return_finish",
+            "start_s": 134.8000000002796,
+            "end_s": 137.75000000029368
+          },
+          {
+            "stage": "recover",
+            "start_s": 137.80000000029392,
+            "end_s": 142.8000000003178
+          },
+          {
+            "stage": "helix_normalize",
+            "start_s": 142.85000000031803,
+            "end_s": 143.40000000032066
+          },
+          {
+            "stage": "align",
+            "start_s": 143.4500000003209,
+            "end_s": 145.0000000003283
+          },
+          {
+            "stage": "unwind",
+            "start_s": 145.05000000032854,
+            "end_s": 152.20000000036268
+          },
+          {
+            "stage": "drop",
+            "start_s": 152.25000000036292,
+            "end_s": 153.20000000036745
+          },
+          {
+            "stage": "drop_hold",
+            "start_s": 153.2500000003677,
+            "end_s": 153.30000000036793
+          },
+          {
+            "stage": "return_seat",
+            "start_s": 153.35000000036817,
+            "end_s": 167.30000000043478
+          },
+          {
+            "stage": "return_wind",
+            "start_s": 167.35000000043502,
+            "end_s": 228.40000000072652
+          },
+          {
+            "stage": "return_finish",
+            "start_s": 228.45000000072676,
+            "end_s": 231.40000000074085
+          },
+          {
+            "stage": "recover",
+            "start_s": 231.45000000074108,
+            "end_s": 236.45000000076496
+          },
+          {
+            "stage": "roll",
+            "start_s": 236.5000000007652,
+            "end_s": 247.00000000081533
+          }
+        ],
+        "commands": [
+          {
+            "time_s": 0.0,
+            "key": "Ctrl+6",
+            "stage_before": null,
+            "result": "accepted",
+            "stage": "front"
+          },
+          {
+            "time_s": 0.0,
+            "key": "Ctrl+G",
+            "stage_before": "front",
+            "result": "accepted",
+            "stage": "front"
+          },
+          {
+            "time_s": 66.01999999995118,
+            "key": "Ctrl+N",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "front_hold"
+          },
+          {
+            "time_s": 66.01999999995118,
+            "key": "Ctrl+L",
+            "stage_before": "front_hold",
+            "result": "accepted",
+            "stage": "return_seat"
+          },
+          {
+            "time_s": 66.01999999995118,
+            "key": "Ctrl+G",
+            "stage_before": "return_seat",
+            "result": "accepted",
+            "stage": "return_seat"
+          },
+          {
+            "time_s": 143.42000000032075,
+            "key": "Ctrl+G",
+            "stage_before": "align",
+            "result": "accepted",
+            "stage": "align"
+          },
+          {
+            "time_s": 145.0000000003283,
+            "key": "Ctrl+N",
+            "stage_before": "align",
+            "result": "accepted",
+            "stage": "align"
+          },
+          {
+            "time_s": 145.0000000003283,
+            "key": "Ctrl+L",
+            "stage_before": "align",
+            "result": "accepted",
+            "stage": "unwind"
+          },
+          {
+            "time_s": 145.0000000003283,
+            "key": "Ctrl+G",
+            "stage_before": "unwind",
+            "result": "accepted",
+            "stage": "unwind"
+          },
+          {
+            "time_s": 152.24000000036287,
+            "key": "Ctrl+N",
+            "stage_before": "unwind",
+            "result": "accepted",
+            "stage": "unwind"
+          },
+          {
+            "time_s": 152.24000000036287,
+            "key": "Ctrl+L",
+            "stage_before": "unwind",
+            "result": "accepted",
+            "stage": "drop"
+          },
+          {
+            "time_s": 152.24000000036287,
+            "key": "Ctrl+G",
+            "stage_before": "drop",
+            "result": "accepted",
+            "stage": "drop"
+          },
+          {
+            "time_s": 153.30000000036793,
+            "key": "Ctrl+N",
+            "stage_before": "drop_hold",
+            "result": "accepted",
+            "stage": "drop_hold"
+          },
+          {
+            "time_s": 153.30000000036793,
+            "key": "Ctrl+L",
+            "stage_before": "drop_hold",
+            "result": "accepted",
+            "stage": "return_seat"
+          },
+          {
+            "time_s": 153.30000000036793,
+            "key": "Ctrl+G",
+            "stage_before": "return_seat",
+            "result": "accepted",
+            "stage": "return_seat"
+          }
+        ],
+        "front_before_tail": true,
+        "actual_helix_shape_passed": true,
+        "helix_shape_frames": 211,
+        "final_min_turns": 1.9747324622366342,
+        "final_max_radius_m": 0.10726068916084935,
+        "preparation_max_near_pipe_coverage_deg": 236.1369779003524,
+        "actual_mode4_material_change_m": null,
+        "passive_actuator_force_max_nm": 0.0,
+        "self_contact_events": [],
+        "floor_frames": 0,
+        "low_total_force_frames": 4,
+        "maximum_actual_joint_deg": 79.54219494350554,
+        "maximum_tracking_deg": 43.525471966257534,
+        "saturated_frames": 613,
+        "right_u_confirmations": [
+          {
+            "time_s": 152.24000000036287,
+            "exact_pose_saved": true,
+            "actual_right_u_ready": true,
+            "tail_com_y_m": -0.04645030638022433,
+            "tail_com_z_m": 1.2723007401174762,
+            "tail_end_m": [
+              -0.019047263560187058,
+              -0.24552415552777654,
+              1.18707498542268
+            ],
+            "main_links": [
+              1,
+              8,
+              14
+            ]
+          }
+        ],
+        "recovery": {
+          "passed": true,
+          "duration_s": 10.450000000049897,
+          "distal_engaged_samples": 210,
+          "samples": 210,
+          "clear_boundary_m": 0.40900000000000003,
+          "all_clear": true,
+          "supported": true,
+          "trailing_advance_m": 0.2153571256383625,
+          "min_x_end_m": 0.7624903736262283,
+          "max_tail_radius_m": 0.10598147096435442,
+          "min_tail_span_deg": 221.62097943579798
+        },
+        "gravity_drop": {
+          "start_tail_com_y_m": -0.048593200307797034,
+          "end_tail_com_y_m": 0.014447355395668441,
+          "end_tail_com_z_m": 0.8742344672022796,
+          "start_gravity_moment_x_nm": 0.6483110412265051,
+          "front_rotation_deg": 42.98551307187798,
+          "head_advance_m": 0.016708477547978884
+        },
+        "passed": true
+      },
+      "video": "artifacts\\full_routes_20261108\\demos\\ctrl6_4x.mp4",
+      "key_log": "artifacts\\full_routes_20261108\\demos\\ctrl6_keys.txt"
+    }
+  },
+  "full_route_attempts": [
+    {
+      "record": "artifacts\\full_routes_20261108\\round1\\ctrl4_ctrl5",
+      "case": "ctrl4_ctrl5",
+      "passed": true,
+      "failure": null,
+      "final_stage": "complete",
+      "dynamics_s": 178.52000000048835,
+      "config": {
+        "window": [
+          7,
+          12
+        ],
+        "feed": -1
+      }
+    },
+    {
+      "record": "artifacts\\full_routes_20261108\\round1\\ctrl4_ctrl5_ctrl6",
+      "case": "ctrl4_ctrl5_ctrl6",
+      "passed": false,
+      "failure": null,
+      "final_stage": "right_u_hold",
+      "dynamics_s": 600.0009999927238,
+      "config": {
+        "tee": true,
+        "feed": -1,
+        "sequential": true,
+        "complete_hold_s": 3.0,
+        "alignment_timeout_s": 60.0
+      }
+    },
+    {
+      "record": "artifacts\\full_routes_20261108\\round1\\ctrl6",
+      "case": "ctrl6",
+      "passed": true,
+      "failure": null,
+      "final_stage": "roll",
+      "dynamics_s": 247.05100000081558,
+      "config": {
+        "tee": true,
+        "alignment_timeout_s": 60.0
+      }
+    },
+    {
+      "record": "artifacts\\full_routes_20261108\\round2\\ctrl4_ctrl5_ctrl6",
+      "case": "ctrl4_ctrl5_ctrl6",
+      "passed": false,
+      "failure": "actual pose did not satisfy the operator confirmation at right_u_hold",
+      "final_stage": "right_u_hold",
+      "dynamics_s": 198.02100000058147,
+      "config": {
+        "tee": true,
+        "feed": -1,
+        "sequential": true,
+        "complete_hold_s": 3.0,
+        "alignment_timeout_s": 60.0,
+        "confirmation_timeout_s": 12.0,
+        "grip_steps": 1
+      }
+    },
+    {
+      "record": "artifacts\\full_routes_20261108\\round2\\ctrl6",
+      "case": "ctrl6",
+      "passed": true,
+      "failure": null,
+      "final_stage": "roll",
+      "dynamics_s": 247.00100000081534,
+      "config": {
+        "tee": true,
+        "alignment_timeout_s": 60.0,
+        "confirmation_timeout_s": 12.0,
+        "grip_steps": 0
+      }
+    },
+    {
+      "record": "artifacts\\full_routes_20261108\\round3\\ctrl4_ctrl5_ctrl6_H",
+      "case": "ctrl4_ctrl5_ctrl6",
+      "passed": false,
+      "failure": "operator alignment did not find a confirmable pose within the recorded interval",
+      "final_stage": "align",
+      "dynamics_s": 235.2210000007591,
+      "config": {
+        "tee": true,
+        "feed": -1,
+        "sequential": true,
+        "complete_hold_s": 3.0,
+        "alignment_timeout_s": 60.0,
+        "confirmation_timeout_s": 12.0,
+        "grip_steps": 1,
+        "operator_head_angle_range": [
+          120.0,
+          135.0
+        ]
+      }
+    },
+    {
+      "record": "artifacts\\full_routes_20261108\\round3\\ctrl4_ctrl5_ctrl6_J",
+      "case": "ctrl4_ctrl5_ctrl6",
+      "passed": false,
+      "failure": "actual pose did not satisfy the operator confirmation at right_u_hold",
+      "final_stage": "right_u_hold",
+      "dynamics_s": 222.38100000069778,
+      "config": {
+        "tee": true,
+        "feed": 1,
+        "sequential": true,
+        "complete_hold_s": 3.0,
+        "alignment_timeout_s": 60.0,
+        "confirmation_timeout_s": 12.0,
+        "grip_steps": 0,
+        "operator_head_angle_range": [
+          90.0,
+          130.0
+        ]
+      }
+    }
+  ],
+  "full_route_attempt_count": 7,
+  "local_probes": [
+    {
+      "record": "artifacts\\full_routes_20261108\\grip_probe_4\\adjusted",
+      "summary": {
+        "tighten_steps": 4,
+        "grip_radius_m": 0.09000000000000016,
+        "actual_u_ready_frames": 0,
+        "max_tracking_deg": 77.66772343651678,
+        "saturated_frames": 219,
+        "interface_passed": true,
+        "dynamics_check_passed": false
+      }
+    },
+    {
+      "record": "artifacts\\full_routes_20261108\\grip_probe_6\\adjusted",
+      "summary": {
+        "tighten_steps": 6,
+        "grip_radius_m": 0.08840000000000023,
+        "actual_u_ready_frames": 0,
+        "max_tracking_deg": 75.52668372296542,
+        "saturated_frames": 219,
+        "interface_passed": false,
+        "dynamics_check_passed": false
+      }
+    }
+  ]
+}

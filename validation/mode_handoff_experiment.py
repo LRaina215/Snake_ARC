@@ -119,21 +119,42 @@ def run(case, output):
     front_hold_started = None
     next_progress = float(data.time)+30.
     clear_since = None
+    helix_complete_at = None
+    align_started_at = None
+    confirmation_started_at = None
+    confirmation_stage = None
+    control_samples = []
+    grip_applied = False
 
     def command(key):
-        controller.command(real.decode_hotkey(ord(key), True))
+        before = controller.helix_transition
+        event = dict(time_s=float(data.time),key='Ctrl+'+key,
+                     stage_before=None if before is None else before.stage)
+        try:
+            result = controller.command(real.decode_hotkey(ord(key), True))
+        except (ValueError,RuntimeError) as exc:
+            event.update(result='rejected',reason=str(exc));commands.append(event)
+            raise
         core = controller.helix_transition
-        commands.append(dict(time_s=float(data.time), key='Ctrl+'+key,
-                             stage=None if core is None else core.stage))
+        event.update(result=result if isinstance(result,str) else 'accepted',
+                     stage=None if core is None else core.stage)
+        commands.append(event)
         if key in ('5', '6'):
             entries.append(core.status())
 
     def confirm(stage):
         nonlocal front_confirmed_at
+        main,branch,_=pipe_contacts(sim)
+        snapshot=dict(stage=stage,stage_before=current_stage(),time_s=float(data.time),qpos=data.qpos.tolist(),qvel=data.qvel.tolist(),
+            targets_rad=np.radians(controller.targets).tolist(),enabled=controller.enabled.copy(),
+            actuator_force_nm=data.actuator_force.tolist(),main_links=main,branch_links=branch,
+            ground_force_n=float(sim.measure(controller.command_phase)['ground_contact_force_n']),
+            actual_right_u_ready=bool(right_u_ready(trial,np.arange(n)<8)),
+            feedback_age_s=float(data.time-controller.feedback_motor_clock_s))
         command('N')
         command('L')
         command('G')
-        confirmations.append(dict(stage=stage, time_s=float(data.time)))
+        confirmations.append(snapshot)
         if stage == 'front_hold':
             front_confirmed_at = float(data.time)
 
@@ -162,6 +183,9 @@ def run(case, output):
         nonlocal locked_front, held_front_count, front_target_change, front_hold_started
         nonlocal support_since
         nonlocal next_progress
+        nonlocal helix_complete_at, align_started_at
+        nonlocal confirmation_started_at, confirmation_stage
+        nonlocal grip_applied
         for contact in data.contact:
             a, b = model.geom_bodyid[[contact.geom1, contact.geom2]]-model.body('head').id
             if min(a, b) >= 0 and abs(a-b) > 2 and contact.dist <= 0.:
@@ -183,12 +207,15 @@ def run(case, output):
             next_progress += 30.
         if controller.feeding_selected:
             if controller.feeding.completed:
-                command('6' if config.get('tee') else '5')
+                command('5' if config.get('sequential') or not config.get('tee') else '6')
                 command('G')
                 core = controller.helix_transition
             elif controller.feeding.fault:
                 failure = controller.feeding.fault
         if core is not None:
+            if core.stage=='align' and config.get('grip_steps',0) and not grip_applied:
+                for _ in range(config['grip_steps']):command('O')
+                grip_applied=True
             front_attached = actual_front_ready(core) if core.stage == 'front_hold' and controller.mode == 'hold' else False
             if core.stage == 'front_hold' and controller.mode != 'hold':
                 support_since = None
@@ -209,9 +236,11 @@ def run(case, output):
                     confirm('drop_hold')
             elif core.stage == 'complete':
                 if config.get('sequential'):
-                    command('6')
-                    command('G')
-                    core = controller.helix_transition
+                    helix_complete_at = float(data.time) if helix_complete_at is None else helix_complete_at
+                    if data.time-helix_complete_at >= config.get('complete_hold_s',3.):
+                        command('6')
+                        command('G')
+                        core = controller.helix_transition
                 elif terminal_at is None:
                     terminal_at = float(data.time)
             elif core.stage == 'blocked':
@@ -220,12 +249,27 @@ def run(case, output):
                 failure = 'front hold did not establish the required actual support'
             elif controller.mode == 'hold' and core.stage == 'align':
                 command('G')
+            if core.stage == 'align':
+                align_started_at = float(data.time) if align_started_at is None else align_started_at
+                if data.time-align_started_at >= config.get('alignment_timeout_s',float('inf')):
+                    failure = 'operator alignment did not find a confirmable pose within the recorded interval'
+            if core.stage in ('right_u_hold','drop_hold') and controller.mode=='hold':
+                if confirmation_stage!=core.stage:
+                    confirmation_stage=core.stage;confirmation_started_at=float(data.time)
+                if data.time-confirmation_started_at>=config.get('confirmation_timeout_s',float('inf')):
+                    failure='actual pose did not satisfy the operator confirmation at '+core.stage
         previous_mode = controller.mode
         controller.tick(.02)
         core = controller.helix_transition
         if core is not None and core.stage == 'front_hold' and controller.mode == 'hold' and previous_mode != 'hold':
             front_hold_started = data.time
         trial.phase = controller.command_phase
+        control_samples.append(dict(time_s=float(data.time),stage=current_stage(),
+            front_stage=None if core is None or core.front is None else core.front.stage,
+            controller_mode=controller.mode,phase_rad=controller.command_phase))
+        if core is not None and not core.helix_only:
+            control_samples[-1].update(grip_radius_m=core.grip_radius_m,grip_radius_target_m=core.grip_radius_target_m,
+                unwind_release_radius_m=core.options.release_radius_m,return_radius_m=core.gait.o.r_h2)
         if (core is not None and core.front is not None and core.stage == 'front' and core.front.stage == 'lead'
                 and any(controller.enabled[core.front.window[1]:])):
             failure = 'tail enabled before the front confirmation'
@@ -250,7 +294,7 @@ def run(case, output):
         return controller.helix_transition.stage if controller.helix_transition is not None else 'feeding'
 
     try:
-        trial.phase_run(1, current_stage, 600. if config.get('tee') else 350., control,
+        trial.phase_run(1, current_stage, config.get('maximum_duration_s',600. if config.get('tee') else 350.), control,
                         stiffness=lambda: np.asarray(controller.enabled, float),
                         stop_when=stopped)
     except (ValueError, RuntimeError) as exc:
@@ -265,6 +309,11 @@ def run(case, output):
              bool(r['distal_contacts']) and any(j <= n//2 for j in r['main_links']) for r in held))
     ordered = first_tail_on is not None and front_confirmed_at is not None and first_tail_on >= front_confirmed_at
     passed = bool(failure is None and not trial.stopped and ordered and (recovery['passed'] if config.get('tee') else helix))
+    control_clock=np.asarray([r['time_s'] for r in control_samples])
+    for row in trial.samples:
+        control_row=control_samples[max(0,int(np.searchsorted(control_clock,row['time_s'],side='right'))-1)]
+        row.update({k:v for k,v in control_row.items() if k in ('front_stage','grip_radius_m',
+            'grip_radius_target_m','unwind_release_radius_m','return_radius_m')})
     with contextlib.redirect_stdout(io.StringIO()):
         save(trial, output, 'locked_gait', None, case=case, passed=passed, failure=failure, config=config,
          binary_enable=True, feedback_period_s=.2, commands=commands, operator_events=confirmations,
@@ -280,6 +329,7 @@ def run(case, output):
          parameters=asdict(sim.p), start_x=.1, assert_front_frozen=ASSERT_FRONT_FROZEN,
          front_support_criteria=dict(min_turns=MIN_FRONT_ATTACHED_TURNS, max_radius_m=MAX_FRONT_ATTACHED_RADIUS_M,
                                      settle_s=FRONT_SUPPORT_SETTLE_S, minimum_contact_index_span=FRONT_MIN_CONTACT_SPAN))
+    (output/'control_trace.json').write_text(json.dumps(control_samples,indent=1),encoding='utf-8')
     print(json.dumps(dict(output=str(output), passed=passed, failure=failure, final_stage=current_stage(),
                           dynamics_s=float(data.time), helix_held=helix, front_before_tail=ordered)), flush=True)
     return passed

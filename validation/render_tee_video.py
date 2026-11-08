@@ -11,6 +11,7 @@ import mujoco
 from PIL import Image, ImageDraw, ImageFont
 from snake_control.rolling_arc import ArcParameters
 from snake_control.tee_simulation import TeeSimulation
+from snake_control.simulation import backbone
 
 FONT = ImageFont.truetype('C:/Windows/Fonts/msyh.ttc', 22)
 SMALL = ImageFont.truetype('C:/Windows/Fonts/msyh.ttc', 18)
@@ -51,7 +52,7 @@ MOTOR_STAGES = {
     'align': '滚动对准支管，等待现场确认',
     'grip_adjust': '手调小U前抱管半径，相位固定',
     'unwind': '尾部解旋，形成主管右侧小 U',
-    'right_u_hold': '小 U 保持搭管，等待确认',
+    'right_u_hold': '等待确认右侧小 U 是否搭稳',
     'drop': '尾部关闭扭矩，靠重力落向轴下',
     'drop_hold': '尾部保持失能，等待确认下垂',
     'rewrap': 'Shift Rolling 回卷，前部同时推进',
@@ -76,6 +77,7 @@ def main():
     parser.add_argument('--start', type=float, default=0., help='First recorded simulation time to show')
     parser.add_argument('--end', type=float, default=float('inf'), help='Last recorded simulation time to show')
     parser.add_argument('--output', type=Path, help='Override the output video path')
+    parser.add_argument('--confirm-pause-s',type=float,default=1.,help='Replay-only hold of exact recorded L-confirmation poses')
     args = parser.parse_args()
     data = json.loads((args.input / f'{args.label}.json').read_text(encoding='utf-8'))
     report, samples = data['summary'], data['samples']
@@ -111,17 +113,33 @@ def main():
     indices = list(range(int(selected[0]), int(selected[-1])+1, step))
     if indices[-1] != selected[-1]:
         indices.append(int(selected[-1]))
+    # Exact confirmation states can lie between the regular 50 ms samples.
+    # Keep them in time order and visibly pause the replay, never the physics.
+    confirmations=sorted((e for e in report.get('operator_events',[]) if 'qpos' in e and
+        times[selected[0]]<=e['time_s']<=times[selected[-1]]),key=lambda e:e['time_s'])
+    render_items=[];confirmation_index=0
+    for index in indices:
+        while confirmation_index<len(confirmations) and confirmations[confirmation_index]['time_s']<=times[index]:
+            event=confirmations[confirmation_index]
+            near=min(len(times)-1,int(np.searchsorted(times,event['time_s'])))
+            render_items.append((near,event));confirmation_index+=1
+        render_items.append((index,None))
     out = args.output or args.input / f'{args.label}_{args.speed:g}x.mp4'
     out.parent.mkdir(parents=True, exist_ok=True)
-    panel_height = 158 if motor_commands else 0
+    panel_height = 220 if motor_commands else 0
     writer = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*'mp4v'), args.fps, (2 * W, H + 70 + panel_height))
     if not writer.isOpened():
         raise RuntimeError('could not open video writer')
     with mujoco.Renderer(model, height=H, width=W) as renderer:
-        for index in indices:
-            d.qpos[:] = qpos[index]
+        for index,confirmation in render_items:
+            frame_time=times[index] if confirmation is None else confirmation['time_s']
+            d.qpos[:] = qpos[index] if confirmation is None else confirmation['qpos']
             mask = masks[index] if masks is not None else sim.p.enabled
             stiffness = scales[index] if scales is not None else mask.astype(float)
+            frame_targets=None if all_targets is None else all_targets[index]
+            if confirmation is not None:
+                mask=np.asarray(confirmation['enabled'],bool);stiffness=mask.astype(float)
+                frame_targets=np.asarray(confirmation['targets_rad'])
             model.geom_rgba[model.geom_bodyid >= head] = [.50, .26, .70, 1]
             for j in np.flatnonzero(mask) + 1:
                 color = [.10, .48, .85, 1] if stiffness[j-1] >= .99 else [.10, .72, .65, 1]
@@ -141,8 +159,14 @@ def main():
                 cam.azimuth, cam.elevation, cam.distance = az, el, dist
                 renderer.update_scene(d, camera=cam)
                 views.append(renderer.render())
-            sample = samples[min(index, len(samples) - 1)]
-            raw = sample.get('stage', 'roll' if times[index] >= 2 else 'settle')
+            sample = samples[min(index, len(samples) - 1)].copy()
+            if confirmation is not None:
+                points=backbone(model,d)
+                sample.update(stage=confirmation.get('stage_before',confirmation['stage']),
+                    time_s=frame_time,main_links=confirmation['main_links'],branch_links=confirmation['branch_links'],
+                    ground_force_n=confirmation.get('ground_force_n',0.),x_min_m=float(points[:,0].min()),
+                    head_x_m=float(points[0,0]))
+            raw = sample.get('stage', 'roll' if frame_time >= 2 else 'settle')
             key = raw.split('_', 1)[1] if re.match(r'c\d+_', raw) else raw
             stage = (raw.split('_')[0] + ' ' if re.match(r'c\d+_', raw) else '') + STAGES.get(key, key)
             if report.get('right_intake') and raw == 'arc_curve_shift':
@@ -163,7 +187,7 @@ def main():
             canvas.paste(Image.fromarray(views[0]), (0, 70))
             canvas.paste(Image.fromarray(views[1]), (W, 70))
             draw = ImageDraw.Draw(canvas)
-            draw.text((12, 6), f'{args.title}    t = {times[index]:5.1f} s    {stage}', fill=(23, 53, 74), font=FONT)
+            draw.text((12, 6), f'{args.title}    t = {frame_time:5.1f} s    {stage}', fill=(23, 53, 74), font=FONT)
             contact = sample.get('branch_links') or []
             if raw in {'progressive_rewrap', 'arc_intake', 'arc_curve_shift'}:
                 control = f'全刚度 {int(np.sum(stiffness >= .99))}  接收 {int(np.sum(mask & (stiffness < .99)))}'
@@ -184,14 +208,16 @@ def main():
             if args.fixed_camera and 'head_x_m' in sample:
                 draw.text((12, 100), f'头端 x = {sample["head_x_m"] * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
             if raw in {'direct_shift', 'direct_shift_cruise'}:
-                confirmed = max((event['joint'] for event in report['events'] if event['time_s'] <= times[index]),
+                confirmed = max((event['joint'] for event in report['events'] if event['time_s'] <= frame_time),
                                 default=report['initial_accepted'])
                 draw.text((12, 124), f'已接入 J{confirmed}  |  全身最小 x = {sample["x_min_m"]*1000:.0f} mm',
                           fill=(80, 80, 80), font=SMALL)
-            if shift_times and times[index] >= shift_times[0]:
-                shifted = shift_samples[np.searchsorted(shift_times, times[index], side='right')-1]['window_shift_m']
+            if shift_times and frame_time >= shift_times[0]:
+                shifted = shift_samples[np.searchsorted(shift_times, frame_time, side='right')-1]['window_shift_m']
                 draw.text((12, 124), f'采样区间前移 {shifted * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
-            draw.text((W + 12, 76), '端视（沿管轴）', fill=(230, 230, 230), font=SMALL)
+            draw.text((W + 12, 76), '端视（尾→头，右侧=-Y）', fill=(230, 230, 230), font=SMALL)
+            if confirmation is not None:
+                draw.text((W+12,100),'按L前实际状态（仅回放停留）',fill=(255,211,86),font=SMALL)
             if motor_commands:
                 y = H+74
                 held = raw in ('front_hold', 'right_u_hold', 'drop_hold')
@@ -203,10 +229,10 @@ def main():
                 if raw == 'first_shift' and report.get('front_freeze_count'):
                     operation = f'前部 J1–J{report["front_freeze_count"]} 目标保持；J/G 只推进后段曲线'
                 if report.get('commands'):
-                    sent = [e for e in report['commands'] if e['time_s'] <= times[index]]
+                    sent = [e for e in report['commands'] if e['time_s'] <= frame_time]
                     if sent:
                         operation = f'最近指令 {sent[-1]["key"]}  |  '+operation
-                events = [e for e in report.get('operator_events', []) if 0. <= times[index]-e['time_s'] <= .8]
+                events = [e for e in report.get('operator_events', []) if 0. <= frame_time-e['time_s'] <= .8]
                 if events:
                     operation = f"操作者确认 {events[-1]['stage']}，对应 Ctrl+L 后 Ctrl+G"
                 draw.text((12, y), f'实机对应操作  {operation}', fill=(23, 53, 74), font=SMALL)
@@ -215,22 +241,33 @@ def main():
                 draw.text((12, y+27), f'控制读角周期 {report["feedback_period_s"]:g} s  |  二值使能  |  相位 {phase:.3f} rad  |  '
                           f'全身最小 x = {sample["x_min_m"]*1000:.0f} mm{clearance}',
                           fill=(62, 86, 102), font=SMALL)
-                draw.text((12, y+63), '关节 / 使能', fill=(62, 86, 102), font=SMALL)
-                draw.text((12, y+93), '已发目标 (°)', fill=(62, 86, 102), font=SMALL)
-                draw.text((12, y+121), '仿真实测 (°)', fill=(62, 86, 102), font=SMALL)
+                sent=[e for e in report.get('commands',[]) if e['time_s']<=frame_time]
+                route=' → '.join(e['key'] for e in sent if e['key'] in ('Ctrl+4','Ctrl+5','Ctrl+6')) or '—'
+                draw.text((12,y+53),f'已执行模式路径：{route}    按键记录（仿真时间，显示最近8次）：',
+                          fill=(23,53,74),font=SMALL)
+                history=sent[-8:]
+                for line in range(2):
+                    events=history[line*4:(line+1)*4]
+                    label='    |    '.join(f'{e["time_s"]:.2f}s {e["key"]}'+
+                              (' [拒绝]' if e.get('result')=='rejected' else '') for e in events)
+                    draw.text((12,y+77+24*line),label,fill=(23,53,74),font=SMALL)
+                draw.text((12, y+125), '关节 / 使能', fill=(62, 86, 102), font=SMALL)
+                draw.text((12, y+155), '已发目标 (°)', fill=(62, 86, 102), font=SMALL)
+                draw.text((12, y+183), '仿真实测 (°)', fill=(62, 86, 102), font=SMALL)
                 measured = np.degrees(d.qpos[sim.drive.qadr])
-                targets = np.degrees(all_targets[index])
+                targets = np.degrees(frame_targets)
                 cell = (2*W-170)/len(mask)
                 for j, enabled in enumerate(mask):
                     x = 165+j*cell
                     color = (20, 124, 179) if enabled else (144, 79, 172)
-                    draw.rounded_rectangle((x, y+60, x+cell-4, y+86), radius=4, fill=color)
-                    draw.text((x+6, y+60), f'J{j+1}', fill='white', font=SMALL)
+                    draw.rounded_rectangle((x, y+122, x+cell-4, y+148), radius=4, fill=color)
+                    draw.text((x+6, y+122), f'J{j+1}', fill='white', font=SMALL)
                     target = f'{targets[j]:.0f}' if enabled else '—'
-                    draw.text((x+6, y+93), target, fill=color, font=SMALL)
-                    draw.text((x+6, y+121), f'{measured[j]:.0f}', fill=(62, 86, 102), font=SMALL)
+                    draw.text((x+6, y+155), target, fill=color, font=SMALL)
+                    draw.text((x+6, y+183), f'{measured[j]:.0f}', fill=(62, 86, 102), font=SMALL)
             frame = cv2.cvtColor(np.asarray(canvas), cv2.COLOR_RGB2BGR)
-            for _ in range(args.fps if fell and index == indices[-1] else 1):
+            repeats=max(1,int(round(args.fps*args.confirm_pause_s))) if confirmation is not None else (args.fps if fell and index==indices[-1] else 1)
+            for _ in range(repeats):
                 writer.write(frame)
     writer.release()
     check = cv2.VideoCapture(str(out))
