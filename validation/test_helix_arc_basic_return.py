@@ -93,6 +93,7 @@ class HelixArcBasicReturnTests(unittest.TestCase):
                 if c.mode=='hold':break
             self.assertEqual(c.mode,'hold');self.assertAlmostEqual(c.phase-start,sign*c.phase_step)
             self.assertEqual(c.enabled,mask)
+            for _ in range(5):c.tick(.02)  # Fixed-phase targets settle; another key need not wait for this.
         self.assertAlmostEqual(c.phase,phase)
         np.testing.assert_allclose(c.targets,held,atol=1e-8)
         c.command('toggle');c.tick(.02)

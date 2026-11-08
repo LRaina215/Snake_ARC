@@ -40,11 +40,11 @@ NUM_JOINTS = 18                # 当前实机为18关节；下方表按此数量
 FIRST_JOINT = 8                 # 关节从 1 开始编号，包含两个端点
 LAST_JOINT = 13                 # 窗口外明确关闭舵机扭矩，不发送零角位置目标
 AMPLITUDE_DEG = 60.0            # 圆弧幅值，单位：度
-OMEGA_RAD_S = 0.6               # 连续滚动角频率，单位：rad/s
+OMEGA_RAD_S = 0.6               # 基础ARC（含7完成后）单步/连续的相位速度，单位rad/s
 DIY_PARAMETERS = True          # 手调：关闭建形/接入的速度、幅值、开放形态和60°/0.6基准拦截
                               # 保留编码范围/有效读角；形成斜率、目标滤波仍按下面参数执行
 INITIAL_PHASE_RAD = 0.0
-PHASE_STEP_RAD = 0.10           # Ctrl+J/H 每次累计的相位增量，单步也平滑执行
+PHASE_STEP_RAD = 0.10           # 基础ARC的J/H每次相位行程；改0.30即三倍，Ctrl+-/=在线调节
 CONTROL_PERIOD_S = 0.02         # 50 Hz，同步发送窗口内所有目标
 FORM_RATE_DEG_S = 15.0          # 从实测姿态形成圆弧时的最大目标角速度
 MAX_TARGET_RATE_DEG_S = 45.0    # 正常滚动/修改幅值时的最大目标角速度
@@ -6997,11 +6997,9 @@ class RollingArcController:
                 self.mode, self.pending_phase = ('run' if running else 'hold'), 0.0
                 if not running:
                     self.forming, self.settle_remaining = False, 0.0
-            self.freeze_targets = False
-            if self.mode != 'hold' and not self.forming and self.compliance is None:
-                goal = self.basic_targets()
-                if any(abs(goal[i] - self.targets[i]) > 1e-6 for i, e in enumerate(self.enabled) if e):
-                    self.forming, self.settle_remaining = True, SETTLE_S
+            # 运动按键只改变相位调度，不能把限速产生的微小目标差当作重新建形。
+            # 初次Ctrl+U和显式调参各自建立构型；J/H/G不再插入形成/静置。
+            self.freeze_targets = self.mode == 'hold'
         else:
             raise ValueError(f'未知命令: {command}')
 
@@ -7044,7 +7042,7 @@ class RollingArcController:
         for i, active in enumerate(self.enabled):
             if active:
                 angle_to_raw(i, goal[i])  # 修改公式后也先检查最终目标，不能靠截断掩盖越界
-        if self.mode == 'hold' and not self.forming:
+        if self.mode == 'hold' and not self.forming and self.freeze_targets:
             goal = self.targets.copy()  # hold 立即冻结已发目标，未到位的形成过程也可以中断
         rate = FORM_RATE_DEG_S if self.forming else MAX_TARGET_RATE_DEG_S
         for i, active in enumerate(self.enabled):
@@ -7053,8 +7051,10 @@ class RollingArcController:
                 self.targets[i] += delta
         self.bus.send_targets(self.targets, self.enabled)
         self.command_phase = self.phase
-        if step_finished and all(abs(goal[i]-self.targets[i])<1e-8 for i,e in enumerate(self.enabled) if e):
-            self.mode = 'hold'  # 最后一小步的目标发送后再保持，避免停在倒数一帧
+        if step_finished:
+            # 单步按相位预算结束。末端目标可继续限速到位，不阻塞下一次J/H；
+            # 人工暂停会置freeze_targets，立即冻结最近目标。
+            self.mode = 'hold'
         if self.forming:
             self.forming = any(abs(goal[i] - self.targets[i]) > 1e-8 for i, e in enumerate(self.enabled) if e)
         else:
@@ -7803,27 +7803,33 @@ def decode_hotkey(vk, control_down):
 
 
 def global_key_listener(commands, keyboard, command_decoder=decode_hotkey, release_decoder=None):
+    def virtual_key(key):
+        vk = getattr(key, 'vk', None)
+        return vk if vk is not None else getattr(getattr(key, 'value', None), 'vk', None)
+
+    def physical_key(key):
+        # Ctrl先松开时，同一字母的press/release字符可能不同；按物理键码配对。
+        vk = virtual_key(key)
+        return ('vk',vk) if vk is not None else ('key',key)
+
     held = set()
-    control_keys = {keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r}
+    control_keys = {physical_key(k) for k in (keyboard.Key.ctrl,keyboard.Key.ctrl_l,keyboard.Key.ctrl_r)}
 
     def on_press(key):
-        if key in held:
+        identity=physical_key(key)
+        if identity in held:
             return              # 按住不放不累计自动重复单步
-        held.add(key)
-        vk = getattr(key, 'vk', None)
-        if vk is None:
-            vk = getattr(getattr(key, 'value', None), 'vk', None)
+        held.add(identity)
+        vk = virtual_key(key)
         command = command_decoder(vk, bool(held & control_keys))
         if command:
             commands.put(command)
 
     def on_release(key):
-        held.discard(key)
+        identity=physical_key(key)
+        held.discard(identity)
         if release_decoder is not None:
-            vk = getattr(key, 'vk', None)
-            if vk is None:
-                vk = getattr(getattr(key, 'value', None), 'vk', None)
-            command = release_decoder(vk, key in control_keys)
+            command = release_decoder(virtual_key(key), identity in control_keys)
             if command:
                 commands.put(command)
 
