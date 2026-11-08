@@ -19,7 +19,7 @@ def review(folder):
     trace=np.load(folder/'locked_gait_trace.npz');sim=TeeSimulation('straight',ArcParameters(**summary['parameters']))
     s=np.arange(20)*.0645;actual=[]
     for i,(row,st) in enumerate(zip(rows,states)):
-        if row['stage'] not in ('arc_end_reset','arc_settle','auto_center','center_settle','arc_roll'):continue
+        if row['stage'] not in ('arc_end_reset','arc_final_end_reset','arc_settle','auto_center','center_settle','arc_roll'):continue
         sim.data.qpos[:]=trace['qpos'][i];mujoco.mj_kinematics(sim.model,sim.data)
         pts=backbone(sim.model,sim.data)
         a=st['arc_head_m'];b=a+st['arc_length_m']

@@ -102,7 +102,7 @@ FEED_DIAGNOSTIC_PERIOD_S = 2.0 # 自动显示两侧判断数值；Ctrl+K随时�
 
 # Ctrl+U：ARC形成并静置后，两端临时使能到0，再失能。关闭此项可跳过。
 END_ZERO_ON_U = True
-END_ZERO_ON_HELIX_ARC = True    # Ctrl+7半圆形成后、自动归中前，两端短时归零再失能
+END_ZERO_ON_HELIX_ARC = True    # Ctrl+7归中前/后各一次，保持承载弧，两端短时归零再失能
 END_ZERO_RATE_DEG_S = 60.
 END_ZERO_HOLD_S = .25
 END_ZERO_MAX_S = 2.
@@ -5376,6 +5376,24 @@ class HelixArcTransition:
                     enabled_joints=(np.flatnonzero(self.enabled)+1).tolist())
 
 
+class ArcCurveReference:
+    """Keep the completed ARC's material interval when normal rolling takes over."""
+    def __init__(self,lengths,head_m,arc_length_m,radius_m,amplitude_deg):
+        self.curve=CurveGait(len(lengths)-1,lengths=lengths)
+        self.head_m,self.arc_length_m,self.radius_m=head_m,arc_length_m,radius_m
+        self.amplitude_deg=amplitude_deg
+
+    def targets(self,phase,amplitude_deg):
+        scale=amplitude_deg/self.amplitude_deg if self.amplitude_deg else 1.
+        target=self.curve.targets([line(self.head_m),arc(self.arc_length_m,scale/self.radius_m),
+            line(self.curve.body_length-self.head_m-self.arc_length_m)],phase)
+        return np.clip(target,-math.radians(88),math.radians(88))
+
+    def status(self):
+        return dict(head_m=self.head_m,arc_length_m=self.arc_length_m,radius_m=self.radius_m,
+                    reference_amplitude_deg=self.amplitude_deg)
+
+
 class HelixArcManual:
     """J/G scheduling around the validated geometry; pauses never advance curve time.
 
@@ -5390,6 +5408,7 @@ class HelixArcManual:
         self.feedback_time=None;self.completed=False;self.feedback_wait=False
         self.end_reset_options=end_reset_options
         self.end_reset=None;self.end_reset_done=False;self.end_reset_last=None;self.reset_suspended=False
+        self.final_end_reset_done=False;self.end_reset_kind=None;self.end_reset_history=[]
 
     @property
     def targets(self):return self.core.targets if self.end_reset is None else np.radians(self.end_reset.targets)
@@ -5398,7 +5417,9 @@ class HelixArcManual:
     def enabled(self):return self.core.enabled if self.end_reset is None else self.end_reset.enabled
 
     @property
-    def stage(self):return self.core.stage if self.end_reset is None else 'arc_end_reset'
+    def stage(self):
+        if self.end_reset is None:return self.core.stage
+        return 'arc_final_end_reset' if self.end_reset_kind=='after_center' else 'arc_end_reset'
 
     @property
     def phase(self):return self.core.phase
@@ -5416,6 +5437,11 @@ class HelixArcManual:
         self.reset_suspended=True
         return True
 
+    def _start_end_reset(self,measured_deg,kind):
+        self.end_reset=PassiveEndReset(measured_deg,np.degrees(self.core.targets),self.core.enabled,
+                                      **self.end_reset_options)
+        self.end_reset_kind=kind;self.reset_suspended=False
+
     def _advance_end_reset(self,dt,measured_deg):
         reset=self.end_reset
         if self.reset_suspended:
@@ -5428,8 +5454,13 @@ class HelixArcManual:
         if reset.done:
             self.core.targets=np.radians(reset.targets)
             self.core.enabled=reset.bearing.copy()
-            self.end_reset_last=reset.status()
-            self.end_reset=None;self.end_reset_done=True
+            self.end_reset_last=dict(reset.status(),when=self.end_reset_kind,
+                bearing_joints=(np.flatnonzero(reset.bearing)+1).tolist(),
+                passive_joints=(np.flatnonzero(~reset.bearing)+1).tolist())
+            self.end_reset_history.append(self.end_reset_last)
+            if self.end_reset_kind=='after_center':self.final_end_reset_done=True
+            else:self.end_reset_done=True
+            self.end_reset=None
             self.core.down=None;self.core.geometry={};self.core.elapsed=0.
 
     def advance(self,dt,now,feedback_time,measured_deg):
@@ -5444,8 +5475,10 @@ class HelixArcManual:
         else:
             self.core.step(used,self.control_time,np.radians(measured_deg),fresh)
             if (self.core.stage=='arc_settle' and self.end_reset_options is not None and not self.end_reset_done):
-                self.end_reset=PassiveEndReset(measured_deg,np.degrees(self.core.targets),self.core.enabled,
-                                              **self.end_reset_options)
+                self._start_end_reset(measured_deg,'before_center')
+            elif (self.core.stage=='arc_roll' and self.end_reset_options is not None and
+                  not self.final_end_reset_done and not self.completed):
+                self._start_end_reset(measured_deg,'after_center')
         self.control_time+=used
         self.step_left=max(0.,self.step_left-used)
         if self.step_left<1e-9:self.step_left=0.
@@ -5459,7 +5492,9 @@ class HelixArcManual:
                     control_time_s=self.control_time,started=self.started,completed=self.completed,
                     feedback_wait=self.feedback_wait,reset_suspended=self.reset_suspended,
                     end_reset=None if self.end_reset is None else self.end_reset.status(),
-                    end_reset_last=self.end_reset_last,end_reset_done=self.end_reset_done)
+                    end_reset_last=self.end_reset_last,end_reset_done=self.end_reset_done,
+                    final_end_reset_done=self.final_end_reset_done,end_reset_kind=self.end_reset_kind,
+                    end_reset_history=list(self.end_reset_history))
 # END ARC_HELIX_CORE
 
 # BEGIN CURVE_FEEDING_CORE
@@ -5833,6 +5868,8 @@ class RollingArcController:
         self.feeding_last_diagnostic_s = None
         self.helix_transition = None
         self.helix_arc_transition = None
+        self.helix_arc_last = None
+        self.basic_arc_reference = None
         self.end_reset = None
         self.end_reset_pending = False
         self.end_reset_last = None
@@ -5883,7 +5920,7 @@ class RollingArcController:
             self.forming, self.settle_remaining = False, 0.
         self.mode, self.freeze_targets = 'hold', True
         print('已选择Helix→开放半圆ARC→自动归中，当前目标/使能保持。'
-              'Ctrl+J单步，Ctrl+G连续/暂停；归中完成自动保持，再J/G进行ARC滚动。', flush=True)
+              'Ctrl+J单步，Ctrl+G连续/暂停；归中和两端归零后交回基础圆弧，J/H正反单步、G连续/暂停。', flush=True)
 
     def command_helix_arc(self, command):
         core = self.helix_arc_transition
@@ -5938,8 +5975,26 @@ class RollingArcController:
         self.command_phase = self.phase = core.phase
         if not core.running and core.step_left <= 0.:
             self.mode, self.freeze_targets = 'hold', True
-        if before != core.stage:
+        if core.completed:
+            self.finish_helix_arc()
+        elif before != core.stage:
             self.show_status()
+
+    def finish_helix_arc(self):
+        """Return to the ordinary ARC scheduler without changing its curve, mask or phase."""
+        manual=self.helix_arc_transition
+        curve=manual.core
+        self.helix_arc_last=copy.deepcopy(manual.status())
+        self.basic_arc_reference=ArcCurveReference(curve.lengths,curve.head,curve.arc_length,
+                                                 curve.radius,self.amplitude)
+        self.end_reset_last=copy.deepcopy(manual.end_reset_last)
+        self.helix_arc_transition=None
+        self.pending_phase,self.mode,self.freeze_targets=0.,'hold',True
+        self.forming,self.settle_remaining=False,0.
+        reset=self.end_reset_last
+        detail=('未启用两端归零' if reset is None else
+                f"归中后归零={reset['reason']}，失能前端部最大角={reset['actual_max_deg']:.2f}°")
+        print('Helix→ARC归中完成，已交回基础圆弧并保持；Ctrl+J/H正反单步，Ctrl+G连续/暂停。'+detail,flush=True)
 
     def select_helix(self):
         """接管时保持已有目标，第一次推进时按最新角度重新规划。"""
@@ -5984,6 +6039,7 @@ class RollingArcController:
         self.hold_for_helix_mode()
 
     def hold_for_helix_mode(self):
+        self.basic_arc_reference=None
         self.sliding, self.compliance, self.pending_gait = None, None, None
         self.feeding_selected, self.feeding = False, None
         self.feeding_inputs = None
@@ -6128,6 +6184,7 @@ class RollingArcController:
 
     def select_feeding(self):
         """选择只读就绪状态；任务由J/H/G明确启动，不在切模式时移窗。"""
+        self.basic_arc_reference=None
         self.sliding, self.compliance = None, None
         self.sliding_fault = False
         self.feeding_selected, self.feeding = True, None
@@ -6375,6 +6432,8 @@ class RollingArcController:
                                 length_normalized=self.length_normalized, manual_tuning=DIY_PARAMETERS)
 
     def basic_targets(self):
+        if self.basic_arc_reference is not None:
+            return np.degrees(self.basic_arc_reference.targets(self.phase,self.amplitude)).tolist()
         return np.degrees(self.section_reference().targets(self.phase)).tolist()
 
     def select_gait(self, kind):
@@ -6517,6 +6576,7 @@ class RollingArcController:
         self.section_checked_sequence = -1
         self.section_block_reason = None
         self.freeze_targets = False
+        self.basic_arc_reference=None
 
     def tick_motor_sliding(self, dt):
         """20ms目标更新；只有新的200ms全关节角反馈可以完成交接。"""
@@ -6647,6 +6707,7 @@ class RollingArcController:
         core.targets = np.radians(self.targets)  # 保留最近发送目标，软接入反馈
         core.next_geometry_s = self.section_clock_s
         self.compliance = core
+        self.basic_arc_reference=None
         self.actual_section = geometry
         self.section_checked_sequence = -1
         self.section_block_reason = None
@@ -6705,6 +6766,7 @@ class RollingArcController:
     def arm(self, window_override=None):
         if self.mode != 'released':
             return              # 重复 apply 不重新初始化，不把机器人拉回相位 0
+        self.basic_arc_reference=None
         self.first, self.last = self.configured_window if window_override is None else window_override
         self.feeding_origin = (self.first,self.last)
         if window_override is None:
@@ -6758,6 +6820,7 @@ class RollingArcController:
                   f"实测最大角={self.end_reset_last['actual_max_deg']:.1f}°；触地端不直接作为重力参考。", flush=True)
 
     def release(self, verify=True):
+        self.basic_arc_reference=None
         self.end_reset = None
         self.end_reset_pending = False
         self.helix_transition = None
@@ -6990,7 +7053,7 @@ class RollingArcController:
                 self.targets[i] += delta
         self.bus.send_targets(self.targets, self.enabled)
         self.command_phase = self.phase
-        if step_finished:
+        if step_finished and all(abs(goal[i]-self.targets[i])<1e-8 for i,e in enumerate(self.enabled) if e):
             self.mode = 'hold'  # 最后一小步的目标发送后再保持，避免停在倒数一帧
         if self.forming:
             self.forming = any(abs(goal[i] - self.targets[i]) > 1e-8 for i, e in enumerate(self.enabled) if e)
@@ -7034,6 +7097,8 @@ class RollingArcController:
                     pending_gait=self.pending_gait,
                     helix_transition=None if self.helix_transition is None else self.helix_transition.status(),
                     helix_arc_transition=None if self.helix_arc_transition is None else self.helix_arc_transition.status(),
+                    helix_arc_last=copy.deepcopy(self.helix_arc_last),
+                    basic_arc_reference=None if self.basic_arc_reference is None else self.basic_arc_reference.status(),
                     feeding=None if self.feeding is None else copy.deepcopy(self.feeding.snapshot()),
                     feeding_motor_input=copy.deepcopy(self.feeding_inputs),
                     feeding_action_id=self.feeding_action_id, feed_requested_m=self.feed_direction*self.feed_distance_m,
@@ -7067,11 +7132,21 @@ class RollingArcController:
                   f'omega={self.omega:g}rad/s | phase={self.phase:.4f}rad | delta={self.phase_step:g}rad', flush=True)
         if self.end_reset is not None:
             print('两端归零：当前临时使能全身，承载段目标保持；结束恢复两端失能，空格可终止。', flush=True)
+        if self.basic_arc_reference is not None:
+            shape=self.basic_arc_reference.status()
+            reset=self.end_reset_last
+            print(f"沿用Ctrl+7形成的ARC：R={shape['radius_m']*1000:.1f}mm，J/H按{self.phase_step:g}rad正反单步，"
+                  f"G按omega={self.omega:g}rad/s连续；当前是基础圆弧控制。",flush=True)
+            if reset is not None:
+                current=np.asarray(self.measured_angles())[~np.asarray(self.enabled,bool)]
+                print(f"归中后两端归零：{reset['reason']}，释放前最大角={reset['actual_max_deg']:.2f}°，"
+                      f"当前失能关节最大角={float(np.max(abs(current),initial=0.)):.2f}°；失能后不保持零角。",flush=True)
         if self.helix_arc_transition is not None:
             h = self.helix_arc_transition.status()
             stages = {'exit_transition':'尾端建立出管过渡', 'reverse_unwrap':'逆向送链，逐段解缠/失能',
                 'crown_align':'选择顶部承载弧', 'flatten':'导出头端并形成半圆', 'arc_release':'逐节释放已导出的端部',
                 'arc_end_reset':'承载半圆保持，两端临时归零再失能',
+                'arc_final_end_reset':'归中已完成，按最终承载范围将两端归零再失能',
                 'arc_settle':'两端已失能，半圆静置', 'auto_center':'角反馈自动调长归中', 'center_settle':'归中后静置',
                 'arc_roll':'归中完成；保持时J/G继续ARC滚动'}
             difference = h['geometry'].get('difference_m')

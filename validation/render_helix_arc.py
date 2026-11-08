@@ -16,6 +16,7 @@ from snake_control.tee_simulation import TeeSimulation
 STAGES=dict(exit_transition='尾端建立出管过渡',reverse_unwrap='逆向Shift，逐段解缠与失能',
     crown_align='选择顶部承载弧',flatten='导出头端，消除螺距形成半圆',arc_release='逐节释放已导出的端部',
     arc_end_reset='承载半圆保持，两端短时归零再失能',
+    arc_final_end_reset='归中结束，最终两端归零再失能',
     arc_settle='开放半圆保持',auto_center='角反馈自动送链归中',center_settle='归中后保持',arc_roll='开放半圆ARC持续滚动')
 
 

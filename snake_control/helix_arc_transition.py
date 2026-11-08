@@ -267,6 +267,24 @@ class HelixArcTransition:
                     enabled_joints=(np.flatnonzero(self.enabled)+1).tolist())
 
 
+class ArcCurveReference:
+    """Keep the completed ARC's material interval when normal rolling takes over."""
+    def __init__(self,lengths,head_m,arc_length_m,radius_m,amplitude_deg):
+        self.curve=CurveGait(len(lengths)-1,lengths=lengths)
+        self.head_m,self.arc_length_m,self.radius_m=head_m,arc_length_m,radius_m
+        self.amplitude_deg=amplitude_deg
+
+    def targets(self,phase,amplitude_deg):
+        scale=amplitude_deg/self.amplitude_deg if self.amplitude_deg else 1.
+        target=self.curve.targets([line(self.head_m),arc(self.arc_length_m,scale/self.radius_m),
+            line(self.curve.body_length-self.head_m-self.arc_length_m)],phase)
+        return np.clip(target,-math.radians(88),math.radians(88))
+
+    def status(self):
+        return dict(head_m=self.head_m,arc_length_m=self.arc_length_m,radius_m=self.radius_m,
+                    reference_amplitude_deg=self.amplitude_deg)
+
+
 class HelixArcManual:
     """J/G scheduling around the validated geometry; pauses never advance curve time.
 
@@ -281,6 +299,7 @@ class HelixArcManual:
         self.feedback_time=None;self.completed=False;self.feedback_wait=False
         self.end_reset_options=end_reset_options
         self.end_reset=None;self.end_reset_done=False;self.end_reset_last=None;self.reset_suspended=False
+        self.final_end_reset_done=False;self.end_reset_kind=None;self.end_reset_history=[]
 
     @property
     def targets(self):return self.core.targets if self.end_reset is None else np.radians(self.end_reset.targets)
@@ -289,7 +308,9 @@ class HelixArcManual:
     def enabled(self):return self.core.enabled if self.end_reset is None else self.end_reset.enabled
 
     @property
-    def stage(self):return self.core.stage if self.end_reset is None else 'arc_end_reset'
+    def stage(self):
+        if self.end_reset is None:return self.core.stage
+        return 'arc_final_end_reset' if self.end_reset_kind=='after_center' else 'arc_end_reset'
 
     @property
     def phase(self):return self.core.phase
@@ -307,6 +328,11 @@ class HelixArcManual:
         self.reset_suspended=True
         return True
 
+    def _start_end_reset(self,measured_deg,kind):
+        self.end_reset=PassiveEndReset(measured_deg,np.degrees(self.core.targets),self.core.enabled,
+                                      **self.end_reset_options)
+        self.end_reset_kind=kind;self.reset_suspended=False
+
     def _advance_end_reset(self,dt,measured_deg):
         reset=self.end_reset
         if self.reset_suspended:
@@ -319,8 +345,13 @@ class HelixArcManual:
         if reset.done:
             self.core.targets=np.radians(reset.targets)
             self.core.enabled=reset.bearing.copy()
-            self.end_reset_last=reset.status()
-            self.end_reset=None;self.end_reset_done=True
+            self.end_reset_last=dict(reset.status(),when=self.end_reset_kind,
+                bearing_joints=(np.flatnonzero(reset.bearing)+1).tolist(),
+                passive_joints=(np.flatnonzero(~reset.bearing)+1).tolist())
+            self.end_reset_history.append(self.end_reset_last)
+            if self.end_reset_kind=='after_center':self.final_end_reset_done=True
+            else:self.end_reset_done=True
+            self.end_reset=None
             self.core.down=None;self.core.geometry={};self.core.elapsed=0.
 
     def advance(self,dt,now,feedback_time,measured_deg):
@@ -335,8 +366,10 @@ class HelixArcManual:
         else:
             self.core.step(used,self.control_time,np.radians(measured_deg),fresh)
             if (self.core.stage=='arc_settle' and self.end_reset_options is not None and not self.end_reset_done):
-                self.end_reset=PassiveEndReset(measured_deg,np.degrees(self.core.targets),self.core.enabled,
-                                              **self.end_reset_options)
+                self._start_end_reset(measured_deg,'before_center')
+            elif (self.core.stage=='arc_roll' and self.end_reset_options is not None and
+                  not self.final_end_reset_done and not self.completed):
+                self._start_end_reset(measured_deg,'after_center')
         self.control_time+=used
         self.step_left=max(0.,self.step_left-used)
         if self.step_left<1e-9:self.step_left=0.
@@ -350,4 +383,6 @@ class HelixArcManual:
                     control_time_s=self.control_time,started=self.started,completed=self.completed,
                     feedback_wait=self.feedback_wait,reset_suspended=self.reset_suspended,
                     end_reset=None if self.end_reset is None else self.end_reset.status(),
-                    end_reset_last=self.end_reset_last,end_reset_done=self.end_reset_done)
+                    end_reset_last=self.end_reset_last,end_reset_done=self.end_reset_done,
+                    final_end_reset_done=self.final_end_reset_done,end_reset_kind=self.end_reset_kind,
+                    end_reset_history=list(self.end_reset_history))

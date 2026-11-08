@@ -93,6 +93,7 @@ class HelixArcManualTests(unittest.TestCase):
         core.running=True
         self.assertFalse(core.advance(.02,5.,0.,c.targets));self.assertEqual(core.control_time,0.)
         core.core.stage='center_settle';core.core.elapsed=2.99;core.started=True
+        core.end_reset_options=None  # Scheduler-only case; final reset is covered separately.
         core.core.head=(core.core.L-core.core.arc_length)/2
         self.assertTrue(core.advance(.02,5.,5.,c.targets))
         self.assertTrue(core.completed);self.assertFalse(core.running);self.assertEqual(core.step_left,0.)

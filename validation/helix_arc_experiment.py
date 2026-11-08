@@ -20,7 +20,7 @@ from snake_control.helix_arc_transition import HelixArcTransition
 from validation.gm_wrap_first_experiment import pipe_contacts
 
 
-def run(beta,output,duration=150.,hotkeys=False):
+def run(beta,output,duration=150.,hotkeys=False,speed_scale=None):
     output.mkdir(parents=True,exist_ok=True)
     shutil.copyfile(Path(__file__),output/'experiment_source.py')
     shutil.copyfile(Path(__file__).resolve().parents[1]/'snake_control/helix_arc_transition.py',output/'controller_source.py')
@@ -39,7 +39,8 @@ def run(beta,output,duration=150.,hotkeys=False):
     failure=None;roll_start=None;printed_stage=None
     controller=None;commands=[];center_hold_at=None;roll_commanded=False
     if hotkeys:
-        from codes.Rolling_Arc_Debug_Mujoco import DebugArcController,MujocoMotorBus,decode_sim_hotkey
+        from codes.Rolling_Arc_Debug_Mujoco import DebugArcController,MujocoMotorBus,decode_sim_hotkey,real
+        if speed_scale is not None:real.HELIX_ARC_SPEED_SCALE=speed_scale
         session=SimpleNamespace(sim=sim,elapsed=0.,physics_started=True,record_event=lambda *a,**k:None)
         bus=MujocoMotorBus(sim)
         controller=DebugArcController(bus,session)
@@ -49,11 +50,16 @@ def run(beta,output,duration=150.,hotkeys=False):
         shutil.copyfile(Path(__file__).resolve().parents[1]/'codes/Rolling_Arc_Real.py',output/'real_entry_source.py')
         schedule=[(0.,'7'),(0.,'J'),(.1,'J'),(1.5,'G'),(4.,'G'),(5.,'J'),(6.5,'G')]
         def command(key):
+            nonlocal roll_commanded
             before=controller.helix_arc_transition
             result=controller.command(decode_sim_hotkey(ord(key),True))
+            after=controller.helix_arc_transition
+            if key=='G' and after is None and controller.basic_arc_reference is not None:
+                roll_commanded=True
             commands.append(dict(time_s=session.elapsed,key='Ctrl+'+key,result=result or 'accepted',
-                stage_before=None if before is None else before.stage,stage=controller.helix_arc_transition.stage,
-                mode=controller.mode))
+                stage_before='basic_arc' if before is None and controller.basic_arc_reference is not None else None if before is None else before.stage,
+                stage='basic_arc' if after is None and controller.basic_arc_reference is not None else None if after is None else after.stage,
+                mode=controller.mode,phase_rad=controller.phase))
     while d.time-start<duration:
         if d.time+1e-8>=next_control:
             fresh=d.time+1e-8>=next_feedback
@@ -65,14 +71,17 @@ def run(beta,output,duration=150.,hotkeys=False):
                 if fresh:controller.refresh_compliance_feedback()
                 while schedule and session.elapsed+1e-8>=schedule[0][0]:
                     _,key=schedule.pop(0);command(key)
-                if controller.helix_arc_transition is not None and controller.helix_arc_transition.completed:
-                    center_hold_at=session.elapsed if center_hold_at is None else center_hold_at
-                    if not roll_commanded and session.elapsed-center_hold_at>=1.:
-                        command('G');roll_commanded=True
+                if controller.helix_arc_transition is None and controller.helix_arc_last is not None and center_hold_at is None:
+                    center_hold_at=session.elapsed
+                    schedule.extend([(session.elapsed+1.,'J'),(session.elapsed+1.5,'H'),(session.elapsed+2.,'G')])
                 controller.tick(.02)
-                core=controller.helix_arc_transition.core
+                if controller.helix_arc_transition is not None:
+                    core=controller.helix_arc_transition.core
                 target=np.radians(controller.targets);mask=np.asarray(controller.enabled,bool)
-            current_status=core.status() if controller is None else controller.helix_arc_transition.status()
+            current_status=(core.status() if controller is None else controller.helix_arc_transition.status()
+                if controller.helix_arc_transition is not None else dict(controller.helix_arc_last,
+                    phase=controller.phase,basic_arc=True,mode=controller.mode,
+                    pending_phase_rad=controller.pending_phase,enabled_joints=(np.flatnonzero(mask)+1).tolist()))
             display_stage=current_status['stage']
             if display_stage!=printed_stage:
                 print(json.dumps(dict(t=round(float(d.time-start),2),stage=display_stage,
@@ -83,7 +92,7 @@ def run(beta,output,duration=150.,hotkeys=False):
         if d.time+1e-8<next_sample:continue
         next_sample+=.05
         pts=backbone(m,d);yz=pts[:,1:]-[0,PIPE_HEIGHT]
-        metrics=sim.measure(core.phase);main,branch,_=pipe_contacts(sim)
+        metrics=sim.measure(current_status['phase']);main,branch,_=pipe_contacts(sim)
         active=np.flatnonzero(mask)
         first,last=int(active.min()),int(active.max())
         arcpts=yz[first:last+3]
@@ -96,7 +105,7 @@ def run(beta,output,duration=150.,hotkeys=False):
         for c in d.contact:
             a,b=m.geom_bodyid[[c.geom1,c.geom2]]-h
             if min(a,b)>=0 and abs(a-b)>2 and c.dist<=0:collision.append([int(a),int(b)])
-        row=dict(time_s=float(d.time-start),stage=display_stage,reference_roll_rad=core.phase,
+        row=dict(time_s=float(d.time-start),stage=display_stage,reference_roll_rad=current_status['phase'],
             x_min_m=float(pts[:,0].min()),center_x_m=float(pts[:,0].mean()),head_x_m=float(pts[0,0]),
             front_angle_deg=float(np.degrees(np.arctan2(yz[4,1],yz[4,0]))),
             tail_z_m=float(pts[-1,2]),min_height_m=float(pts[:,2].min()),
@@ -115,14 +124,19 @@ def run(beta,output,duration=150.,hotkeys=False):
         if core.stage=='arc_roll' and (controller is None or roll_commanded):
             roll_start=float(d.time) if roll_start is None else roll_start
             if d.time-roll_start>=6.:break
-    if core.stage!='arc_roll' and failure is None:failure='time budget reached at '+core.stage
+    finished=(core.stage=='arc_roll' and (controller is None or
+        (controller.helix_arc_transition is None and controller.helix_arc_last is not None)))
+    if not finished and failure is None:failure='time budget reached at '+display_stage
     summary=dict(scene='straight',parameters=asdict(params),joints=18,beta_deg=beta,initial_radius_m=initial_radius,
         initial_tail_azimuth_deg=float(np.degrees(np.arctan2(initial_points[-1,2]-PIPE_HEIGHT,initial_points[-1,1]))),
         feedback_period_s=core.o.feedback_period_s,controller_options=asdict(core.o),binary_enable=True,
         controller_inputs='sampled motor angles, dimensions, time only',
-        passed=core.stage=='arc_roll' and failure is None,failure=failure,final_stage=core.stage,dynamics_s=float(d.time-start),
-        controller_status=core.status(),events=core.events,commands=commands,
-        hotkey_entry=hotkeys,center_completion_auto_hold_s=None if center_hold_at is None else 1.)
+        passed=finished and failure is None,failure=failure,final_stage=display_stage,dynamics_s=float(d.time-start),
+        controller_status=current_status,events=core.events,commands=commands,
+        hotkey_entry=hotkeys,center_completion_auto_hold_s=None if center_hold_at is None else 1.,
+        main_pipe_radius_m=float(m.geom_size[m.geom('pipe_main').id,0]),
+        model_link_lengths_m=np.linalg.norm(np.diff(backbone(m,d),axis=0),axis=1).tolist(),
+        returned_to_basic=controller is not None and controller.basic_arc_reference is not None)
     (output/'locked_gait.json').write_text(json.dumps(dict(summary=summary,samples=rows),ensure_ascii=False,indent=1),encoding='utf-8')
     (output/'controller.json').write_text(json.dumps(statuses,ensure_ascii=False),encoding='utf-8')
     np.savez_compressed(output/'locked_gait_trace.npz',time=[r['time_s'] for r in rows],qpos=states,qvel=vel,targets=targets,masks=masks,actuator_force=forces)
@@ -132,4 +146,5 @@ def run(beta,output,duration=150.,hotkeys=False):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--beta',type=float,default=0.);p.add_argument('--output',type=Path,required=True);p.add_argument('--duration',type=float,default=150.)
     p.add_argument('--hotkeys',action='store_true',help='Use the actual shared Ctrl+7/J/G debug dispatcher')
-    a=p.parse_args();run(a.beta,a.output,a.duration,a.hotkeys)
+    p.add_argument('--speed-scale',type=float,help='Override motion speed in this experiment process; preserve user source parameters')
+    a=p.parse_args();run(a.beta,a.output,a.duration,a.hotkeys,a.speed_scale)

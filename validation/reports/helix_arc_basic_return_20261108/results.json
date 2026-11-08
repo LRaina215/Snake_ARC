@@ -1,0 +1,494 @@
+{
+  "software_checks_passed": 59,
+  "hardware_actuated": false,
+  "runs": {
+    "beta120": {
+      "beta_deg": 120.0,
+      "initial_tail_azimuth_deg": -40.96079816084745,
+      "controller_passed": true,
+      "failure": null,
+      "stages": [
+        {
+          "stage": "exit_transition",
+          "start_s": 0.001000000000000112,
+          "end_s": 0.44999999999995066
+        },
+        {
+          "stage": "reverse_unwrap",
+          "start_s": 0.49999999999994515,
+          "end_s": 13.94999999999671
+        },
+        {
+          "stage": "crown_align",
+          "start_s": 13.999999999996682,
+          "end_s": 15.799999999998882
+        },
+        {
+          "stage": "flatten",
+          "start_s": 15.849999999998943,
+          "end_s": 17.800000000001326
+        },
+        {
+          "stage": "arc_release",
+          "start_s": 17.850000000001387,
+          "end_s": 18.100000000001693
+        },
+        {
+          "stage": "arc_end_reset",
+          "start_s": 18.150000000001754,
+          "end_s": 18.45000000000212
+        },
+        {
+          "stage": "arc_settle",
+          "start_s": 18.50000000000218,
+          "end_s": 20.450000000004565
+        },
+        {
+          "stage": "auto_center",
+          "start_s": 20.500000000004626,
+          "end_s": 28.80000000001477
+        },
+        {
+          "stage": "center_settle",
+          "start_s": 28.85000000001483,
+          "end_s": 31.800000000012037
+        },
+        {
+          "stage": "arc_final_end_reset",
+          "start_s": 31.85000000001192,
+          "end_s": 32.100000000011335
+        },
+        {
+          "stage": "arc_roll",
+          "start_s": 32.15000000001122,
+          "end_s": 40.19999999999246
+        }
+      ],
+      "actual_final_shape_passed": true,
+      "arc_process_shape_passed": false,
+      "actual_balanced": true,
+      "final_ends_disabled": true,
+      "final_coverage_min_max_deg": [
+        176.45873069271408,
+        181.76221928295087
+      ],
+      "final_max_balance_difference_m": 0.0426336017393934,
+      "final_max_plane_rms_m": 0.010105886046726329,
+      "roll_center_advance_m": 0.12618878801628297,
+      "total_center_displacement_m": 0.08193031694069039,
+      "passive_force_max_nm": 0.0,
+      "floor_frames": 0,
+      "self_contact_frames": 0,
+      "unsupported_frames": 1,
+      "maximum_actual_joint_deg": 78.57826096809045,
+      "maximum_tracking_deg": 13.069385159441012,
+      "saturated_frames": 81,
+      "passed": false,
+      "speed_scale": 3.0,
+      "main_pipe_radius_m": 0.055,
+      "model_link_lengths_m": [
+        0.06450000000000002,
+        0.06450000000000009,
+        0.06450000000000006,
+        0.0645000000000001,
+        0.06450000000000014,
+        0.06450000000000014,
+        0.06450000000000018,
+        0.06450000000000011,
+        0.0645,
+        0.06450000000000007,
+        0.06450000000000009,
+        0.06450000000000003,
+        0.06450000000000002,
+        0.06450000000000011,
+        0.06450000000000013,
+        0.06450000000000006,
+        0.06450000000000007,
+        0.06450000000000006,
+        0.06449999999999996
+      ],
+      "reset_history": [
+        {
+          "elapsed_s": 0.32,
+          "done": true,
+          "actual_max_deg": 0.30557251321801604,
+          "reason": "zero_then_disabled",
+          "temporary_enabled": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "when": "before_center",
+          "bearing_joints": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "passive_joints": [
+            1,
+            2,
+            3,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ]
+        },
+        {
+          "elapsed_s": 0.3,
+          "done": true,
+          "actual_max_deg": 0.15441868511848314,
+          "reason": "zero_then_disabled",
+          "temporary_enabled": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "when": "after_center",
+          "bearing_joints": [
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "passive_joints": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            14,
+            15,
+            16,
+            17,
+            18
+          ]
+        }
+      ],
+      "returned_to_basic": true,
+      "post_completion_commands": [
+        {
+          "time_s": 33.14000000000891,
+          "key": "Ctrl+J",
+          "result": "accepted",
+          "stage_before": "basic_arc",
+          "stage": "basic_arc",
+          "mode": "step",
+          "phase_rad": -3.311634062947611
+        },
+        {
+          "time_s": 33.640000000007745,
+          "key": "Ctrl+H",
+          "result": "accepted",
+          "stage_before": "basic_arc",
+          "stage": "basic_arc",
+          "mode": "step",
+          "phase_rad": -3.211634062947611
+        },
+        {
+          "time_s": 34.14000000000658,
+          "key": "Ctrl+G",
+          "result": "accepted",
+          "stage_before": "basic_arc",
+          "stage": "basic_arc",
+          "mode": "run",
+          "phase_rad": -3.311634062947611
+        }
+      ],
+      "J_phase_delta_rad": 0.10000000000000009,
+      "H_phase_delta_rad": -0.10000000000000009,
+      "failed_shape_samples": 12,
+      "minimum_process_coverage_deg": 143.84095047870113,
+      "failed_shape_time_s": [
+        26.60000000001208,
+        27.150000000012753
+      ],
+      "bearing_target_jump_at_handoff_deg": 0.0,
+      "phase_jump_at_handoff_rad": 0.0
+    },
+    "beta120_speed1": {
+      "beta_deg": 120.0,
+      "initial_tail_azimuth_deg": -40.96079816084745,
+      "controller_passed": true,
+      "failure": null,
+      "stages": [
+        {
+          "stage": "exit_transition",
+          "start_s": 0.001000000000000112,
+          "end_s": 1.9499999999997855
+        },
+        {
+          "stage": "reverse_unwrap",
+          "start_s": 1.99999999999978,
+          "end_s": 37.89999999999782
+        },
+        {
+          "stage": "crown_align",
+          "start_s": 37.9499999999977,
+          "end_s": 40.99999999999059
+        },
+        {
+          "stage": "flatten",
+          "start_s": 41.049999999990476,
+          "end_s": 46.99999999997661
+        },
+        {
+          "stage": "arc_release",
+          "start_s": 47.04999999997649,
+          "end_s": 47.99999999997428
+        },
+        {
+          "stage": "arc_end_reset",
+          "start_s": 48.04999999997416,
+          "end_s": 48.399999999973346
+        },
+        {
+          "stage": "arc_settle",
+          "start_s": 48.44999999997323,
+          "end_s": 50.399999999968685
+        },
+        {
+          "stage": "auto_center",
+          "start_s": 50.44999999996857,
+          "end_s": 75.40000000000563
+        },
+        {
+          "stage": "center_settle",
+          "start_s": 75.45000000000587,
+          "end_s": 78.40000000001996
+        },
+        {
+          "stage": "arc_final_end_reset",
+          "start_s": 78.4500000000202,
+          "end_s": 78.75000000002163
+        },
+        {
+          "stage": "arc_roll",
+          "start_s": 78.80000000002187,
+          "end_s": 86.8500000000603
+        }
+      ],
+      "actual_final_shape_passed": true,
+      "arc_process_shape_passed": true,
+      "actual_balanced": true,
+      "final_ends_disabled": true,
+      "final_coverage_min_max_deg": [
+        176.4972452992181,
+        181.7665322883571
+      ],
+      "final_max_balance_difference_m": 0.03950831082277567,
+      "final_max_plane_rms_m": 0.011601972630317882,
+      "roll_center_advance_m": 0.12679984818988219,
+      "total_center_displacement_m": 0.06857754401987431,
+      "passive_force_max_nm": 0.0,
+      "floor_frames": 0,
+      "self_contact_frames": 0,
+      "unsupported_frames": 1,
+      "maximum_actual_joint_deg": 78.60157882237039,
+      "maximum_tracking_deg": 1.7287285170332871,
+      "saturated_frames": 36,
+      "passed": true,
+      "speed_scale": 1.0,
+      "main_pipe_radius_m": 0.055,
+      "model_link_lengths_m": [
+        0.06450000000000013,
+        0.06449999999999999,
+        0.0645,
+        0.06450000000000004,
+        0.06449999999999999,
+        0.06449999999999985,
+        0.06450000000000007,
+        0.06450000000000009,
+        0.0644999999999999,
+        0.06449999999999997,
+        0.06450000000000002,
+        0.06449999999999993,
+        0.06450000000000009,
+        0.06450000000000009,
+        0.06450000000000007,
+        0.06449999999999993,
+        0.0645,
+        0.06450000000000002,
+        0.06449999999999995
+      ],
+      "reset_history": [
+        {
+          "elapsed_s": 0.4000000000000001,
+          "done": true,
+          "actual_max_deg": 0.03135681910405302,
+          "reason": "zero_then_disabled",
+          "temporary_enabled": [
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "when": "before_center",
+          "bearing_joints": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "passive_joints": [
+            1,
+            2,
+            3,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ]
+        },
+        {
+          "elapsed_s": 0.36000000000000004,
+          "done": true,
+          "actual_max_deg": 0.040872583978179396,
+          "reason": "zero_then_disabled",
+          "temporary_enabled": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "when": "after_center",
+          "bearing_joints": [
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+          ],
+          "passive_joints": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ]
+        }
+      ],
+      "returned_to_basic": true,
+      "post_completion_commands": [
+        {
+          "time_s": 79.80000000002664,
+          "key": "Ctrl+J",
+          "result": "accepted",
+          "stage_before": "basic_arc",
+          "stage": "basic_arc",
+          "mode": "step",
+          "phase_rad": -3.7863336932601173
+        },
+        {
+          "time_s": 80.30000000002903,
+          "key": "Ctrl+H",
+          "result": "accepted",
+          "stage_before": "basic_arc",
+          "stage": "basic_arc",
+          "mode": "step",
+          "phase_rad": -3.686333693260117
+        },
+        {
+          "time_s": 80.80000000003142,
+          "key": "Ctrl+G",
+          "result": "accepted",
+          "stage_before": "basic_arc",
+          "stage": "basic_arc",
+          "mode": "run",
+          "phase_rad": -3.7863336932601173
+        }
+      ],
+      "J_phase_delta_rad": 0.10000000000000009,
+      "H_phase_delta_rad": -0.10000000000000009,
+      "failed_shape_samples": 0,
+      "minimum_process_coverage_deg": 166.84301767341694,
+      "bearing_target_jump_at_handoff_deg": 0.0,
+      "phase_jump_at_handoff_rad": 0.0
+    }
+  }
+}
