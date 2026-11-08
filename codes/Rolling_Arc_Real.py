@@ -84,13 +84,14 @@ POSTURE_CONTRACTION_TURN_ERROR_DEG = 5.0
 
 # 主动送链：只用角度/时间，暂停滚动，首次按旧版模板建形；不是管径顺应。
 FEED_DISTANCE_M = .0645        # Ctrl+J/H一次任务的材料量；四连杆试验改为.258
+FEED_RATE_JOINTS_S = .10       # 左右调长速度上限：关节间距/秒；模式4直接用，模式5/6自动调长再乘HELIX_TRANSITION_SPEED_SCALE
 FEED_AMPLITUDE_DEG = 60.0      # 送链起态自己的幅值，不覆盖你的基础/顺应参数
 FEED_PREPARATION_S = 6.0       # 首次形成；之后另等接管展直稳定才标定本步基线
 FEED_AUTOMATIC_RETURN = False  # 手调默认单程，到位保持；不自动反向
 FEED_FORCE_STEP_JOINTS = .05   # Ctrl+L强制推进的弯曲分布位移；单位关节间距，不是实测毫米
 FEED_OPTIONS_OVERRIDE = {
     'tracking_tolerance_deg': 8.0,  # 手调接管/运动跟踪容差；原5°，不改目标或使能交接逻辑
-}                             # 其他ContinuousFeedingOptions字段也可在这里覆盖
+}                             # 其他字段可覆盖；已有maximum_position_rate_joints_s覆盖项优先，模式4/5/6均读取
 FEED_DIRECTION_OVERRIDE = {}   # 第3C段ManualFeedingDirectionOptions：选段/直线度/稳定时间
 FEED_DIAGNOSTIC_PERIOD_S = 2.0 # 自动显示两侧判断数值；Ctrl+K随时查看
 
@@ -4498,9 +4499,10 @@ class GravityMomentGait:
 class GravityFrontTransition(ArcHelixTransition):
     """保持承载 ARC，只延长头端螺旋，直至操作者确认贴管。"""
 
-    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., **kwargs):
+    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., feed_rate_joints_s=.1, **kwargs):
         self.minimum_front_turns = minimum_front_turns
         self.speed_scale = speed_scale
+        self.feed_rate_joints_s = feed_rate_joints_s
         super().__init__(*args, **kwargs)
 
     def _check_front_entry(self):
@@ -4533,7 +4535,7 @@ class GravityFrontTransition(ArcHelixTransition):
         options = ContinuousFeedingOptions(first_joint=first, last_joint=last,
             amplitude_deg=math.degrees(self.amplitude), requested_transfer_m=goal*self.l,
             automatic_return=False, tracking_tolerance_deg=8.,
-            maximum_position_rate_joints_s=.1*self.speed_scale)
+            maximum_position_rate_joints_s=self.feed_rate_joints_s*self.speed_scale)
         self.transfer = ContinuousFeeding(self.lengths, options)
         self.transfer.phase = self.phase
         self.transfer.targets = self.measured.copy()
@@ -4560,7 +4562,7 @@ class GravityFrontTransition(ArcHelixTransition):
             remaining = abs(self.transfer_goal-helper.position)
             if remaining > 1e-9:
                 pace = float(np.clip((math.radians(23.)-error)/math.radians(17.), .1, 1.))
-                increment = min(remaining, .1*self.speed_scale*pace*dt)
+                increment = min(remaining, helper.options.maximum_position_rate_joints_s*pace*dt)
                 _, focus, _, _ = helper.profile(helper.position, helper.bias)
                 required = helper.required_mask(focus, np.degrees(self.measured), helper.position)
                 entering = required & ~helper.enabled
@@ -4609,6 +4611,7 @@ class GravityCrossingOptions:
     front_seat_rad: float = .14
     grip_radius_rate_m_s: float = .002
     transition_speed_scale: float = 1.
+    feed_rate_joints_s: float = .1
 
 
 class GravityCrossing:
@@ -4668,7 +4671,8 @@ class GravityCrossing:
     def _make_front(self, lengths, window):
         return GravityFrontTransition(lengths, window, np.degrees(self.measured),
             options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
-            minimum_front_turns=self.options.min_front_turns,speed_scale=self.options.transition_speed_scale)
+            minimum_front_turns=self.options.min_front_turns,speed_scale=self.options.transition_speed_scale,
+            feed_rate_joints_s=self.options.feed_rate_joints_s)
 
     def unwind_retain_count(self, helix_length=None):
         """Complete helical joint neighbourhoods; no MuJoCo support estimate."""
@@ -5078,6 +5082,7 @@ class GravityCrossing:
                     unwind_release_radius_m=self.options.release_radius_m,
                     return_radius_m=self.gait.o.r_h2,
                     transition_speed_scale=self.options.transition_speed_scale,
+                    auto_feed_rate_joints_s=self.options.feed_rate_joints_s*self.options.transition_speed_scale,
                     planned_u_angle_deg=math.degrees(self.options.release_arc_rad),
                     planned_u_length_m=self.gait.o.r_c*self.options.release_arc_rad,
                     planned_straight_m=self.options.release_line_m,
@@ -5285,7 +5290,8 @@ class RollingArcController:
             return_roll_rad_s=GRAVITY_RETURN_ROLL_RAD_S,step_s=HELIX_STEP_S,
             min_front_turns=HELIX_MIN_FRONT_TURNS,front_seat_rad=HELIX_FRONT_SEAT_RAD,
             grip_radius_rate_m_s=GRAVITY_GRIP_RADIUS_RATE_MM_S/1000.,
-            transition_speed_scale=HELIX_TRANSITION_SPEED_SCALE)
+            transition_speed_scale=HELIX_TRANSITION_SPEED_SCALE,
+            feed_rate_joints_s=FEED_OPTIONS_OVERRIDE.get('maximum_position_rate_joints_s',FEED_RATE_JOINTS_S))
 
     def read_helix_entry(self):
         """用同一帧全身舵机角重建当前搭管姿态并规划切换。"""
@@ -5511,7 +5517,7 @@ class RollingArcController:
             return
         options = ContinuousFeedingOptions(first_joint=self.feeding_origin[0], last_joint=self.feeding_origin[1],
             amplitude_deg=FEED_AMPLITUDE_DEG, requested_transfer_m=self.feed_direction*self.feed_distance_m,
-            preparation_s=FEED_PREPARATION_S,
+            preparation_s=FEED_PREPARATION_S, maximum_position_rate_joints_s=FEED_RATE_JOINTS_S,
             maximum_feed_s=60. if self.feed_distance_m<=float(np.mean(LINK_LENGTHS_M))+1e-9 else 100.)
         options = replace(options, **FEED_OPTIONS_OVERRIDE)
         options = replace(options, automatic_return=FEED_AUTOMATIC_RETURN)
@@ -6411,6 +6417,7 @@ class RollingArcController:
             print(f"阶段={h['stage']} | 曲线进给={1000*h['shift_m']:.1f} mm | "
                   f"已接收边界={h['accepted_joint']} | 相位={h['phase_rad']:.3f} rad | "
                   f"首次切换速度={h['transition_speed_scale']:g}倍 | {instruction}", flush=True)
+            print(f"自动调长速度上限={h['auto_feed_rate_joints_s']:g}关节间距/s（已含首次切换倍率）",flush=True)
             if not self.helix_transition.helix_only:
                 print(f"小U前抱管R={h['grip_radius_m']*1000:.2f} → {h['grip_radius_target_m']*1000:.2f} mm | "
                       f"原放松R={h['unwind_release_radius_m']*1000:.2f} mm | "
@@ -6441,7 +6448,10 @@ class RollingArcController:
             if core is not None and core.forced_step is not None:
                 print('强制步正在下发目标：绕过跟踪误差/稳定采样等待，发完后保持。', flush=True)
             delta = None if core is None or core.baseline is None or not o.get('valid') else 1000*(o['transfer_coordinate_m']-core.baseline)
+            feed_rate = core.options.maximum_position_rate_joints_s if core is not None else FEED_OPTIONS_OVERRIDE.get(
+                'maximum_position_rate_joints_s',FEED_RATE_JOINTS_S)
             print(f'下一任务={1000*self.feed_direction*self.feed_distance_m:+g}mm | '
+                  f'调长速度上限={feed_rate:g}关节间距/s | '
                   f'阶段={"就绪" if core is None else core.stage} | 几何长度代理变化={delta}mm | '
                   f'目标={None if core is None or core.goal_m is None else 1000*(core.goal_m-core.baseline)}mm | '
                   f'暂停={self.feeding_paused} | 原因={None if core is None else core.fault or core.acquisition_reason or o.get("reason")}', flush=True)

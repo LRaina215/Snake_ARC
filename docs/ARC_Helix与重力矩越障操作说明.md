@@ -120,6 +120,7 @@ L确认时保持目标；继续回卷后前部目标随曲线变化。现场对�
 | `HELIX_RADIUS_M / HELIX_PITCH_M` | 蛇身中心线螺旋半径／每圈轴向螺距 |
 | `HELIX_MIN_FRONT_TURNS / HELIX_FRONT_SEAT_RAD` | 前部材料预算／前部单独小幅滚动就位量 |
 | `HELIX_STEP_S` | 模式5/6的J单步控制时间预算 |
+| `FEED_RATE_JOINTS_S` | 与模式4共用的左右调长速度上限，默认`.10`个关节间距/s；模式5/6自动调长时再乘下行倍率。若曾在`FEED_OPTIONS_OVERRIDE`添加同名底层速度项，以覆盖项为准 |
 | `HELIX_TRANSITION_SPEED_SCALE` | 首次ARC→Helix速度倍率，默认1.3；不加快后续重力释放回卷，1.0恢复原速 |
 | `GRAVITY_ALIGN_RATE_RAD_S` | 对准阶段滚动速度 |
 | `GRAVITY_U_ANGLE_DEG / GRAVITY_U_RADIUS_M / GRAVITY_RELEASE_LINE_M` | 本次实测候选150°／90 mm／129 mm；分别为U角度、U中心线半径与直尾长度 |

@@ -17,9 +17,10 @@ from .posture_initialization import choose_feeding_arc
 class GravityFrontTransition(ArcHelixTransition):
     """保持承载 ARC，只延长头端螺旋，直至操作者确认贴管。"""
 
-    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., **kwargs):
+    def __init__(self, *args, minimum_front_turns=1., speed_scale=1., feed_rate_joints_s=.1, **kwargs):
         self.minimum_front_turns = minimum_front_turns
         self.speed_scale = speed_scale
+        self.feed_rate_joints_s = feed_rate_joints_s
         super().__init__(*args, **kwargs)
 
     def _check_front_entry(self):
@@ -52,7 +53,7 @@ class GravityFrontTransition(ArcHelixTransition):
         options = ContinuousFeedingOptions(first_joint=first, last_joint=last,
             amplitude_deg=math.degrees(self.amplitude), requested_transfer_m=goal*self.l,
             automatic_return=False, tracking_tolerance_deg=8.,
-            maximum_position_rate_joints_s=.1*self.speed_scale)
+            maximum_position_rate_joints_s=self.feed_rate_joints_s*self.speed_scale)
         self.transfer = ContinuousFeeding(self.lengths, options)
         self.transfer.phase = self.phase
         self.transfer.targets = self.measured.copy()
@@ -79,7 +80,7 @@ class GravityFrontTransition(ArcHelixTransition):
             remaining = abs(self.transfer_goal-helper.position)
             if remaining > 1e-9:
                 pace = float(np.clip((math.radians(23.)-error)/math.radians(17.), .1, 1.))
-                increment = min(remaining, .1*self.speed_scale*pace*dt)
+                increment = min(remaining, helper.options.maximum_position_rate_joints_s*pace*dt)
                 _, focus, _, _ = helper.profile(helper.position, helper.bias)
                 required = helper.required_mask(focus, np.degrees(self.measured), helper.position)
                 entering = required & ~helper.enabled
@@ -128,6 +129,7 @@ class GravityCrossingOptions:
     front_seat_rad: float = .14
     grip_radius_rate_m_s: float = .002
     transition_speed_scale: float = 1.
+    feed_rate_joints_s: float = .1
 
 
 class GravityCrossing:
@@ -187,7 +189,8 @@ class GravityCrossing:
     def _make_front(self, lengths, window):
         return GravityFrontTransition(lengths, window, np.degrees(self.measured),
             options=ArcHelixOptions(radius_m=self.gait.o.r_h1, pitch_m=self.gait.o.pitch, prepare_front=True),
-            minimum_front_turns=self.options.min_front_turns,speed_scale=self.options.transition_speed_scale)
+            minimum_front_turns=self.options.min_front_turns,speed_scale=self.options.transition_speed_scale,
+            feed_rate_joints_s=self.options.feed_rate_joints_s)
 
     def unwind_retain_count(self, helix_length=None):
         """Complete helical joint neighbourhoods; no MuJoCo support estimate."""
@@ -597,6 +600,7 @@ class GravityCrossing:
                     unwind_release_radius_m=self.options.release_radius_m,
                     return_radius_m=self.gait.o.r_h2,
                     transition_speed_scale=self.options.transition_speed_scale,
+                    auto_feed_rate_joints_s=self.options.feed_rate_joints_s*self.options.transition_speed_scale,
                     planned_u_angle_deg=math.degrees(self.options.release_arc_rad),
                     planned_u_length_m=self.gait.o.r_c*self.options.release_arc_rad,
                     planned_straight_m=self.options.release_line_m,
