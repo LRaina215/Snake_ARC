@@ -41,6 +41,12 @@ def curve_feeding_class(base):
             self.last_curve = plan
             return plan.targets(self.lengths), plan.focus, plan.cell, plan.fraction
 
+        def snapshot(self):
+            row = super().snapshot()
+            row['trajectory_backend'] = self.trajectory_backend
+            row['curve_reference'] = None if self.last_curve is None else self.last_curve.as_dict()
+            return row
+
     CurveContinuousFeeding.__name__ = 'CurveContinuousFeeding'
     return CurveContinuousFeeding
 

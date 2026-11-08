@@ -7,7 +7,7 @@ Ctrl+U 形成圆弧，Ctrl+J/H 正/反单步，Ctrl+G 连续/暂停，Ctrl+X 全
 Ctrl+1/2/3 切换基础圆弧、固定截面顺应、仅角度反馈自动移窗与数量自适应。
 失能时Ctrl+3按全身实测姿态选窗接管并进入顺应；Ctrl+U始终按配置窗口形成。
 模式4转3会按实测重新选窗并撤去送链缓冲，成功后Ctrl+G开始滚动。
-Ctrl+4 主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，Ctrl+Y 提前返回，Ctrl+L沿任务方向强制推进一步。
+Ctrl+4 曲线积分主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，Ctrl+Y 提前返回，Ctrl+L沿任务方向强制推进一步。
 Ctrl+5 按实测圆弧自动调长两侧、先卷前部；Ctrl+L 确认搭稳后，Ctrl+J/G 逐节送尾。
 Ctrl+6 接入 T 管重力矩越障；Ctrl+L 确认并保持实际姿态，Ctrl+J/G 再推进。
 Ctrl+7 从当前Helix逆向解缠成开放半圆并自动归中；J单步、G连续/暂停，归中后保持。
@@ -83,7 +83,7 @@ POSTURE_CONTRACT_EXIT_ANGLE_DEG = 12.0
 POSTURE_EXPANSION_TURN_ERROR_DEG = -5.0
 POSTURE_CONTRACTION_TURN_ERROR_DEG = 5.0
 
-# 主动送链：只用角度/时间，暂停滚动，首次按旧版模板建形；不是管径顺应。
+# 主动送链：只用角度/时间，暂停滚动；目标由拼接曲线积分生成，操作与交接不变。
 FEED_DISTANCE_M = .0645        # Ctrl+J/H一次任务的材料量；四连杆试验改为.258
 FEED_RATE_JOINTS_S = .10       # 左右调长速度上限：关节间距/秒；模式4直接用，模式5/6自动调长再乘HELIX_TRANSITION_SPEED_SCALE
 FEED_AMPLITUDE_DEG = 60.0      # 送链起态自己的幅值，不覆盖你的基础/顺应参数
@@ -5411,6 +5411,190 @@ class HelixArcManual:
                     feedback_wait=self.feedback_wait)
 # END ARC_HELIX_CORE
 
+# BEGIN CURVE_FEEDING_CORE
+# 模式4目标生成：拼接曲率子段 → 相邻连杆积分 → 目标角。
+# J/H任务、角反馈、长度估计、预置使能与退出逻辑继承前面的原控制器。
+# 改形状分配看FeedingCurveBuilder；改速度/步长仍看顶部FEED_*。
+@dataclass(frozen=True)
+class CurvePlan:
+    segments: tuple
+    focus: tuple
+    cell: int = 0
+    fraction: float = 0.
+
+    def targets(self, lengths):
+        """Exact integral of k*cos(psi), k*sin(psi) over adjacent-link spans.
+
+        Uses individual link lengths, with the production parity convention.
+        Constant torsion is supported so the same integral accepts helix
+        segments later; this feeding backend currently uses tau=0 subarcs.
+        """
+        s = np.r_[0., np.cumsum(lengths)]
+        lo, hi = s[:-2], s[2:]
+        out = np.zeros(len(lengths)-1)
+        boundary = phase = 0.
+        pitch = np.arange(len(out)) % 2 == 0
+        for segment in self.segments:
+            phase += segment.psi
+            a = np.maximum(lo, boundary)
+            b = np.minimum(hi, boundary+segment.length)
+            span = np.maximum(b-a, 0.)
+            mid = phase+segment.tau*((a+b)/2-boundary)
+            weight = segment.kappa*span*np.sinc(segment.tau*span/(2*math.pi))
+            out += weight*np.where(pitch, np.cos(mid), np.sin(mid))
+            phase += segment.tau*segment.length
+            boundary += segment.length
+        return out
+
+    def as_dict(self):
+        boundary = phase = 0.
+        rows = []
+        for segment in self.segments:
+            phase += segment.psi
+            rows.append(dict(start_m=boundary, length_m=segment.length,
+                             curvature_per_m=segment.kappa,
+                             bending_direction_rad=phase,
+                             torsion_per_m=segment.tau))
+            boundary += segment.length
+            phase += segment.tau*segment.length
+        return dict(focus=list(self.focus), cell=self.cell,
+                    fraction=self.fraction, segments=rows)
+
+
+class FeedingCurveBuilder:
+    def __init__(self, lengths):
+        self.lengths = np.asarray(lengths, float)
+        if self.lengths.ndim != 1 or len(self.lengths) < 4 or not np.isfinite(self.lengths).all() or np.any(self.lengths <= 0):
+            raise ValueError('Positive finite individual link lengths required')
+        self.n = len(self.lengths)-1
+        self.s = np.r_[0., np.cumsum(self.lengths)]
+
+    def _basis(self, window, phase, amplitude_deg, bias):
+        """Curvature densities keyed by axis and adjacent-link interval.
+
+        Amplitude is the integrated turn budget of each nominal subarc, not
+        an already generated motor vector. Bias redistributes the budget of
+        the two shoulder subarcs within each bending-axis family.
+        """
+        first, last = window
+        if not 2 <= first <= last < self.n:
+            raise ValueError('Active arc needs passive boundary joints')
+        basis = {}
+        for parity, projection in enumerate((math.cos(phase), math.sin(phase))):
+            family = [j for j in range(first, last+1) if (j-1) % 2 == parity]
+            for j in family:
+                shoulder = 1.
+                if len(family) >= 2:
+                    if j == family[0]:
+                        shoulder *= 1.-bias
+                    if j == family[-1]:
+                        shoulder *= 1.+bias
+                width = self.s[j+1]-self.s[j-1]
+                basis[j] = math.radians(amplitude_deg)*projection*shoulder/width
+        return basis
+
+    def _stitch(self, densities, focus, cell=0, fraction=0.):
+        # Every link boundary is a possible endpoint of a staggered basis.
+        # Assemble the two projected components over their common partition.
+        components = np.zeros((len(self.lengths), 2))
+        for j, density in densities.items():
+            components[j-1:j+1, (j-1) % 2] += density
+        segments, phase = [], 0.
+        for length, (kp, ky) in zip(self.lengths, components):
+            curvature = math.hypot(kp, ky)
+            direction = math.atan2(ky, kp) if curvature else phase
+            segment = HelixCurveSegment(float(length), curvature, 0., direction-phase)
+            # Merge identical neighboring subarcs. A zero-curvature extension
+            # carries the frame onward; it does not enable any passive hinge.
+            if segments and abs(segment.psi) < 1e-15 and segments[-1].kappa == curvature:
+                old = segments[-1]
+                segments[-1] = HelixCurveSegment(old.length+length, curvature, 0., old.psi)
+            else:
+                segments.append(segment)
+            phase = direction
+        return CurvePlan(tuple(segments), tuple(focus), cell, fraction)
+
+    def template(self, window, phase, amplitude_deg, bias=0.):
+        return self._stitch(self._basis(window, phase, amplitude_deg, bias), window)
+
+    def travelling(self, origin, position, phase, bias, options, minimum_bin, maximum_bin):
+        cell = int(np.clip(math.floor(position/2), minimum_bin, maximum_bin))
+        fraction = float(np.clip(position/2-cell, 0., 1.))
+        old = tuple(j+2*cell for j in origin)
+        new = tuple(j+2 for j in old)
+        left = self._basis(old, phase, options.amplitude_deg, bias)
+        right = self._basis(new, phase, options.amplitude_deg, bias)
+        densities, support = {}, []
+        for j in sorted(left.keys() | right.keys()):
+            a, b = left.get(j, 0.), right.get(j, 0.)
+            width = self.s[j+1]-self.s[j-1]
+            if (abs(a)+abs(b))*width > 1e-10:
+                support.append(j)
+            densities[j] = (1-fraction)*a+fraction*b
+        if not support:
+            raise ValueError('Zero bending budget has no feeding arc')
+        allocation = float(np.clip((abs(position)-options.middle_boost_activation_joints)/
+                                  options.middle_boost_ramp_joints, 0., 1.))
+        allocation = allocation**2*(3.-2.*allocation)
+        extra_turn = math.radians(options.fractional_middle_boost_deg)*allocation*math.sin(math.pi*fraction)**2
+        if len(support) == 4:
+            for j, sign in zip(support, (-1., 1., 1., -1.)):
+                densities[j] += sign*extra_turn/(self.s[j+1]-self.s[j-1])
+        return self._stitch(densities, (support[0], support[-1]), cell, fraction)
+
+
+class _CurveTemplateHelper:
+    def __init__(self, original, owner):
+        self.original, self.owner = original, owner
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, 'original'), name)
+
+    def template(self, window, phase, amplitude, bias=0.):
+        plan = self.owner.curve_builder.template(window, phase, amplitude, bias)
+        self.owner.last_curve = plan
+        return plan.targets(self.owner.lengths)
+
+
+def curve_feeding_class(base):
+    """Works with library or single-file embedded controller, unchanged above.
+
+    Super initializes the old bookkeeping; its unused seed is immediately
+    replaced before the object is exposed. Every returned motion reference,
+    including preparation, comes through the curve integral thereafter.
+    """
+    if getattr(base, 'trajectory_backend', None) == 'stitched_curve_integral':
+        return base
+
+    class CurveContinuousFeeding(base):
+        trajectory_backend = 'stitched_curve_integral'
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.curve_builder = FeedingCurveBuilder(self.lengths)
+            self.last_curve = None
+            self.helper = _CurveTemplateHelper(self.helper, self)
+            self.targets = self.helper.template(self.origin, self.phase, self.options.amplitude_deg)
+
+        def profile(self, position, bias):
+            plan = self.curve_builder.travelling(self.origin, position, self.phase, bias,
+                self.options, self.minimum_bin, self.maximum_bin)
+            self.last_curve = plan
+            return plan.targets(self.lengths), plan.focus, plan.cell, plan.fraction
+
+        def snapshot(self):
+            row = super().snapshot()
+            row['trajectory_backend'] = self.trajectory_backend
+            row['curve_reference'] = None if self.last_curve is None else self.last_curve.as_dict()
+            return row
+
+    CurveContinuousFeeding.__name__ = 'CurveContinuousFeeding'
+    return CurveContinuousFeeding
+
+# 保存旧类仅用于离线对照；实机所有调长实例默认用曲线积分。
+LegacyContinuousFeeding = ContinuousFeeding
+ContinuousFeeding = curve_feeding_class(LegacyContinuousFeeding)
+# END CURVE_FEEDING_CORE
+
 # BEGIN PASSIVE_END_RESET_CORE
 class PassiveEndReset:
     def __init__(self, measured_deg, bearing_targets_deg, bearing_mask, *, rate_deg_s=60., hold_s=.25, max_s=2.):
@@ -6890,6 +7074,7 @@ class RollingArcController:
                 print(f"停在当前目标：{h['events'][-1]['reason']}", flush=True)
         if self.feeding_selected:
             core = self.feeding
+            print('目标生成=拼接曲线积分 | J/H手动相对调长，G暂停/继续，L强制一帧', flush=True)
             o = {} if core is None else core.observation or {}
             if core is not None and core.forced_step is not None:
                 print('强制步正在下发目标：绕过跟踪误差/稳定采样等待，发完后保持。', flush=True)

@@ -25,7 +25,8 @@ from .backend import curve_feeding_class
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT/'validation/reports/curve_feeding_20261108'
-BASE = real.ContinuousFeeding
+# Keep the original comparator after the curve backend is released to real.
+BASE = getattr(real, 'LegacyContinuousFeeding', real.ContinuousFeeding)
 CURVE = curve_feeding_class(BASE)
 CASES = dict(roundtrip=(7, 12), boundary=(2, 7))
 
