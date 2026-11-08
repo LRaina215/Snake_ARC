@@ -60,7 +60,7 @@ class CompactUFastTransitionTests(unittest.TestCase):
         self.assertIsNone(new.options.retain_joints)
         self.assertAlmostEqual(new.options.release_line_m,.129)
         self.assertAlmostEqual(new.options.release_arc_rad,math.radians(150))
-        self.assertAlmostEqual(new.options.transition_speed_scale,1.3)
+        self.assertAlmostEqual(new.options.transition_speed_scale,real.HELIX_TRANSITION_SPEED_SCALE)
         self.assertEqual(new.unwind_retain_count(),12)
         self.assertAlmostEqual(real.ContinuousFeedingOptions().maximum_position_rate_joints_s,.1)
 

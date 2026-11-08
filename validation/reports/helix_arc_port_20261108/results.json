@@ -1,0 +1,161 @@
+{
+  "hardware_run": false,
+  "software_checks_passed": 47,
+  "raw_directory": "artifacts\\helix_arc_port_20261108\\hotkeys_beta120",
+  "actual_review": {
+    "beta_deg": 120.0,
+    "initial_tail_azimuth_deg": -40.96079816084745,
+    "controller_passed": true,
+    "failure": null,
+    "stages": [
+      {
+        "stage": "exit_transition",
+        "start_s": 0.001000000000000112,
+        "end_s": 1.9499999999997855
+      },
+      {
+        "stage": "reverse_unwrap",
+        "start_s": 1.99999999999978,
+        "end_s": 37.89999999999782
+      },
+      {
+        "stage": "crown_align",
+        "start_s": 37.9499999999977,
+        "end_s": 40.99999999999059
+      },
+      {
+        "stage": "flatten",
+        "start_s": 41.049999999990476,
+        "end_s": 46.99999999997661
+      },
+      {
+        "stage": "arc_release",
+        "start_s": 47.04999999997649,
+        "end_s": 47.99999999997428
+      },
+      {
+        "stage": "arc_settle",
+        "start_s": 48.04999999997416,
+        "end_s": 49.99999999996962
+      },
+      {
+        "stage": "auto_center",
+        "start_s": 50.0499999999695,
+        "end_s": 75.00000000000372
+      },
+      {
+        "stage": "center_settle",
+        "start_s": 75.05000000000396,
+        "end_s": 78.00000000001805
+      },
+      {
+        "stage": "arc_roll",
+        "start_s": 78.05000000001829,
+        "end_s": 85.05000000005171
+      }
+    ],
+    "actual_final_shape_passed": true,
+    "arc_process_shape_passed": true,
+    "actual_balanced": true,
+    "final_ends_disabled": true,
+    "final_coverage_min_max_deg": [
+      176.98347567968682,
+      181.82888926683657
+    ],
+    "final_max_balance_difference_m": 0.03648360251397992,
+    "final_max_plane_rms_m": 0.010336672101179856,
+    "roll_center_advance_m": 0.07397301493888526,
+    "total_center_displacement_m": 0.01651062585057589,
+    "passive_force_max_nm": 0.0,
+    "floor_frames": 0,
+    "self_contact_frames": 0,
+    "unsupported_frames": 2,
+    "maximum_actual_joint_deg": 78.0899245543581,
+    "maximum_tracking_deg": 1.7406296177249765,
+    "saturated_frames": 37,
+    "passed": true
+  },
+  "commands": [
+    {
+      "time_s": 0.0,
+      "key": "Ctrl+7",
+      "result": "accepted",
+      "stage_before": null,
+      "stage": "exit_transition",
+      "mode": "hold"
+    },
+    {
+      "time_s": 0.0,
+      "key": "Ctrl+J",
+      "result": "accepted",
+      "stage_before": "exit_transition",
+      "stage": "exit_transition",
+      "mode": "step"
+    },
+    {
+      "time_s": 0.09999999999998921,
+      "key": "Ctrl+J",
+      "result": "accepted",
+      "stage_before": "exit_transition",
+      "stage": "exit_transition",
+      "mode": "step"
+    },
+    {
+      "time_s": 1.499999999999835,
+      "key": "Ctrl+G",
+      "result": "accepted",
+      "stage_before": "exit_transition",
+      "stage": "exit_transition",
+      "mode": "run"
+    },
+    {
+      "time_s": 4.000000000000448,
+      "key": "Ctrl+G",
+      "result": "accepted",
+      "stage_before": "reverse_unwrap",
+      "stage": "reverse_unwrap",
+      "mode": "hold"
+    },
+    {
+      "time_s": 5.000000000000782,
+      "key": "Ctrl+J",
+      "result": "accepted",
+      "stage_before": "reverse_unwrap",
+      "stage": "reverse_unwrap",
+      "mode": "step"
+    },
+    {
+      "time_s": 6.5000000000008376,
+      "key": "Ctrl+G",
+      "result": "accepted",
+      "stage_before": "reverse_unwrap",
+      "stage": "reverse_unwrap",
+      "mode": "run"
+    },
+    {
+      "time_s": 79.04000000002301,
+      "key": "Ctrl+G",
+      "result": "accepted",
+      "stage_before": "arc_roll",
+      "stage": "arc_roll",
+      "mode": "run"
+    }
+  ],
+  "controller_options": {
+    "retained_turns": 1.0,
+    "exit_extra_rad": 0.5235987755982988,
+    "head_clearance_rad": 0.6981317007977318,
+    "reverse_feed_m_s": 0.016,
+    "reverse_roll_rad_s": 0.112,
+    "target_rate_deg_s": 35.0,
+    "feedback_period_s": 0.2,
+    "lead_s": 1.5,
+    "flatten_s": 6.0,
+    "center_rate_m_s": 0.01,
+    "center_tolerance_m": 0.025,
+    "roll_rate_rad_s": 0.35
+  },
+  "entry": "DebugArcController and shared standalone core through actual Ctrl+7/J/G decoder",
+  "note": "The recorded repeated-J return value was lost by the debug wrapper; fixed and checked without changing movement.",
+  "isolated_single_file_check_passed": true
+}

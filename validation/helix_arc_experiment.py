@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 import sys
 import shutil
+from types import SimpleNamespace
 
 import mujoco
 import numpy as np
@@ -19,7 +20,7 @@ from snake_control.helix_arc_transition import HelixArcTransition
 from validation.gm_wrap_first_experiment import pipe_contacts
 
 
-def run(beta,output,duration=150.):
+def run(beta,output,duration=150.,hotkeys=False):
     output.mkdir(parents=True,exist_ok=True)
     shutil.copyfile(Path(__file__),output/'experiment_source.py')
     shutil.copyfile(Path(__file__).resolve().parents[1]/'snake_control/helix_arc_transition.py',output/'controller_source.py')
@@ -36,11 +37,41 @@ def run(beta,output,duration=150.):
     start=float(d.time);measured=d.qpos[sim.drive.qadr].copy();next_control=start;next_feedback=start;next_sample=start
     rows=[];states=[];vel=[];targets=[];masks=[];forces=[];statuses=[]
     failure=None;roll_start=None;printed_stage=None
+    controller=None;commands=[];center_hold_at=None;roll_commanded=False
+    if hotkeys:
+        from codes.Rolling_Arc_Debug_Mujoco import DebugArcController,MujocoMotorBus,decode_sim_hotkey
+        session=SimpleNamespace(sim=sim,elapsed=0.,physics_started=True,record_event=lambda *a,**k:None)
+        bus=MujocoMotorBus(sim)
+        controller=DebugArcController(bus,session)
+        controller.enabled=mask.tolist();controller.targets=np.degrees(d.qpos[sim.drive.qadr]).tolist()
+        controller.first,controller.last,controller.mode=1,18,'hold'
+        bus.prepare_enabled(controller.targets,controller.enabled)
+        shutil.copyfile(Path(__file__).resolve().parents[1]/'codes/Rolling_Arc_Real.py',output/'real_entry_source.py')
+        schedule=[(0.,'7'),(0.,'J'),(.1,'J'),(1.5,'G'),(4.,'G'),(5.,'J'),(6.5,'G')]
+        def command(key):
+            before=controller.helix_arc_transition
+            result=controller.command(decode_sim_hotkey(ord(key),True))
+            commands.append(dict(time_s=session.elapsed,key='Ctrl+'+key,result=result or 'accepted',
+                stage_before=None if before is None else before.stage,stage=controller.helix_arc_transition.stage,
+                mode=controller.mode))
     while d.time-start<duration:
         if d.time+1e-8>=next_control:
             fresh=d.time+1e-8>=next_feedback
             if fresh:measured=d.qpos[sim.drive.qadr].copy();next_feedback+=core.o.feedback_period_s
-            target,mask=core.step(.02,float(d.time-start),measured,fresh)
+            if controller is None:
+                target,mask=core.step(.02,float(d.time-start),measured,fresh)
+            else:
+                session.elapsed=float(d.time-start)
+                if fresh:controller.refresh_compliance_feedback()
+                while schedule and session.elapsed+1e-8>=schedule[0][0]:
+                    _,key=schedule.pop(0);command(key)
+                if controller.helix_arc_transition is not None and controller.helix_arc_transition.completed:
+                    center_hold_at=session.elapsed if center_hold_at is None else center_hold_at
+                    if not roll_commanded and session.elapsed-center_hold_at>=1.:
+                        command('G');roll_commanded=True
+                controller.tick(.02)
+                core=controller.helix_arc_transition.core
+                target=np.radians(controller.targets);mask=np.asarray(controller.enabled,bool)
             if core.stage!=printed_stage:
                 print(json.dumps(dict(t=round(float(d.time-start),2),stage=core.stage,
                     enabled=int(mask.sum()),head_m=core.head,center_error_m=core.center_error),ensure_ascii=False),flush=True)
@@ -79,7 +110,7 @@ def run(beta,output,duration=150.):
         rows.append(row);states.append(d.qpos.copy());vel.append(d.qvel.copy());targets.append(target.copy());masks.append(mask.copy());forces.append(d.actuator_force.copy());statuses.append(core.status())
         if metrics['ground_contact_force_n']>1. or pts[:,2].max()<.9:
             failure='floor contact or whole body lost pipe';break
-        if core.stage=='arc_roll':
+        if core.stage=='arc_roll' and (controller is None or roll_commanded):
             roll_start=float(d.time) if roll_start is None else roll_start
             if d.time-roll_start>=6.:break
     if core.stage!='arc_roll' and failure is None:failure='time budget reached at '+core.stage
@@ -88,7 +119,8 @@ def run(beta,output,duration=150.):
         feedback_period_s=core.o.feedback_period_s,controller_options=asdict(core.o),binary_enable=True,
         controller_inputs='sampled motor angles, dimensions, time only',
         passed=core.stage=='arc_roll' and failure is None,failure=failure,final_stage=core.stage,dynamics_s=float(d.time-start),
-        controller_status=core.status(),events=core.events,commands=[])
+        controller_status=core.status(),events=core.events,commands=commands,
+        hotkey_entry=hotkeys,center_completion_auto_hold_s=None if center_hold_at is None else 1.)
     (output/'locked_gait.json').write_text(json.dumps(dict(summary=summary,samples=rows),ensure_ascii=False,indent=1),encoding='utf-8')
     (output/'controller.json').write_text(json.dumps(statuses,ensure_ascii=False),encoding='utf-8')
     np.savez_compressed(output/'locked_gait_trace.npz',time=[r['time_s'] for r in rows],qpos=states,qvel=vel,targets=targets,masks=masks,actuator_force=forces)
@@ -97,4 +129,5 @@ def run(beta,output,duration=150.):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--beta',type=float,default=0.);p.add_argument('--output',type=Path,required=True);p.add_argument('--duration',type=float,default=150.)
-    a=p.parse_args();run(a.beta,a.output,a.duration)
+    p.add_argument('--hotkeys',action='store_true',help='Use the actual shared Ctrl+7/J/G debug dispatcher')
+    a=p.parse_args();run(a.beta,a.output,a.duration,a.hotkeys)

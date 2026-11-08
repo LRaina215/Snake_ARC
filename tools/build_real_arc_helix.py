@@ -15,9 +15,10 @@ def main():
     curve = re.sub(r'\bSegment\b', 'HelixCurveSegment', curve)
     gravity = declaration(src/'gravity_moment.py', {'GravityMomentOptions', 'GravityMomentGait', 'smooth'})
     gravity = re.sub(r'\bSegment\b', 'HelixCurveSegment', gravity)
+    reverse = re.sub(r'\bSegment\b', 'HelixCurveSegment', declaration(src/'helix_arc_transition.py'))
     parts = [curve, declaration(src/'gravity_global_shift.py', {'ArcHelixShift', 'MeasuredGravityShift'}),
              declaration(src/'active_arc_transfer.py'), declaration(src/'arc_helix_transition.py'),
-             gravity, declaration(src/'gravity_handoff.py')]
+             gravity, declaration(src/'gravity_handoff.py'), reverse]
     target = ROOT/'codes/Rolling_Arc_Real.py'
     source = target.read_text(encoding='utf-8')
     if BEGIN in source:

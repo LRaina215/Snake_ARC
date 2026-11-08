@@ -1,13 +1,12 @@
 """Experimental reverse shift: sampled joint angles -> open ARC -> material centering.
 
 No MuJoCo, pipe coordinates, contact forces or root orientation enter this module.
-Units: metres, radians, seconds. This is deliberately not bundled into the real entry.
+Units: metres, radians, seconds. The same declarations are bundled into the real entry.
 """
 from dataclasses import dataclass
 import math
 
 import numpy as np
-from scipy.optimize import least_squares
 
 from .curve_gait import CurveGait, Segment, line, arc
 from .gravity_moment import smooth
@@ -16,6 +15,7 @@ from .section_geometry import forward
 
 def fit_helix(q, link):
     """Fit the two alternating curvature-integral families, including signed torsion."""
+    from scipy.optimize import least_squares
     s=(np.arange(len(q))+1)*link
     odd=np.arange(len(q))%2==0
     def basis(tau):
@@ -29,6 +29,8 @@ def fit_helix(q, link):
     _,c,tau=min(seeds,key=lambda x:x[0])
     fit=least_squares(lambda x:basis(x[2])@x[:2]-q,[*c,tau],max_nfev=60)
     x=fit.x;amplitude=float(np.hypot(*x[:2]));tau=float(x[2])
+    if not math.isfinite(amplitude) or amplitude<1e-8:
+        raise ValueError('当前角反馈没有可计算的螺旋曲率；Ctrl+7用于已搭管的Helix')
     kappa=amplitude/(2*link*np.sinc(tau*link/math.pi))
     radius=kappa/(kappa*kappa+tau*tau)
     return dict(kappa=kappa,tau=tau,radius=radius,phase=math.atan2(x[1],x[0]),
@@ -252,3 +254,54 @@ class HelixArcTransition:
                     straight_m=self.straight,arc_head_m=self.head,arc_length_m=self.arc_length,
                     crown_m=self.crown,fit=self.fit,geometry=self.geometry,center_error_m=self.center_error,
                     enabled_joints=(np.flatnonzero(self.enabled)+1).tolist())
+
+
+class HelixArcManual:
+    """J/G scheduling around the validated geometry; pauses never advance curve time.
+
+    Angle samples are degrees at the entry boundary, radians inside the core.
+    Centering completion pauses once. A further J/G explicitly starts ARC rolling.
+    """
+    def __init__(self,measured_deg,lengths,options=HelixArcOptions(),step_s=1.,max_feedback_age_s=.8):
+        self.core=HelixArcTransition(np.radians(measured_deg),lengths,options)
+        self.step_s=step_s;self.max_feedback_age_s=max_feedback_age_s
+        self.running=False;self.started=False;self.step_left=0.;self.control_time=0.
+        self.feedback_time=None;self.completed=False;self.feedback_wait=False
+
+    @property
+    def targets(self):return self.core.targets
+
+    @property
+    def enabled(self):return self.core.enabled
+
+    @property
+    def stage(self):return self.core.stage
+
+    @property
+    def phase(self):return self.core.phase
+
+    def pause(self):
+        self.running=False;self.step_left=0.
+
+    def step_once(self):
+        self.running=False;self.step_left=self.step_s
+
+    def advance(self,dt,now,feedback_time,measured_deg):
+        if not self.running and self.step_left<=0.:return False
+        self.feedback_wait=feedback_time is None or now-feedback_time>self.max_feedback_age_s
+        if self.feedback_wait:return False
+        fresh=self.feedback_time is None or feedback_time>self.feedback_time
+        self.feedback_time=feedback_time;self.started=True
+        used=dt if self.running else min(dt,self.step_left)
+        self.core.step(used,self.control_time,np.radians(measured_deg),fresh)
+        self.control_time+=used
+        self.step_left=max(0.,self.step_left-used)
+        if self.step_left<1e-9:self.step_left=0.
+        if self.stage=='arc_roll' and not self.completed:
+            self.completed=True;self.pause()
+        return True
+
+    def status(self):
+        return dict(self.core.status(),running=self.running,step_remaining_s=self.step_left,
+                    control_time_s=self.control_time,started=self.started,completed=self.completed,
+                    feedback_wait=self.feedback_wait)

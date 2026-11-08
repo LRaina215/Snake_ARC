@@ -202,8 +202,9 @@ class DebugArcController(real.RollingArcController):
         if not real.DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and command.strip().lower() == 'reverse':
             raise ValueError('冻结角度基准未标定反向滚动；先切换基础/固定模式')
         command = command.strip().lower()
-        if command in ('gait_helix', 'gait_gravity') or (self.helix_transition is not None and command.startswith('gait_')):
-            super().command(command)
+        if command in ('gait_helix', 'gait_gravity', 'gait_helix_arc') or (
+                (self.helix_transition is not None or self.helix_arc_transition is not None) and command.startswith('gait_')):
+            return super().command(command)
         elif command.startswith('gait_'):
             self.select_gait(command[5:])
         elif command in ('push_left', 'push_right'):
@@ -227,9 +228,9 @@ class DebugArcController(real.RollingArcController):
                 self.sliding.pending = None
         elif command in ('quit', 'exit'):
             self.session.stop_push()
-            super().command(command)
+            return super().command(command)
         else:
-            super().command(command)
+            return super().command(command)
 
     def tick(self, dt):
         if self.sliding is None:
@@ -542,7 +543,8 @@ class DebugSession:
             return
         # 首次接管前只是初始姿态预览，避免读操作说明期间掉管；
         # 接管/释放后再不冻结物理，暂停、保持与失能都按真实动力学执行。
-        self.physics_started |= c.touched_hardware
+        self.physics_started |= c.touched_hardware or (
+            c.helix_arc_transition is not None and c.mode in ('step', 'run'))
         if not self.physics_started:
             return
         before = (c.mode, c.forming, c.settle_remaining > 0)
