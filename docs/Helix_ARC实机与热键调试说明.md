@@ -1,6 +1,6 @@
 # Ctrl+7：Helix → 开放半圆ARC → 自动归中
 
-完整的上电→U→5→7操作及各阶段调速见[往返切换简明说明](上电到ARC_Helix往返切换操作说明.md)。
+完整的上电→Ctrl+U→Ctrl+5→Ctrl+7连续操作及各阶段调速见[往返切换简明说明](上电到ARC_Helix往返切换操作说明.md)。
 
 2026-11-08，按用户验收的三周向仿真版本同步。实机与`Rolling_Arc_Debug_Mujoco.py`共用同一个控制器；实机仍只需运行一份`Rolling_Arc_Real.py`。实机效果由用户验收，本轮没有打开COM串口。
 

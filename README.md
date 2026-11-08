@@ -21,7 +21,7 @@ python .\codes\Rolling_Arc_Real.py
 
 直接运行一份Python文件，自动识别CH340串口；需要指定端口时在文件顶部修改`PORT`。当前配置18关节，默认Ctrl+U形成J8–J13。机械尺寸按手量近似配置：头端25 mm、相邻转轴72 mm、尾端91 mm。参数和速度均在文件顶部修改，改完重启程序；日志保存到`codes/logs/`。
 
-常用路线：**上电搭管 → 启动程序 → Ctrl+U形成ARC → Ctrl+5、G自动准备前部 → 前部搭稳后L确认、G送尾 → Helix完成 → Ctrl+7、G解缠并归中 → J/H正反ARC单步。**下文及操作说明中的字母都需同时按住Ctrl。
+按同一份程序连续做完整个往返：**上电搭管 → 启动一次程序 → Ctrl+U形成ARC并等归零结束 → Ctrl+5、Ctrl+G自动准备前部 → 前部搭稳后Ctrl+L确认、Ctrl+G送尾 → Helix完成后直接Ctrl+7、Ctrl+G解缠并归中 → 最终归零结束，Ctrl+J／Ctrl+H正反ARC运动。**完整的逐步按键、观察现象和调速位置见上方操作说明。
 
 **Ctrl+空格**暂停，**Ctrl+K**查看阶段与下一步，**Ctrl+X**全部失能，**Ctrl+Q**退出。启动时自动打开预览，关闭预览窗口不会停止控制。操作时只运行一个控制入口。
 
@@ -40,6 +40,6 @@ python .\codes\Rolling_Arc_Debug_Mujoco.py
 | 110→210 mm连续90°急弯变径 | `SCENE='elbow90_taper110_210'`，`START_X_M=-.25` |
 | T管，主管/支管110/60 mm | `SCENE='tee_up60'`，`START_X_M=.2` |
 
-仿真中按住**Ctrl+A/D**侧拉悬垂端，松开停止；**Ctrl+[/]**调拉力，**Ctrl+R**重建初始预览。
+仿真中按住**Ctrl+A或Ctrl+D**侧拉悬垂端，松开停止；**Ctrl+[或Ctrl+]**调拉力，**Ctrl+R**重建初始预览。
 
 更详细的专题操作：[两侧长度调整](docs/曲线积分调长实机验收.md)、[ARC→Helix与T管](docs/ARC_Helix与重力矩越障操作说明.md)、[Helix→ARC](docs/Helix_ARC实机与热键调试说明.md)、[仿真实机统一调试](docs/仿真实机统一调试说明.md)。
