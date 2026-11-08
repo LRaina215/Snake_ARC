@@ -1,0 +1,231 @@
+{
+  "label": "full_stroke_curve",
+  "acceptance": {
+    "task_complete": true,
+    "actual_length_direction": true,
+    "actual_length_error_le12mm": false,
+    "open_arc": false,
+    "whole_positive_turn_le218": true,
+    "continuous_sampled_contact": false,
+    "no_floor_or_self_contact": true,
+    "no_limit_excess": true,
+    "passive_motor_torque_zero": true,
+    "entering_preloaded_measured_angle": true,
+    "slew_limit": true
+  },
+  "all_passed": false,
+  "length_completions": [
+    {
+      "action": 0,
+      "requested_mm": -64.5,
+      "true_head_change_mm": -64.29102911025558,
+      "true_tail_change_mm": 71.60178294163988,
+      "true_transfer_mm": -67.94640602594774,
+      "encoder_delta_mm": -64.70171747043752,
+      "true_error_mm": -3.446406025947738
+    },
+    {
+      "action": 1,
+      "requested_mm": -64.5,
+      "true_head_change_mm": -76.87893608962216,
+      "true_tail_change_mm": 65.56690842009361,
+      "true_transfer_mm": -71.22292225485788,
+      "encoder_delta_mm": -66.58172443522614,
+      "true_error_mm": -6.7229222548578775
+    },
+    {
+      "action": 2,
+      "requested_mm": -64.5,
+      "true_head_change_mm": -56.761786692381136,
+      "true_tail_change_mm": 81.87958731881773,
+      "true_transfer_mm": -69.32068700559942,
+      "encoder_delta_mm": -63.84018129474506,
+      "true_error_mm": -4.820687005599424
+    },
+    {
+      "action": 3,
+      "requested_mm": -64.5,
+      "true_head_change_mm": -63.563098435167056,
+      "true_tail_change_mm": 53.74890423406298,
+      "true_transfer_mm": -58.65600133461501,
+      "encoder_delta_mm": -63.55297675195109,
+      "true_error_mm": 5.843998665384987
+    },
+    {
+      "action": 5,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 85.54841975285821,
+      "true_tail_change_mm": -65.28274831264946,
+      "true_transfer_mm": 75.41558403275384,
+      "encoder_delta_mm": 63.6929314382364,
+      "true_error_mm": 10.915584032753841
+    },
+    {
+      "action": 6,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 38.22854902514969,
+      "true_tail_change_mm": -57.42404666299805,
+      "true_transfer_mm": 47.826297844073856,
+      "encoder_delta_mm": 60.66347150296875,
+      "true_error_mm": -16.673702155926144
+    },
+    {
+      "action": 7,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 65.42748139153525,
+      "true_tail_change_mm": -68.776224201746,
+      "true_transfer_mm": 67.10185279664063,
+      "encoder_delta_mm": 63.68633960026193,
+      "true_error_mm": 2.601852796640628
+    },
+    {
+      "action": 8,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 73.25647925320261,
+      "true_tail_change_mm": -72.39453995806767,
+      "true_transfer_mm": 72.82550960563513,
+      "encoder_delta_mm": 64.63380279499886,
+      "true_error_mm": 8.325509605635133
+    },
+    {
+      "action": 9,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 68.14590863649694,
+      "true_tail_change_mm": -66.58836263824975,
+      "true_transfer_mm": 67.36713563737334,
+      "encoder_delta_mm": 64.35608170329263,
+      "true_error_mm": 2.8671356373733374
+    },
+    {
+      "action": 10,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 77.0354463097348,
+      "true_tail_change_mm": -76.87596283554011,
+      "true_transfer_mm": 76.95570457263744,
+      "encoder_delta_mm": 66.19275764775331,
+      "true_error_mm": 12.455704572637444
+    },
+    {
+      "action": 11,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 68.81550743334208,
+      "true_tail_change_mm": -47.39284462566595,
+      "true_transfer_mm": 58.10417602950402,
+      "encoder_delta_mm": 63.996654507078254,
+      "true_error_mm": -6.395823970495982
+    },
+    {
+      "action": 12,
+      "requested_mm": 64.5,
+      "true_head_change_mm": 61.558327460996765,
+      "true_tail_change_mm": -75.16188181351791,
+      "true_transfer_mm": 68.36010463725734,
+      "encoder_delta_mm": 64.62434837868936,
+      "true_error_mm": 3.8601046372573364
+    },
+    {
+      "action": 14,
+      "requested_mm": -64.5,
+      "true_head_change_mm": -59.42557576400675,
+      "true_tail_change_mm": 83.90494710894481,
+      "true_transfer_mm": -71.66526143647577,
+      "encoder_delta_mm": -63.51078817958966,
+      "true_error_mm": -7.165261436475774
+    },
+    {
+      "action": 15,
+      "requested_mm": -64.5,
+      "true_head_change_mm": -66.77988889775798,
+      "true_tail_change_mm": 36.315987398323536,
+      "true_transfer_mm": -51.547938148040764,
+      "encoder_delta_mm": -62.15317570869367,
+      "true_error_mm": 12.952061851959236
+    },
+    {
+      "action": 16,
+      "requested_mm": -64.5,
+      "true_head_change_mm": -71.10870203692188,
+      "true_tail_change_mm": 82.16444435885062,
+      "true_transfer_mm": -76.63657319788625,
+      "encoder_delta_mm": -64.2461664300952,
+      "true_error_mm": -12.13657319788625
+    }
+  ],
+  "upper_turn_deg": [
+    174.39209931680006,
+    195.1739685177506
+  ],
+  "minimum_open_gap": 0.3846877625868869,
+  "whole_positive_turn_max_deg": 199.41591282247788,
+  "curvature_polyline_max_per_m": 20.51167895719395,
+  "active_count": [
+    9,
+    14
+  ],
+  "enable_events_per_joint": [
+    0,
+    2,
+    3,
+    3,
+    2,
+    2,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    3,
+    5,
+    5,
+    0,
+    0,
+    0
+  ],
+  "disable_events_per_joint": [
+    0,
+    2,
+    2,
+    2,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    3,
+    5,
+    5,
+    0,
+    0,
+    0
+  ],
+  "preload_error_max_deg": 0.0,
+  "preload_vs_instantaneous_angle_max_deg": 0.04457733427497601,
+  "saturated_joint_step_fraction": 2.7572116905775682e-05,
+  "max_axis_drift_mm": 0.3131140944359623,
+  "final_hold_length_range_mm": [
+    8.898568861305133,
+    10.766120697750846,
+    9.772192185943386
+  ],
+  "final_hold_axis_drift_mm": 0.055396223327522365,
+  "max_tracking_error_deg": 0.884072030549504,
+  "angle_down_vs_world_gravity_max_deg": 12.872358373202259,
+  "feedback_rigid_fit_residual_max_m": 8.520268960298858e-05,
+  "worst_open_shape_time_s": 203.2000000006062,
+  "review_samples": 4917,
+  "actual_duration_s": 245.7800000008096,
+  "measured_link_length_range_m": [
+    0.0644999999999995,
+    0.06450000000000054
+  ],
+  "scope": "full saved trajectory and 3s final physical hold; contact sampled at 50ms, torque/limits/collisions at 1ms; no hardware",
+  "notes": [
+    "Motor-off still has the original model passive damping 1.5; this is not proof of hardware friction.",
+    "World-z shoulder crossings evaluate actual hanging length, independent of the angle-only controller.",
+    "No T crossing or compliance change in this experiment."
+  ]
+}

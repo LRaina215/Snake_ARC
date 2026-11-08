@@ -48,6 +48,9 @@ def review_one(output, label):
     transitions = np.diff(mask.astype(int), axis=0)
     first_time = times[0]
     motion_end = report['completed_actions'][-1]['time_s'] if report['completed_actions'] else times[-1]
+    centre_events = [e for e in report.get('stage_events', []) if e.get('kind') == 'centre_coordinate_reached']
+    if centre_events:
+        motion_end = centre_events[-1]['time_s']
     held = times >= motion_end
     center = points.mean(axis=1)
     all_raw_turns = []
@@ -73,7 +76,19 @@ def review_one(output, label):
             encoder_delta_mm=(f['observation']['transfer_coordinate_m']-f['baseline_m'])*1000,
             true_error_mm=float(delta[2]-1000*f['goal_delta_m'])))
     handover = report['handovers']
-    preload_error = max((abs(a-b) for event in handover[1:] for a,b in zip(event['preload_deg'], event['actual_deg'])), default=0.)
+    instantaneous_preload_difference = max((abs(a-b) for event in handover[1:]
+        for a,b in zip(event['preload_deg'], event['actual_deg'])), default=0.)
+    # Hardware preloads the last measured sample, not an unavailable zero-age
+    # angle at the instant of enabling. Keep both differences explicit.
+    control_times = np.array([r['time_s'] for r in controls])
+    preload_errors = []
+    for event in handover[1:]:
+        row = controls[int(np.argmin(abs(control_times-event['time_s'])))]
+        inp = row['motor_input']
+        if inp:
+            preload_errors.extend(abs(value-inp['angles_deg'][j-1])
+                for value,j in zip(event['preload_deg'], event['entering']))
+    preload_error = max(preload_errors, default=0.)
     direction_errors, reconstruction_residuals = [], []
     for row in controls:
         inp, obs = row['motor_input'], row['feeding']['observation']
@@ -113,6 +128,7 @@ def review_one(output, label):
         enable_events_per_joint=(transitions > 0).sum(axis=0).tolist(),
         disable_events_per_joint=(transitions < 0).sum(axis=0).tolist(),
         preload_error_max_deg=preload_error,
+        preload_vs_instantaneous_angle_max_deg=instantaneous_preload_difference,
         saturated_joint_step_fraction=report['statistics']['saturated_joint_steps']/report['statistics']['joint_steps'],
         max_axis_drift_mm=float(np.max(abs(center[:, 0]-center[0, 0]))*1000),
         final_hold_length_range_mm=(np.ptp(length[held], axis=0)*1000).tolist(),

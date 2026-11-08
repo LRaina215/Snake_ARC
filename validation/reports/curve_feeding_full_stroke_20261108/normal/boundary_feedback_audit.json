@@ -1,0 +1,14 @@
+[
+  {
+    "boundary_time_s": 72.63999999998279,
+    "recorded_motor_samples_satisfy_same_decision": true,
+    "maximum_error_deg": 0.680251972514526,
+    "control_frames": 31
+  },
+  {
+    "boundary_time_s": 195.44000000056914,
+    "recorded_motor_samples_satisfy_same_decision": true,
+    "maximum_error_deg": 0.40185796361924986,
+    "control_frames": 31
+  }
+]

@@ -25,6 +25,8 @@ python -m experiments.curve_feeding.review --input validation/results/curve_feed
 
 本轮结论和视频见 [验证报告](../../validation/reports/curve_feeding_20261108/README.md)。曲线迁移复现了原行为；原长度代理在短端姿态仍存在明显偏差，不能把兼容性通过说成毫米精度通过。
 
+另有一次 [中间→左端→右端→中间的连续全行程记录](../../validation/reports/curve_feeding_full_stroke_20261108/README.md)，附完整视频。动作路径完成，但回中实际长度及部分过渡形态仍有偏差。
+
 ## 本轮预先约定
 
 假设：把旧模板、肩部偏置和中部转角重分配表达为分段曲率并积分，可以保留原调长行为。第一轮是兼容迁移，不同时优化半径、速度或放宽反馈门槛。
