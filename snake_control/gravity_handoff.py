@@ -122,6 +122,7 @@ class GravityCrossingOptions:
     max_feedback_age_s: float = .8
     min_front_turns: float = 1.
     front_seat_rad: float = .14
+    grip_radius_rate_m_s: float = .002
 
 
 class GravityCrossing:
@@ -138,6 +139,7 @@ class GravityCrossing:
         self.gait = GravityMomentGait(self.n, gait_options, self.l)
         self.gait.segments(options.release_radius_m, ls=options.release_line_m, th1=math.pi)
         self.options = options
+        self.grip_radius_m = self.grip_radius_target_m = gait_options.r_h1
         self.helix_only = helix_only
         self._enabled = np.asarray(enabled, bool).copy()
         self.measured = np.radians(measured_deg)
@@ -246,6 +248,34 @@ class GravityCrossing:
         self.running = False
         self.step_left = self.options.step_s
 
+    def request_grip_radius_change(self, delta_m):
+        """形成小U前手调Helix半径；固定相位、使能和螺距，平滑执行后保持。"""
+        if self.helix_only or self.stage not in ('align', 'grip_adjust'):
+            raise ValueError('抱管半径用Ctrl+6对准阶段的Ctrl+O/P调整，位置在形成小U之前')
+        target = self.grip_radius_target_m+float(delta_m)
+        if not math.isfinite(target) or target <= 0.:
+            raise ValueError('曲线半径必须为有限正数')
+        if not math.isfinite(self.options.grip_radius_rate_m_s) or self.options.grip_radius_rate_m_s <= 0.:
+            raise ValueError('抱管半径调节速度必须为有限正数')
+        self.pause()
+        self.grip_radius_target_m = target
+        if self.stage != 'grip_adjust':
+            self._enter('grip_adjust')
+        self.started = self.running = True
+        self.events.append(dict(stage='manual_grip_radius', change_m=delta_m,
+            target_radius_m=target, phase_rad=self.phase))
+
+    def _advance_grip_radius(self, dt):
+        remaining = self.grip_radius_target_m-self.grip_radius_m
+        change = float(np.clip(remaining, -self.options.grip_radius_rate_m_s*dt,
+                                self.options.grip_radius_rate_m_s*dt))
+        self.grip_radius_m += change
+        goal = self._helix(self.phase, self.grip_radius_m)
+        self._set_targets(goal, dt)
+        if abs(remaining-change) < 1e-10 and np.max(abs(goal-self._targets)) < 1e-9:
+            self._enter('align')
+            self.pause()
+
     def _start_front_finish(self):
         """尾端失能，将原承载弧接入完整的前部螺旋。"""
         count = max(self.front.window[1], self.front.support_joint_count)
@@ -342,7 +372,7 @@ class GravityCrossing:
         front_ready = self.stage in ('front_finish', 'front_seat', 'front_hold')
         release_ready = (self.stage == 'right_u_hold' or
                          (self.stage == 'unwind' and self.elapsed >= 3.))
-        if not (front_ready or release_ready or self.stage in ('align', 'drop_hold')):
+        if not (front_ready or release_ready or self.stage in ('align', 'grip_adjust', 'drop_hold')):
             raise ValueError(f'当前阶段={self.stage}，尚无可确认的交接；Ctrl+J/G推进，Ctrl+K查看具体阶段')
         before = self.stage
         self.pause()
@@ -356,7 +386,9 @@ class GravityCrossing:
             # Earlier physical confirmation is remembered, not mistaken for a
             # completed geometric transition. J/G finishes front preparation
             # before entering the same source return automatically.
-        elif self.stage == 'align':
+        elif self.stage in ('align', 'grip_adjust'):
+            # L确认当前已执行到的半径，不在开始小U后追赶剩余调节。
+            self.grip_radius_target_m = self.grip_radius_m
             self.anchor = self._targets.copy()
             self._enter('unwind')
         elif self.stage == 'right_u_hold' or (self.stage == 'unwind' and self.elapsed >= 3.):
@@ -392,7 +424,9 @@ class GravityCrossing:
             self.step_left = 0.
         self.elapsed += dt
 
-        if self.stage == 'arc_settle':
+        if self.stage == 'grip_adjust':
+            self._advance_grip_radius(dt)
+        elif self.stage == 'arc_settle':
             self._advance_arc_reference(dt, fresh)
         elif self.stage == 'front':
             self.front.running = True
@@ -430,7 +464,7 @@ class GravityCrossing:
             self._advance_source_return(dt)
         elif self.stage == 'align':
             self.phase += self.align_direction*self.options.alignment_rate_rad_s*dt
-            self._set_targets(self._helix(self.phase, self.gait.o.r_h1), dt)
+            self._set_targets(self._helix(self.phase, self.grip_radius_m), dt)
         elif self.stage == 'unwind':
             self._advance_unwind(dt)
         elif self.stage == 'drop':
@@ -450,10 +484,11 @@ class GravityCrossing:
 
     def _advance_unwind(self, dt):
         t, opt, gait = self.elapsed, self.options, self.gait
-        radius = gait.o.r_h1+(opt.release_radius_m-gait.o.r_h1)*smooth((t-7.)/.85)
+        # 手调只保持到小U/直尾形成；随后恢复原放松半径，释放及回卷参数不改。
+        radius = self.grip_radius_m+(opt.release_radius_m-self.grip_radius_m)*smooth((t-7.)/.85)
         goal = gait.targets(self.phase, radius, ls=opt.release_line_m*smooth((t-3.)/4.),
                             th1=math.pi*smooth(t/3.))[0]
-        residual = self.anchor-self._helix(self.phase, gait.o.r_h1)
+        residual = self.anchor-self._helix(self.phase, self.grip_radius_m)
         self._set_targets(goal+(1.-smooth(t))*residual, dt, rate=30.)
         if t >= 7.85:
             self._enter('right_u_hold')
@@ -526,4 +561,8 @@ class GravityCrossing:
                     accepted_joint=self.accepted, shift_m=self.offset, step_remaining_s=self.step_left,
                     initial_source_return=self.initial_source_return,
                     return_retain_joints=getattr(self, 'return_retain', None),
+                    grip_radius_m=self.grip_radius_m,
+                    grip_radius_target_m=self.grip_radius_target_m,
+                    unwind_release_radius_m=self.options.release_radius_m,
+                    return_radius_m=self.gait.o.r_h2,
                     front=front, events=self.events.copy())

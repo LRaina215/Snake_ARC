@@ -62,6 +62,8 @@ python .\codes\Rolling_Arc_Real.py
 
 也可在使用`mujoco`解释器的IDE中直接运行该文件。需要固定端口时修改文件顶部的`PORT`；不连接机器人演练时将顶部`DRY_RUN`改为`True`，再运行同一文件。运行前关闭其他占用串口的程序。
 
+**小U前手调抱紧**：在Ctrl+6的 `align` 对准阶段，**Ctrl+O收紧／Ctrl+P放松Helix半径，每次1 mm**，自动平滑执行并保持，再L确认、J/G形成小U。原放松、释放和回卷半径不改，不会全程抱紧。步长／速度在顶部 `GRAVITY_GRIP_RADIUS_STEP_MM / GRAVITY_GRIP_RADIUS_RATE_MM_S` 修改；这不是模式4左右调长ARC半径。
+
 ## 自动实验
 
 自动研究实验与手调入口分开保留。例如无图形窗口运行基础急弯：

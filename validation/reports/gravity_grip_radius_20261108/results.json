@@ -1,0 +1,106 @@
+{
+  "hardware_run": false,
+  "feature": "manual pre-U Helix radius; later original loosening unchanged",
+  "motor_feedback_period_s": 0.2,
+  "control_period_s": 0.02,
+  "old_model_axis_spacing_m": 0.0645,
+  "main_pipe_diameter_m": 0.11,
+  "software_checks_passed": 34,
+  "trials": [
+    {
+      "adjusted": false,
+      "source_record": "artifacts\\sequential_handoff\\round19\\buffer6",
+      "source_index": 7751,
+      "source_time_s": 387.5509999977475,
+      "dynamics_s": 12.200999999998677,
+      "final_stage": "right_u_hold",
+      "grip_radius_m": 0.094,
+      "original_later_radii_unchanged": true,
+      "trim_phase_spread_rad": 0.0,
+      "enabled_changed": false,
+      "max_tracking_deg": 32.527283766434216,
+      "max_actual_joint_deg": 75.2670491128038,
+      "saturated_frames": 92,
+      "no_main_contact_frames": 1,
+      "no_front_contact_frames": 14,
+      "floor_frames": 0,
+      "self_contact_events": [],
+      "pre_loosen_front_turn_min_deg": 300.608623164583,
+      "pre_loosen_front_axial_range_m": 0.006245026427166012,
+      "interface_passed": true,
+      "dynamics_check_passed": false,
+      "max_saved_target_change_deg": 1.8000000000000091,
+      "actual_u_ready_frames": 0,
+      "actual_u_end_ready": false,
+      "bounded_contact_check_passed": false
+    },
+    {
+      "adjusted": true,
+      "source_record": "artifacts\\sequential_handoff\\round19\\buffer6",
+      "source_index": 7751,
+      "source_time_s": 387.5509999977475,
+      "dynamics_s": 12.200999999998677,
+      "final_stage": "right_u_hold",
+      "grip_radius_m": 0.09300000000000004,
+      "original_later_radii_unchanged": true,
+      "trim_phase_spread_rad": 0.0,
+      "enabled_changed": false,
+      "max_tracking_deg": 36.45158516896981,
+      "max_actual_joint_deg": 76.09960077497276,
+      "saturated_frames": 94,
+      "no_main_contact_frames": 0,
+      "no_front_contact_frames": 0,
+      "floor_frames": 0,
+      "self_contact_events": [],
+      "pre_loosen_front_turn_min_deg": 302.452356531181,
+      "pre_loosen_front_axial_range_m": 0.0052135913963284874,
+      "interface_passed": true,
+      "dynamics_check_passed": false,
+      "max_saved_target_change_deg": 1.8000000000000154,
+      "actual_u_ready_frames": 0,
+      "actual_u_end_ready": false,
+      "bounded_contact_check_passed": true
+    }
+  ],
+  "tracking_review": [
+    {
+      "case": "baseline",
+      "max_error_joint": 10,
+      "max_error_time_s": 10.349999999999703,
+      "max_error_stage": "unwind",
+      "max_front8_error_deg": 28.02425737997202,
+      "frames": 245
+    },
+    {
+      "case": "adjusted",
+      "max_error_joint": 10,
+      "max_error_time_s": 11.349999999999149,
+      "max_error_stage": "right_u_hold",
+      "max_front8_error_deg": 7.081790180495571,
+      "frames": 245
+    }
+  ],
+  "actual_u_review": [
+    {
+      "case": "baseline",
+      "ready_frames": 0,
+      "first_ready_s": null,
+      "last_ready_s": null,
+      "end_ready": false,
+      "tail_com_y": -0.04327368392407929,
+      "tail_end_y": -0.09939686459648137,
+      "tail_end_z": 0.7121200996435431
+    },
+    {
+      "case": "adjusted",
+      "ready_frames": 0,
+      "first_ready_s": null,
+      "last_ready_s": null,
+      "end_ready": false,
+      "tail_com_y": -0.12514322666280267,
+      "tail_end_y": -0.3510718432104668,
+      "tail_end_z": 1.0907736595053934
+    }
+  ],
+  "scope": "Manual control interface verified; actual supported U and anti-slip hardware effect not verified."
+}

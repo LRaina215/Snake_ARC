@@ -115,6 +115,8 @@ GRAVITY_OPEN_RADIUS_M = .098    # 释放后保留的前部稍微放松，尾部�
 GRAVITY_ALIGN_RATE_RAD_S = .14  # Ctrl+J/H 对准支管时的滚动速度
 GRAVITY_SHIFT_RATE_M_S = .012   # Shift Rolling 最大曲线进给速度
 GRAVITY_RETURN_ROLL_RAD_S = .084 # 原回卷及初次ARC接尾均推进前部相位，配合直尾缩短
+GRAVITY_GRIP_RADIUS_STEP_MM = 1.0 # Ctrl+O/P：形成小U前Helix半径收紧/放松，不是调长ARC半径
+GRAVITY_GRIP_RADIUS_RATE_MM_S = 2.0 # 平滑调半径，完成后保持；不改原释放/回卷半径
 
 # 历史幅值/滑动窗口原型参数：只供旧仿真导入第3A段，当前实机入口不用。
 MIN_COMPLIANCE_AMPLITUDE_DEG = 25.0
@@ -147,6 +149,7 @@ HOTKEY_COMMANDS = {
     'U': 'apply', 'J': 'step', 'H': 'back', 'G': 'toggle', 'N': 'hold',
     'K': 'status', 'X': 'release', 'Q': 'quit', 'T': 'reverse', 'E': 'compliance',
     'W': 'window_auto', 'Y': 'feed_return', 'L': 'feed_tick',
+    'O': 'grip_tighten', 'P': 'grip_loosen',
     '-': 'delta-', '=': 'delta+',
 }
 HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响应）：
@@ -162,6 +165,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   送链中Ctrl+G暂停/继续；Ctrl+L沿任务方向强制推进一步，目标发完保持；Ctrl+Y提前返回起态
   Ctrl+5 自动调长并先成前部；L确认，J/G复用原回卷，前部推进、直尾逐段入螺旋
   Ctrl+6 选择 T 管重力矩越障（J1 为前端）；Ctrl+J/G 推进，Ctrl+L 确认实物姿态
+  Ctrl+6对准阶段：Ctrl+O/P 抱管半径收紧/放松1mm，平滑执行并保持；后续仍按原半径放松/释放
   模式5/6：Ctrl+J每次最多1秒；Ctrl+G按一次连续到确认点/完成，再按暂停；不必反复按J
   全身已使能时再Ctrl+5选择统一Helix归形，再Ctrl+J/G；尾段仍失能时先完成逐段接管
   T 管模式对准支管时 Ctrl+J/H 正反单步；Ctrl+空格暂停，Ctrl+X 全部失能
@@ -4595,6 +4599,7 @@ class GravityCrossingOptions:
     max_feedback_age_s: float = .8
     min_front_turns: float = 1.
     front_seat_rad: float = .14
+    grip_radius_rate_m_s: float = .002
 
 
 class GravityCrossing:
@@ -4611,6 +4616,7 @@ class GravityCrossing:
         self.gait = GravityMomentGait(self.n, gait_options, self.l)
         self.gait.segments(options.release_radius_m, ls=options.release_line_m, th1=math.pi)
         self.options = options
+        self.grip_radius_m = self.grip_radius_target_m = gait_options.r_h1
         self.helix_only = helix_only
         self._enabled = np.asarray(enabled, bool).copy()
         self.measured = np.radians(measured_deg)
@@ -4719,6 +4725,34 @@ class GravityCrossing:
         self.running = False
         self.step_left = self.options.step_s
 
+    def request_grip_radius_change(self, delta_m):
+        """形成小U前手调Helix半径；固定相位、使能和螺距，平滑执行后保持。"""
+        if self.helix_only or self.stage not in ('align', 'grip_adjust'):
+            raise ValueError('抱管半径用Ctrl+6对准阶段的Ctrl+O/P调整，位置在形成小U之前')
+        target = self.grip_radius_target_m+float(delta_m)
+        if not math.isfinite(target) or target <= 0.:
+            raise ValueError('曲线半径必须为有限正数')
+        if not math.isfinite(self.options.grip_radius_rate_m_s) or self.options.grip_radius_rate_m_s <= 0.:
+            raise ValueError('抱管半径调节速度必须为有限正数')
+        self.pause()
+        self.grip_radius_target_m = target
+        if self.stage != 'grip_adjust':
+            self._enter('grip_adjust')
+        self.started = self.running = True
+        self.events.append(dict(stage='manual_grip_radius', change_m=delta_m,
+            target_radius_m=target, phase_rad=self.phase))
+
+    def _advance_grip_radius(self, dt):
+        remaining = self.grip_radius_target_m-self.grip_radius_m
+        change = float(np.clip(remaining, -self.options.grip_radius_rate_m_s*dt,
+                                self.options.grip_radius_rate_m_s*dt))
+        self.grip_radius_m += change
+        goal = self._helix(self.phase, self.grip_radius_m)
+        self._set_targets(goal, dt)
+        if abs(remaining-change) < 1e-10 and np.max(abs(goal-self._targets)) < 1e-9:
+            self._enter('align')
+            self.pause()
+
     def _start_front_finish(self):
         """尾端失能，将原承载弧接入完整的前部螺旋。"""
         count = max(self.front.window[1], self.front.support_joint_count)
@@ -4815,7 +4849,7 @@ class GravityCrossing:
         front_ready = self.stage in ('front_finish', 'front_seat', 'front_hold')
         release_ready = (self.stage == 'right_u_hold' or
                          (self.stage == 'unwind' and self.elapsed >= 3.))
-        if not (front_ready or release_ready or self.stage in ('align', 'drop_hold')):
+        if not (front_ready or release_ready or self.stage in ('align', 'grip_adjust', 'drop_hold')):
             raise ValueError(f'当前阶段={self.stage}，尚无可确认的交接；Ctrl+J/G推进，Ctrl+K查看具体阶段')
         before = self.stage
         self.pause()
@@ -4829,7 +4863,9 @@ class GravityCrossing:
             # Earlier physical confirmation is remembered, not mistaken for a
             # completed geometric transition. J/G finishes front preparation
             # before entering the same source return automatically.
-        elif self.stage == 'align':
+        elif self.stage in ('align', 'grip_adjust'):
+            # L确认当前已执行到的半径，不在开始小U后追赶剩余调节。
+            self.grip_radius_target_m = self.grip_radius_m
             self.anchor = self._targets.copy()
             self._enter('unwind')
         elif self.stage == 'right_u_hold' or (self.stage == 'unwind' and self.elapsed >= 3.):
@@ -4865,7 +4901,9 @@ class GravityCrossing:
             self.step_left = 0.
         self.elapsed += dt
 
-        if self.stage == 'arc_settle':
+        if self.stage == 'grip_adjust':
+            self._advance_grip_radius(dt)
+        elif self.stage == 'arc_settle':
             self._advance_arc_reference(dt, fresh)
         elif self.stage == 'front':
             self.front.running = True
@@ -4903,7 +4941,7 @@ class GravityCrossing:
             self._advance_source_return(dt)
         elif self.stage == 'align':
             self.phase += self.align_direction*self.options.alignment_rate_rad_s*dt
-            self._set_targets(self._helix(self.phase, self.gait.o.r_h1), dt)
+            self._set_targets(self._helix(self.phase, self.grip_radius_m), dt)
         elif self.stage == 'unwind':
             self._advance_unwind(dt)
         elif self.stage == 'drop':
@@ -4923,10 +4961,11 @@ class GravityCrossing:
 
     def _advance_unwind(self, dt):
         t, opt, gait = self.elapsed, self.options, self.gait
-        radius = gait.o.r_h1+(opt.release_radius_m-gait.o.r_h1)*smooth((t-7.)/.85)
+        # 手调只保持到小U/直尾形成；随后恢复原放松半径，释放及回卷参数不改。
+        radius = self.grip_radius_m+(opt.release_radius_m-self.grip_radius_m)*smooth((t-7.)/.85)
         goal = gait.targets(self.phase, radius, ls=opt.release_line_m*smooth((t-3.)/4.),
                             th1=math.pi*smooth(t/3.))[0]
-        residual = self.anchor-self._helix(self.phase, gait.o.r_h1)
+        residual = self.anchor-self._helix(self.phase, self.grip_radius_m)
         self._set_targets(goal+(1.-smooth(t))*residual, dt, rate=30.)
         if t >= 7.85:
             self._enter('right_u_hold')
@@ -4999,6 +5038,10 @@ class GravityCrossing:
                     accepted_joint=self.accepted, shift_m=self.offset, step_remaining_s=self.step_left,
                     initial_source_return=self.initial_source_return,
                     return_retain_joints=getattr(self, 'return_retain', None),
+                    grip_radius_m=self.grip_radius_m,
+                    grip_radius_target_m=self.grip_radius_target_m,
+                    unwind_release_radius_m=self.options.release_radius_m,
+                    return_radius_m=self.gait.o.r_h2,
                     front=front, events=self.events.copy())
 # END ARC_HELIX_CORE
 
@@ -5263,7 +5306,8 @@ class RollingArcController:
                                          shift_rate_m_s=GRAVITY_SHIFT_RATE_M_S,
                                          return_roll_rad_s=GRAVITY_RETURN_ROLL_RAD_S, step_s=HELIX_STEP_S,
                                          min_front_turns=HELIX_MIN_FRONT_TURNS,
-                                         front_seat_rad=HELIX_FRONT_SEAT_RAD)
+                                         front_seat_rad=HELIX_FRONT_SEAT_RAD,
+                                         grip_radius_rate_m_s=GRAVITY_GRIP_RADIUS_RATE_MM_S/1000.)
         core = GravityCrossing(LINK_LENGTHS_M, enabled, self.measured_angles(), gait, options,
                                from_helix=from_helix, helix_only=helix_only)
         core.events.insert(0, dict(stage='entry_selection', source_enabled=self.enabled.copy(),
@@ -5288,6 +5332,15 @@ class RollingArcController:
         if command in ('release', 'quit', 'exit', 'status'):
             return False
         gravity = isinstance(core, GravityCrossing)
+        if gravity and command in ('grip_tighten', 'grip_loosen'):
+            self.refresh_compliance_feedback()
+            delta = GRAVITY_GRIP_RADIUS_STEP_MM/1000.*(-1 if command=='grip_tighten' else 1)
+            core.request_grip_radius_change(delta)
+            self.mode, self.freeze_targets = 'run', False
+            print(f'形成小U前调半径：{core.grip_radius_m*1000:.2f} → '
+                  f'{core.grip_radius_target_m*1000:.2f} mm，固定相位平滑执行后保持；'
+                  '后续仍按原参数放松/释放。', flush=True)
+            return True
         if gravity and command == 'feed_tick':
             self.refresh_compliance_feedback()
             _, sample_time = self.motor_sample_clock()
@@ -6109,6 +6162,8 @@ class RollingArcController:
             result = self.command_helix(command)
             if result:
                 return result
+        if command in ('grip_tighten', 'grip_loosen'):
+            raise ValueError('Ctrl+O/P用于Ctrl+6完整Helix对准阶段，形成小U之前手调抱管半径')
         if self.feeding_selected and self.command_feeding(command):
             return
         if not DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and (command in ('reverse', 'back') or
@@ -6294,6 +6349,7 @@ class RollingArcController:
                 'front_seat': '仅前部小幅就位；L记录搭稳确认，J/G完成衔接后接原回卷',
                 'helix_normalize': '全身归到同一条Helix；Ctrl+J单步/Ctrl+G连续，结束后保持；空格暂停',
                 'align': 'Ctrl+J/H 微调。确认前部过支管、螺旋已对准后按 Ctrl+L',
+                'grip_adjust': '正在手调初始抱管半径，相位固定；完成后保持，L确认当前半径再J/G形成小U',
                 'unwind': '形成右侧小 U；从尾朝头观察，确认 U 搭稳后暂停并按 Ctrl+L',
                 'right_u_hold': '确认小 U 搭在主管右侧，前部贴稳后按 Ctrl+L，再用 Ctrl+J/G 释放尾段',
                 'drop': '尾段关闭扭矩，自然下落',
@@ -6307,6 +6363,10 @@ class RollingArcController:
             }.get(h['stage'], '查看调长状态和反馈')
             print(f"阶段={h['stage']} | 曲线进给={1000*h['shift_m']:.1f} mm | "
                   f"已接收边界={h['accepted_joint']} | 相位={h['phase_rad']:.3f} rad | {instruction}", flush=True)
+            if not self.helix_transition.helix_only:
+                print(f"小U前抱管R={h['grip_radius_m']*1000:.2f} → {h['grip_radius_target_m']*1000:.2f} mm | "
+                      f"原放松R={h['unwind_release_radius_m']*1000:.2f} mm | "
+                      f"原释放/回卷R={h['return_radius_m']*1000:.2f} mm | Ctrl+O收紧 / Ctrl+P放松", flush=True)
             if h['front'] and h['stage'] in ('front', 'blocked'):
                 front = h['front']
                 print(f"头部接入={front['stage']} | 调长阶段={front['transfer_stage']} | "

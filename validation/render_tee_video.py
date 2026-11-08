@@ -49,6 +49,7 @@ MOTOR_STAGES = {
     'first_shift': '前部保持，尾段沿曲线逐节上管',
     'first_recover': '全身螺旋成形，恢复滚动',
     'align': '滚动对准支管，等待现场确认',
+    'grip_adjust': '手调小U前抱管半径，相位固定',
     'unwind': '尾部解旋，形成主管右侧小 U',
     'right_u_hold': '小 U 保持搭管，等待确认',
     'drop': '尾部关闭扭矩，靠重力落向轴下',
@@ -175,6 +176,11 @@ def main():
                                 f'支管接触: {"连杆" + ",".join(map(str, contact)) if contact else "无"}    '
                                 f'{args.speed:g}倍速回放（{colors}）', fill=(62, 86, 102), font=SMALL)
             draw.text((12, 76), '斜视', fill=(80, 80, 80), font=SMALL)
+            if 'grip_radius_m' in sample:
+                draw.text((12, 100), f'小U前R {sample["grip_radius_m"]*1000:.2f} → '
+                          f'{sample["grip_radius_target_m"]*1000:.2f} mm',fill=(23,53,74),font=SMALL)
+                draw.text((12, 126), f'后续原放松R {sample["unwind_release_radius_m"]*1000:.2f} mm，'
+                          f'回卷R {sample["return_radius_m"]*1000:.2f} mm',fill=(23,53,74),font=SMALL)
             if args.fixed_camera and 'head_x_m' in sample:
                 draw.text((12, 100), f'头端 x = {sample["head_x_m"] * 1000:.0f} mm', fill=(80, 80, 80), font=SMALL)
             if raw in {'direct_shift', 'direct_shift_cruise'}:
@@ -192,6 +198,8 @@ def main():
                 operation = '保持，Ctrl+L 确认后 Ctrl+J/G 执行下一段' if held else 'Ctrl+G 连续，可用 Ctrl+空格 暂停'
                 if raw == 'complete':
                     operation = '完整 Helix 保持，继续 T 管流程用 Ctrl+6'
+                if raw == 'grip_adjust':
+                    operation = 'O/P收紧/放松；到位保持，L确认后J/G形成小U'
                 if raw == 'first_shift' and report.get('front_freeze_count'):
                     operation = f'前部 J1–J{report["front_freeze_count"]} 目标保持；J/G 只推进后段曲线'
                 if report.get('commands'):
