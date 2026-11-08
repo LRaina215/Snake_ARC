@@ -74,4 +74,12 @@ python .\codes\Rolling_Arc_Real.py
 python .\codes\Rolling_Arc_Mujoco.py --headless --scene elbow90 --start-x -0.25 --duration 60 --output validation/results/elbow90.json
 ```
 
+Helix→开放半圆ARC→自动归中目前是独立仿真实验入口，尚未同步实机与热键程序：
+
+```powershell
+python .\validation\helix_arc_experiment.py --beta 0 --output artifacts/helix_arc_manual/beta0
+```
+
+`--beta`选择初始绕管周向角（度）；本轮视频与结果见[仿真记录](validation/reports/helix_arc_20261108/README.md)。
+
 完整操作见[两端统一调试说明](docs/仿真实机统一调试说明.md)及[实机调试说明](docs/实机调试代码说明.md)；其他实验入口及记录见[开发与验证记录](docs/开发与验证记录.md)。

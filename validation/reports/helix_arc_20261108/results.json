@@ -1,0 +1,613 @@
+{
+  "hardware_run": false,
+  "real_entry_updated": false,
+  "physics_runs": 9,
+  "final_cases": 3,
+  "conditions": {
+    "joints": 18,
+    "link_m": 0.0645,
+    "pipe_diameter_m": 0.11,
+    "feedback_period_s": 0.2,
+    "saved_state_period_s": 0.05,
+    "post_center_roll_s": 6
+  },
+  "runs": {
+    "round1_beta0": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round1_beta0",
+      "initial_tail_azimuth_deg": -156.9380183775271,
+      "controller_reached_roll": false,
+      "final_stage": "crown_align",
+      "duration_s": 150.00000000036184,
+      "failure": null,
+      "self_contact_saved_frames": 0,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 0.8986173625046838,
+      "controller_snapshot_saved": false
+    },
+    "round2_beta0": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round2_beta0",
+      "initial_tail_azimuth_deg": -156.9380183775271,
+      "controller_reached_roll": true,
+      "final_stage": "arc_roll",
+      "duration_s": 89.25000000007176,
+      "failure": null,
+      "self_contact_saved_frames": 21,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 10.536246908063367,
+      "controller_snapshot_saved": false,
+      "actual_review": {
+        "beta_deg": 0.0,
+        "initial_tail_azimuth_deg": -156.9380183775271,
+        "controller_passed": true,
+        "failure": null,
+        "stages": [
+          {
+            "stage": "exit_transition",
+            "start_s": 0.001000000000000112,
+            "end_s": 1.4499999999998405
+          },
+          {
+            "stage": "reverse_unwrap",
+            "start_s": 1.499999999999835,
+            "end_s": 38.94999999999537
+          },
+          {
+            "stage": "crown_align",
+            "start_s": 38.999999999995254,
+            "end_s": 39.99999999999292
+          },
+          {
+            "stage": "flatten",
+            "start_s": 40.04999999999281,
+            "end_s": 45.99999999997894
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 46.04999999997882,
+            "end_s": 47.99999999997428
+          },
+          {
+            "stage": "auto_center",
+            "start_s": 48.04999999997416,
+            "end_s": 80.20000000002855
+          },
+          {
+            "stage": "center_settle",
+            "start_s": 80.25000000002879,
+            "end_s": 83.20000000004288
+          },
+          {
+            "stage": "arc_roll",
+            "start_s": 83.25000000004312,
+            "end_s": 89.25000000007176
+          }
+        ],
+        "actual_final_shape_passed": true,
+        "actual_balanced": true,
+        "final_coverage_min_max_deg": [
+          177.700608785391,
+          181.85096014280376
+        ],
+        "final_max_balance_difference_m": 0.03766589167344481,
+        "final_max_plane_rms_m": 0.010153733741720523,
+        "passive_force_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 21,
+        "unsupported_frames": 1,
+        "maximum_actual_joint_deg": 78.02254746726629,
+        "maximum_tracking_deg": 10.536246908063367,
+        "saturated_frames": 20,
+        "passed": false
+      }
+    },
+    "round2_beta120": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round2_beta120",
+      "initial_tail_azimuth_deg": -40.96079816084745,
+      "controller_reached_roll": true,
+      "final_stage": "arc_roll",
+      "duration_s": 87.65000000006413,
+      "failure": null,
+      "self_contact_saved_frames": 52,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 8.615102408485464,
+      "controller_snapshot_saved": true,
+      "actual_review": {
+        "beta_deg": 120.0,
+        "initial_tail_azimuth_deg": -40.96079816084745,
+        "controller_passed": true,
+        "failure": null,
+        "stages": [
+          {
+            "stage": "exit_transition",
+            "start_s": 0.001000000000000112,
+            "end_s": 1.4499999999998405
+          },
+          {
+            "stage": "reverse_unwrap",
+            "start_s": 1.499999999999835,
+            "end_s": 38.94999999999537
+          },
+          {
+            "stage": "crown_align",
+            "start_s": 38.999999999995254,
+            "end_s": 40.39999999999199
+          },
+          {
+            "stage": "flatten",
+            "start_s": 40.449999999991874,
+            "end_s": 46.39999999997801
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 46.44999999997789,
+            "end_s": 48.399999999973346
+          },
+          {
+            "stage": "auto_center",
+            "start_s": 48.44999999997323,
+            "end_s": 78.60000000002091
+          },
+          {
+            "stage": "center_settle",
+            "start_s": 78.65000000002115,
+            "end_s": 81.60000000003524
+          },
+          {
+            "stage": "arc_roll",
+            "start_s": 81.65000000003548,
+            "end_s": 87.65000000006413
+          }
+        ],
+        "actual_final_shape_passed": true,
+        "actual_balanced": true,
+        "final_coverage_min_max_deg": [
+          177.84351775304526,
+          181.82542675192744
+        ],
+        "final_max_balance_difference_m": 0.037966669615181414,
+        "final_max_plane_rms_m": 0.010348567265286586,
+        "passive_force_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 52,
+        "unsupported_frames": 3,
+        "maximum_actual_joint_deg": 78.10552012229249,
+        "maximum_tracking_deg": 8.615102408485464,
+        "saturated_frames": 13,
+        "passed": false
+      }
+    },
+    "round2_beta240": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round2_beta240",
+      "initial_tail_azimuth_deg": 82.6575436778012,
+      "controller_reached_roll": true,
+      "final_stage": "arc_roll",
+      "duration_s": 89.45000000007272,
+      "failure": null,
+      "self_contact_saved_frames": 21,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 10.525209159319058,
+      "controller_snapshot_saved": true,
+      "actual_review": {
+        "beta_deg": 240.0,
+        "initial_tail_azimuth_deg": 82.6575436778012,
+        "controller_passed": true,
+        "failure": null,
+        "stages": [
+          {
+            "stage": "exit_transition",
+            "start_s": 0.001000000000000112,
+            "end_s": 1.4499999999998405
+          },
+          {
+            "stage": "reverse_unwrap",
+            "start_s": 1.499999999999835,
+            "end_s": 38.89999999999549
+          },
+          {
+            "stage": "crown_align",
+            "start_s": 38.94999999999537,
+            "end_s": 39.79999999999339
+          },
+          {
+            "stage": "flatten",
+            "start_s": 39.84999999999327,
+            "end_s": 45.799999999979406
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 45.84999999997929,
+            "end_s": 47.799999999974744
+          },
+          {
+            "stage": "auto_center",
+            "start_s": 47.84999999997463,
+            "end_s": 80.40000000002951
+          },
+          {
+            "stage": "center_settle",
+            "start_s": 80.45000000002975,
+            "end_s": 83.40000000004383
+          },
+          {
+            "stage": "arc_roll",
+            "start_s": 83.45000000004407,
+            "end_s": 89.45000000007272
+          }
+        ],
+        "actual_final_shape_passed": true,
+        "actual_balanced": true,
+        "final_coverage_min_max_deg": [
+          177.9265441732779,
+          182.02136878219173
+        ],
+        "final_max_balance_difference_m": 0.03687886096313475,
+        "final_max_plane_rms_m": 0.009780505163200878,
+        "passive_force_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 21,
+        "unsupported_frames": 2,
+        "maximum_actual_joint_deg": 78.00592180514971,
+        "maximum_tracking_deg": 10.525209159319058,
+        "saturated_frames": 22,
+        "passed": false
+      }
+    },
+    "round3_beta0": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round3_beta0",
+      "initial_tail_azimuth_deg": -156.9380183775271,
+      "controller_reached_roll": true,
+      "final_stage": "arc_roll",
+      "duration_s": 90.05000000007558,
+      "failure": null,
+      "self_contact_saved_frames": 13,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 8.874594117449297,
+      "controller_snapshot_saved": true,
+      "actual_review": {
+        "beta_deg": 0.0,
+        "initial_tail_azimuth_deg": -156.9380183775271,
+        "controller_passed": true,
+        "failure": null,
+        "stages": [
+          {
+            "stage": "exit_transition",
+            "start_s": 0.001000000000000112,
+            "end_s": 1.4499999999998405
+          },
+          {
+            "stage": "reverse_unwrap",
+            "start_s": 1.499999999999835,
+            "end_s": 38.94999999999537
+          },
+          {
+            "stage": "crown_align",
+            "start_s": 38.999999999995254,
+            "end_s": 39.99999999999292
+          },
+          {
+            "stage": "flatten",
+            "start_s": 40.04999999999281,
+            "end_s": 45.99999999997894
+          },
+          {
+            "stage": "arc_release",
+            "start_s": 46.04999999997882,
+            "end_s": 46.799999999977075
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 46.84999999997696,
+            "end_s": 48.799999999972414
+          },
+          {
+            "stage": "auto_center",
+            "start_s": 48.8499999999723,
+            "end_s": 81.00000000003237
+          },
+          {
+            "stage": "center_settle",
+            "start_s": 81.05000000003261,
+            "end_s": 84.0000000000467
+          },
+          {
+            "stage": "arc_roll",
+            "start_s": 84.05000000004694,
+            "end_s": 90.05000000007558
+          }
+        ],
+        "actual_final_shape_passed": true,
+        "actual_balanced": true,
+        "final_coverage_min_max_deg": [
+          177.70896732479574,
+          181.85169322005018
+        ],
+        "final_max_balance_difference_m": 0.03756604241804906,
+        "final_max_plane_rms_m": 0.010155950688126093,
+        "passive_force_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 13,
+        "unsupported_frames": 0,
+        "maximum_actual_joint_deg": 78.00936110771889,
+        "maximum_tracking_deg": 8.874594117449297,
+        "saturated_frames": 13,
+        "passed": false
+      }
+    },
+    "round4_beta0": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round4_beta0",
+      "initial_tail_azimuth_deg": -156.9380183775271,
+      "controller_reached_roll": false,
+      "final_stage": "auto_center",
+      "duration_s": 88.6500000000689,
+      "failure": "floor contact or whole body lost pipe",
+      "self_contact_saved_frames": 0,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 3.3178870041446324,
+      "controller_snapshot_saved": true
+    },
+    "round5_beta0": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round5_beta0",
+      "initial_tail_azimuth_deg": -156.9380183775271,
+      "controller_reached_roll": true,
+      "final_stage": "arc_roll",
+      "duration_s": 81.25000000003357,
+      "failure": null,
+      "self_contact_saved_frames": 0,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 1.4491616006216221,
+      "controller_snapshot_saved": true,
+      "actual_review": {
+        "beta_deg": 0.0,
+        "initial_tail_azimuth_deg": -156.9380183775271,
+        "controller_passed": true,
+        "failure": null,
+        "stages": [
+          {
+            "stage": "exit_transition",
+            "start_s": 0.001000000000000112,
+            "end_s": 1.4499999999998405
+          },
+          {
+            "stage": "reverse_unwrap",
+            "start_s": 1.499999999999835,
+            "end_s": 35.850000000002595
+          },
+          {
+            "stage": "crown_align",
+            "start_s": 35.90000000000248,
+            "end_s": 38.999999999995254
+          },
+          {
+            "stage": "flatten",
+            "start_s": 39.04999999999514,
+            "end_s": 44.99999999998127
+          },
+          {
+            "stage": "arc_release",
+            "start_s": 45.049999999981154,
+            "end_s": 45.99999999997894
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 46.04999999997882,
+            "end_s": 47.99999999997428
+          },
+          {
+            "stage": "auto_center",
+            "start_s": 48.04999999997416,
+            "end_s": 72.19999999999035
+          },
+          {
+            "stage": "center_settle",
+            "start_s": 72.24999999999059,
+            "end_s": 75.20000000000468
+          },
+          {
+            "stage": "arc_roll",
+            "start_s": 75.25000000000492,
+            "end_s": 81.25000000003357
+          }
+        ],
+        "actual_final_shape_passed": true,
+        "arc_process_shape_passed": true,
+        "actual_balanced": true,
+        "final_ends_disabled": true,
+        "final_coverage_min_max_deg": [
+          176.92243450049156,
+          181.87057675834478
+        ],
+        "final_max_balance_difference_m": 0.03385918624159295,
+        "final_max_plane_rms_m": 0.010560931004665396,
+        "roll_center_advance_m": 0.07485043312464092,
+        "total_center_displacement_m": 0.014589184854291212,
+        "passive_force_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 0,
+        "unsupported_frames": 0,
+        "maximum_actual_joint_deg": 78.08413479893211,
+        "maximum_tracking_deg": 1.4491616006216221,
+        "saturated_frames": 28,
+        "passed": true
+      }
+    },
+    "round5_beta120": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round5_beta120",
+      "initial_tail_azimuth_deg": -40.96079816084745,
+      "controller_reached_roll": true,
+      "final_stage": "arc_roll",
+      "duration_s": 82.05000000003739,
+      "failure": null,
+      "self_contact_saved_frames": 0,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 1.7488136323335637,
+      "controller_snapshot_saved": true,
+      "actual_review": {
+        "beta_deg": 120.0,
+        "initial_tail_azimuth_deg": -40.96079816084745,
+        "controller_passed": true,
+        "failure": null,
+        "stages": [
+          {
+            "stage": "exit_transition",
+            "start_s": 0.001000000000000112,
+            "end_s": 1.4499999999998405
+          },
+          {
+            "stage": "reverse_unwrap",
+            "start_s": 1.499999999999835,
+            "end_s": 35.90000000000248
+          },
+          {
+            "stage": "crown_align",
+            "start_s": 35.95000000000236,
+            "end_s": 38.999999999995254
+          },
+          {
+            "stage": "flatten",
+            "start_s": 39.04999999999514,
+            "end_s": 44.99999999998127
+          },
+          {
+            "stage": "arc_release",
+            "start_s": 45.049999999981154,
+            "end_s": 45.99999999997894
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 46.04999999997882,
+            "end_s": 47.99999999997428
+          },
+          {
+            "stage": "auto_center",
+            "start_s": 48.04999999997416,
+            "end_s": 72.99999999999417
+          },
+          {
+            "stage": "center_settle",
+            "start_s": 73.04999999999441,
+            "end_s": 76.0000000000085
+          },
+          {
+            "stage": "arc_roll",
+            "start_s": 76.05000000000874,
+            "end_s": 82.05000000003739
+          }
+        ],
+        "actual_final_shape_passed": true,
+        "arc_process_shape_passed": true,
+        "actual_balanced": true,
+        "final_ends_disabled": true,
+        "final_coverage_min_max_deg": [
+          176.90585912238717,
+          181.82534415062275
+        ],
+        "final_max_balance_difference_m": 0.03558054529547289,
+        "final_max_plane_rms_m": 0.010613146652222355,
+        "roll_center_advance_m": 0.07422272749382473,
+        "total_center_displacement_m": 0.01657890251006175,
+        "passive_force_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 0,
+        "unsupported_frames": 1,
+        "maximum_actual_joint_deg": 78.09275985358857,
+        "maximum_tracking_deg": 1.7488136323335637,
+        "saturated_frames": 34,
+        "passed": true
+      }
+    },
+    "round5_beta240": {
+      "raw_directory": "artifacts\\helix_arc_20261108\\round5_beta240",
+      "initial_tail_azimuth_deg": 82.6575436778012,
+      "controller_reached_roll": true,
+      "final_stage": "arc_roll",
+      "duration_s": 82.25000000003834,
+      "failure": null,
+      "self_contact_saved_frames": 0,
+      "floor_saved_frames": 0,
+      "passive_force_max_nm": 0.0,
+      "maximum_tracking_deg": 1.679973671834817,
+      "controller_snapshot_saved": true,
+      "actual_review": {
+        "beta_deg": 240.0,
+        "initial_tail_azimuth_deg": 82.6575436778012,
+        "controller_passed": true,
+        "failure": null,
+        "stages": [
+          {
+            "stage": "exit_transition",
+            "start_s": 0.001000000000000112,
+            "end_s": 1.4499999999998405
+          },
+          {
+            "stage": "reverse_unwrap",
+            "start_s": 1.499999999999835,
+            "end_s": 35.80000000000271
+          },
+          {
+            "stage": "crown_align",
+            "start_s": 35.850000000002595,
+            "end_s": 38.79999999999572
+          },
+          {
+            "stage": "flatten",
+            "start_s": 38.8499999999956,
+            "end_s": 44.799999999981736
+          },
+          {
+            "stage": "arc_release",
+            "start_s": 44.84999999998162,
+            "end_s": 45.799999999979406
+          },
+          {
+            "stage": "arc_settle",
+            "start_s": 45.84999999997929,
+            "end_s": 47.799999999974744
+          },
+          {
+            "stage": "auto_center",
+            "start_s": 47.84999999997463,
+            "end_s": 73.19999999999513
+          },
+          {
+            "stage": "center_settle",
+            "start_s": 73.24999999999537,
+            "end_s": 76.20000000000945
+          },
+          {
+            "stage": "arc_roll",
+            "start_s": 76.25000000000969,
+            "end_s": 82.25000000003834
+          }
+        ],
+        "actual_final_shape_passed": true,
+        "arc_process_shape_passed": true,
+        "actual_balanced": true,
+        "final_ends_disabled": true,
+        "final_coverage_min_max_deg": [
+          177.29664724987543,
+          182.04876698536398
+        ],
+        "final_max_balance_difference_m": 0.03539635321419188,
+        "final_max_plane_rms_m": 0.01077894904973379,
+        "roll_center_advance_m": 0.07212235158928891,
+        "total_center_displacement_m": 0.011259210584174728,
+        "passive_force_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 0,
+        "unsupported_frames": 0,
+        "maximum_actual_joint_deg": 78.03353928425956,
+        "maximum_tracking_deg": 1.679973671834817,
+        "saturated_frames": 27,
+        "passed": true
+      }
+    }
+  }
+}
