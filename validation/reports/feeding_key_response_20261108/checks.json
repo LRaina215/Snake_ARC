@@ -1,0 +1,53 @@
+{
+  "passed": true,
+  "tests": 4,
+  "baseline_commit": "ee22e39",
+  "hardware_run": false,
+  "new_physics_runs": 0,
+  "failures": [],
+  "real_log": {
+    "source": "codes\\logs\\rolling_arc_20261108_182119_098682.jsonl",
+    "rows": 406,
+    "start_s": 2825.5159999999887,
+    "end_s": 2851.077999999994,
+    "received_step_commands": 39,
+    "maximum_action_id": 39,
+    "completed_relative_goals": 1,
+    "final_position_joints": 1.0962153158427284,
+    "meaning": "Archived real input evidence, not a new real test of this fix"
+  },
+  "continuous_key_comparison": [
+    {
+      "version": "old",
+      "stage": "acquire",
+      "position_joints": 0.0,
+      "action_id_delta": 15,
+      "fault": null
+    },
+    {
+      "version": "fixed",
+      "stage": "feed_out",
+      "position_joints": 0.2119999999999951,
+      "action_id_delta": 0,
+      "fault": null
+    }
+  ],
+  "repeat_key_comparison": [
+    {
+      "version": "old",
+      "samples": 0,
+      "baseline": null,
+      "goal": null,
+      "action_id_delta": 1,
+      "read_packets": 36
+    },
+    {
+      "version": "fixed",
+      "samples": 1,
+      "baseline": 0.123,
+      "goal": 0.1875,
+      "action_id_delta": 0,
+      "read_packets": 0
+    }
+  ]
+}

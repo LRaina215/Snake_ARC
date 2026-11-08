@@ -6197,18 +6197,31 @@ class RollingArcController:
             self.pending_gait = None
 
     def start_feeding(self, direction=None, running=True):
-        """每按一次执行一个相对调长段；已有任务保留当前弯曲分布。"""
+        """启动相对调长；运行中同向按键继续当前任务，不清空采样。"""
         if self.mode=='released' or self.forming or self.settle_remaining>0:
             raise ValueError('先Ctrl+U形成圆弧，等待形成/静置完成，再启动送链')
+        requested_direction = self.feed_direction if direction is None else direction
+        core = self.feeding
+        if (core is not None and running and not self.feeding_paused and
+                not core.completed and core.fault is None and
+                core.stage in ('prepare', 'acquire', 'feed_out', 'review_out') and
+                requested_direction*core.options.requested_transfer_m > 0):
+            # 同向连按只是继续尚未完成的这一段，不能反复清空稳定采样和基线。
+            # 此分支不读串口；主循环仍按原反馈周期读角并推进当前目标。
+            now, _ = self.motor_sample_clock()
+            core.events.append(dict(kind='manual_same_direction_continue',
+                time_s=now-self.feeding_clock_origin, stage=core.stage,
+                position_joints=core.position))
+            return 'feeding_continues'
         self.refresh_compliance_feedback()
         now, feedback = self.motor_sample_clock()
-        self.feed_direction = self.feed_direction if direction is None else direction
+        self.feed_direction = requested_direction
         if self.feeding is not None:
             core = self.feeding
             # Restore the clock before starting a new relative action. Do not
             # regenerate the seed arc or reset p when changing direction.
             core.completed = False
-            self.resume_feeding()
+            self.resume_feeding(refresh_feedback=False)  # 上面已经完整读过一次，不再重复读18路。
             now, _ = self.motor_sample_clock()
             core.request_step(self.feed_direction*self.feed_distance_m, now-self.feeding_clock_origin)
             core.options = replace(core.options, automatic_return=FEED_AUTOMATIC_RETURN,
@@ -6219,14 +6232,14 @@ class RollingArcController:
             if not running:
                 self.pause_feeding()
             return
-        options = ContinuousFeedingOptions(first_joint=self.feeding_origin[0], last_joint=self.feeding_origin[1],
+        settings=self.make_feeding_settings()
+        options = replace(settings.options,first_joint=self.feeding_origin[0], last_joint=self.feeding_origin[1],
             amplitude_deg=FEED_AMPLITUDE_DEG, requested_transfer_m=self.feed_direction*self.feed_distance_m,
             preparation_s=FEED_PREPARATION_S, maximum_position_rate_joints_s=FEED_RATE_JOINTS_S,
             maximum_feed_s=60. if self.feed_distance_m<=float(np.median(LINK_LENGTHS_M[1:-1]))+1e-9 else 100.)
         options = replace(options, **FEED_OPTIONS_OVERRIDE)
         options = replace(options, automatic_return=FEED_AUTOMATIC_RETURN)
-        core = ContinuousFeeding(LINK_LENGTHS_M, options)
-        core.length_observer.options = replace(core.length_observer.options, **FEED_DIRECTION_OVERRIDE)
+        core = create_feeding_controller(LINK_LENGTHS_M,self.feeding_origin,replace(settings,options=options))
         measured = np.asarray(self.measured_angles())
         mask = core.enabled | np.asarray(self.enabled)
         entering = mask & ~np.asarray(self.enabled)
@@ -6260,7 +6273,7 @@ class RollingArcController:
         self.mode = 'hold'
         self.bus.send_targets(self.targets, self.enabled)
 
-    def resume_feeding(self):
+    def resume_feeding(self, refresh_feedback=True):
         """保留真实反馈时间戳；暂停时长不算等待期限、不变成控制dt。"""
         if self.feeding is None:
             self.start_feeding()
@@ -6268,7 +6281,8 @@ class RollingArcController:
         if self.feeding.completed:
             print('本步已完成并保持；Ctrl+J/H执行下一段，Ctrl+Y手动返回本步起态。', flush=True)
             return
-        self.refresh_compliance_feedback()
+        if refresh_feedback:
+            self.refresh_compliance_feedback()
         now, _ = self.motor_sample_clock()
         core = self.feeding
         retrying = core.fault is not None
@@ -6317,7 +6331,7 @@ class RollingArcController:
     def command_feeding(self, command):
         """J/H仍为整段任务；L沿任务方向强制推进，目标发完后保持。"""
         if command in ('step', 'back'):
-            self.start_feeding(1 if command=='step' else -1)
+            return self.start_feeding(1 if command=='step' else -1) or True
         elif command in ('toggle', 'run', 'pause', 'hold'):
             if command in ('pause', 'hold') or command=='toggle' and not self.feeding_paused:
                 self.pause_feeding()
@@ -6944,8 +6958,10 @@ class RollingArcController:
                 return result
         if command in ('grip_tighten', 'grip_loosen'):
             raise ValueError('Ctrl+O/P用于Ctrl+6完整Helix对准阶段，形成小U之前手调抱管半径')
-        if self.feeding_selected and self.command_feeding(command):
-            return
+        if self.feeding_selected:
+            feeding_result = self.command_feeding(command)
+            if feeding_result:
+                return feeding_result if isinstance(feeding_result, str) else None
         if not DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and (command in ('reverse', 'back') or
                 (command == 'step' and self.pending_phase < 0)):
             raise ValueError('角度相位基准未标定反向滚动；先切换基础/固定模式')
@@ -7915,7 +7931,8 @@ def process_control_commands(controller, commands, elapsed):
     """实机与MuJoCo手调共用同一命令分派和状态提示。"""
     for _ in range(commands.qsize()):
         command = commands.get_nowait()
-        core = controller.helix_arc_transition or controller.helix_transition
+        core = (controller.helix_arc_transition or controller.helix_transition or
+                (controller.feeding if controller.feeding_selected else None))
         event = dict(time_s=elapsed, command=command, mode_before=controller.mode,
                      stage_before=None if core is None else core.stage, result='accepted', reason=None)
         try:
@@ -7925,6 +7942,9 @@ def process_control_commands(controller, commands, elapsed):
             result = controller.command(command)
             if result == 'in_progress':
                 event.update(result='in_progress', reason='当前单步仍在执行，本次不追加；Ctrl+G连续执行')
+            elif result == 'feeding_continues':
+                event.update(result='continued', reason='同向调长任务继续；未重置接管采样、长度基线或当前目标')
+                print('已收到J/H：继续当前同向调长，不重置任务或重新等待采样。', flush=True)
             if command.strip().lower() == 'status':
                 controller.feedback_time_s = elapsed
             controller.show_status(include_feedback=command.strip().lower() == 'status')
@@ -7932,7 +7952,8 @@ def process_control_commands(controller, commands, elapsed):
             event.update(result='rejected', reason=str(exc))
             print(f'参数/操作未执行: {exc}', flush=True)
         finally:
-            core = controller.helix_arc_transition or controller.helix_transition
+            core = (controller.helix_arc_transition or controller.helix_transition or
+                    (controller.feeding if controller.feeding_selected else None))
             controller.control_command_sequence += 1
             event.update(sequence=controller.control_command_sequence, mode_after=controller.mode,
                          stage_after=None if core is None else core.stage)
