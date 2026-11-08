@@ -1,89 +1,45 @@
 # Snake_ARC
 
-研究蛇形机器人在管道外的局部圆弧滚动：使能圆弧及交接所需关节，其余关节失能。仿真手调与单文件实机程序共用基础圆弧、固定截面顺应、仅角度反馈的自动移窗与数量自适应、主动送链调长，以及Ctrl热键。实机程序附带实测全身构型与使能预览，真实运动效果待用户验证。
+研究蛇形机器人在管道外的局部圆弧滚动：使能承载圆弧及交接所需关节，其余关节失能。项目提供基础ARC、局部顺应与自动选窗、两侧长度调整、ARC↔Helix切换及T管重力矩越障控制。单文件实机程序带有关节构型与使能预览，仿真手调入口共用Ctrl热键和控制逻辑。
+
+**完整操作请看：[从上电、Ctrl+U到ARC→Helix→ARC](docs/上电到ARC_Helix往返切换操作说明.md)。**包含每一步按什么、观察什么，以及各阶段的步长和速度调节。
 
 ## 启动环境
 
-沿用参考项目已有的`mujoco` Conda环境。在Anaconda Prompt或已配置Conda的PowerShell中执行：
+沿用本机已有的`mujoco` Conda环境：
 
 ```powershell
 conda activate mujoco
 cd "D:\Desktop\SNAKE\Paper Code\Mujoco\Snake_ARC"
 ```
 
-## 仿真手动调试
-
-```powershell
-python .\codes\Rolling_Arc_Debug_Mujoco.py
-```
-
-这是供人工操作的版本，与实机共用基本控制和Ctrl热键。场景、位置与搭管关节在该文件顶部改`SCENE / START_X_M / SIM_FIRST_JOINT / SIM_LAST_JOINT`，仿真幅值与频率改`SIM_AMPLITUDE_DEG / SIM_OMEGA_RAD_S`。普通字母/空格不控制步态，也不触发MuJoCo原生键盘菜单。
-
-**按住Ctrl+A/D**拉动左/右悬垂端，松开停止；**Ctrl+[/]**调扰动力，**Ctrl+R**重新开始初始预览。文件顶部`SLIDING_FEEDBACK='contact'`可切回历史仿真接触反馈版本。
-
-110→210→110 mm直管设`SCENE='length_taper_return'`、`START_X_M=-.35`；110→210 mm连续90°急弯设`SCENE='elbow90_taper110_210'`、`START_X_M=-.25`。
-
-手动测试T管切换设`SCENE='tee_up60'`、`START_X_M=.2`，主管/支管直径110/60 mm，仍使用同一套Ctrl+5/6操作。
-
 ## 实机测试
-
-当前实机默认18关节、ID为1–18；零位使用2026-11-07用户确认直线姿态的新校准。手量几何近似：头端25 mm、身体相邻转轴72 mm、尾端91 mm，在文件顶部修改；仿真手调使用所加载模型的尺寸。直接运行一份Python文件控制舵机，无需填写启动参数或使用外部可视化程序。默认自动识别CH340，日志自动保存到`codes/logs/`：
 
 ```powershell
 python .\codes\Rolling_Arc_Real.py
 ```
 
-两端操作：**Ctrl+U**形成圆弧，等待形成与静置完成；**Ctrl+1/2/3**切换基础/固定顺应/自动滑窗，**Ctrl+W**开关自动选窗，**Ctrl+G**连续/暂停，**Ctrl+J/H**正/反单步，**Ctrl+E**顺应开关，**Ctrl+N**冻结目标，**Ctrl+X**全部失能，**Ctrl+Q**退出。默认J8–J13使能。默认开启DIY调参，可修改顶部幅值、频率、窗口与步态公式后直接运行，三模式不再因60°/0.6标定或开放形态门槛拒绝接入。两端使用全局Ctrl热键，操作时运行其中一个入口。
+直接运行一份Python文件，自动识别CH340串口；需要指定端口时在文件顶部修改`PORT`。当前配置18关节，默认Ctrl+U形成J8–J13。机械尺寸按手量近似配置：头端25 mm、相邻转轴72 mm、尾端91 mm。参数和速度均在文件顶部修改，改完重启程序；日志保存到`codes/logs/`。
 
-失能状态下，**Ctrl+3**按全身实测姿态选择初始圆弧并接管，形成后进入自动滑窗顺应；无法定位圆弧时保持失能并提示原因。**Ctrl+U**始终按配置窗口形成，X→U不会沿用上次扩大的窗口。**模式4→3会重新按实测选窗，不继承送链缓冲使能；成功后按Ctrl+G滚动。**其他已使能模式按Ctrl+3接入当前窗口的自动滑窗，Ctrl+W同时开关自动位置与数量选择。两端启动全18关节截面预览，蓝色使能、紫色失能，按估计重力朝下定向；关闭预览不停止控制，实机`SHOW_PREVIEW=False`、仿真`SHOW_SHAPE_PREVIEW=False`可关闭。
+常用路线：**上电搭管 → 启动程序 → Ctrl+U形成ARC → Ctrl+5、G自动准备前部 → 前部搭稳后L确认、G送尾 → Helix完成 → Ctrl+7、G解缠并归中 → J/H正反ARC单步。**下文及操作说明中的字母都需同时按住Ctrl。
 
-**主动送链调长**：形成完成后按**Ctrl+4**，每按一次**Ctrl+J/H**执行一段头侧增长/缩短，到位保持，不自动往返。实机默认请求72 mm，**Ctrl+-/=**减半/加倍；到可达边界停止同向推进，反向键可退出。**Ctrl+G**暂停/继续，**Ctrl+L**沿当前调整方向强制推进一小步，**Ctrl+Y**手动返回本步起态，**Ctrl+X**全部失能。仿真同键位，默认请求一个模型轴距；参数在实机文件顶部`FEED_*`修改。[完整操作说明](docs/主动送链实机验收说明.md)。 当前模式4目标已改为曲线积分，[实机试机步骤](docs/曲线积分调长实机验收.md)。
+**Ctrl+空格**暂停，**Ctrl+K**查看阶段与下一步，**Ctrl+X**全部失能，**Ctrl+Q**退出。启动时自动打开预览，关闭预览窗口不会停止控制。操作时只运行一个控制入口。
 
-**ARC→Helix**：在可识别、稳定搭管的ARC上按 **Ctrl+5**，再用 **Ctrl+J/G** 按当前姿态自动调长两侧、先形成前部螺旋；也可先用4手动调长再接5。前部搭稳后 **Ctrl+L** 确认，再 **J/G** 逐节送尾，完成后保持Helix。当前选择适合切换的长度分配，未证明任意姿态均可成功或全局最优。[完整操作与适用范围](docs/ARC_Helix与重力矩越障操作说明.md)
+## 仿真手动测试
 
-**不需要反复按J。常用切换操作：Ctrl+5 → Ctrl+G → 观察前部搭稳后Ctrl+L → Ctrl+G连续逐段送尾 → 完成后自动保持。**
+```powershell
+python .\codes\Rolling_Arc_Debug_Mujoco.py
+```
 
-**Helix→ARC→自动归中**：已稳定搭管的Helix按 **Ctrl+7** 选择并保持，再 **Ctrl+J** 单步（每次最多1秒）或 **Ctrl+G** 连续／暂停。半圆形成后两端归零再失能，随后归中；归中结束按最终使能范围再归零一次，再交回基础圆弧并保持。此后 **J/H正反单步、G连续／暂停**，保留当前圆弧和相位。空格暂停，K查看阶段及归零结果，X全部失能，4/5/6保留。切换速度改 `HELIX_ARC_SPEED_SCALE`，完成后的滚动速度改 `OMEGA_RAD_S`。[操作与参数说明](docs/Helix_ARC实机与热键调试说明.md)。
+使用相同的Ctrl按键。在该文件顶部修改`SCENE / START_X_M / SIM_FIRST_JOINT / SIM_LAST_JOINT`；仿真幅值和频率为`SIM_AMPLITUDE_DEG / SIM_OMEGA_RAD_S`。仿真使用所加载模型的实际尺寸，实机使用实机文件顶部尺寸。
 
-当前送尾复用原重力矩回卷：前部继续螺旋推进，直尾缩短并逐段上管。新版已通过三种直管起态仿真，实机等待验收。[本轮结果与适用范围](validation/reports/source_entry_20261107/README.md)。
-
-**Ctrl+U**形成并静置后，默认将两端非承载关节短时使能到0再失能；空格可提前结束归零并释放两端。顶部 `END_ZERO_ON_U=False` 可关闭。触地端展直后不等于已竖直下垂。
-
-| 模式5／6按键 | 实际作用 |
+| 测试场景 | 配置 |
 | --- | --- |
-| **Ctrl+J** | 每按一次运行最多1秒后保持；执行中再按不追加。用于停顿观察，按住不连续执行 |
-| **Ctrl+G** | 按一次连续执行当前流程，到下一个姿态确认点或完成态自动停下；再按一次暂停。沿曲线逐步运动，不是瞬间到位 |
-| **Ctrl+L** | front_seat／front_hold确认实物支撑后直接进入送尾准备，下一次J/G动作；front_finish提前确认会记住，J/G继续衔接。送尾中重复L不重置 |
-| **Ctrl+空格／K／X** | 暂停保持／查看当前阶段与下一步／全部失能 |
+| 直管，手调ARC与往返切换 | `SCENE='straight'` |
+| 110→210→110 mm变径直管 | `SCENE='length_taper_return'`，`START_X_M=-.35` |
+| 110→210 mm连续90°急弯变径 | `SCENE='elbow90_taper110_210'`，`START_X_M=-.25` |
+| T管，主管/支管110/60 mm | `SCENE='tee_up60'`，`START_X_M=.2` |
 
-模式1–3的G是持续滚动／暂停；模式4的G是当前调长任务继续／暂停。两端共用这些按键。
+仿真中按住**Ctrl+A/D**侧拉悬垂端，松开停止；**Ctrl+[/]**调拉力，**Ctrl+R**重建初始预览。
 
-**基础圆弧单步调节（含Ctrl+7完成后）**：Ctrl+=加大步长、Ctrl+-减小步长；顶部`PHASE_STEP_RAD`默认0.10，可改0.20/0.30增大每次行程。实际执行速度改`OMEGA_RAD_S`，目标角变化速率改`MAX_TARGET_RATE_DEG_S`。J/H运动中再按可继续累计或反向抵消，不再因目标差重新建形并静置。
-
-**全身恢复同一条Helix**：全身已使能时按 **Ctrl+5 → Ctrl+G**，进入 `helix_normalize` 逐渐统一半径、螺距、绕向和相位；也可用J单步、空格暂停。尾部仍失能时需先完成逐段接管。启动后若实物已是可识别的全身螺旋，也可直接5按实测角接管、再G归形。此操作的目标一致性已核对，实机贴管效果待验收。
-
-**T管重力矩越障**用 **Ctrl+6** 选择：从ARC先完成Helix切换，从5完成态直接进入对准。保持J1为前端；对准后暂停、**Ctrl+L** 确认，再 **Ctrl+J** 单步开始解旋。后续右U搭稳和尾部落向轴下也分别用L确认、J/G推进，实机不需要等待录像中的对准时长。**Ctrl+K** 查阶段，**Ctrl+空格** 暂停。[逐阶段按键与参数](docs/ARC_Helix与重力矩越障操作说明.md)
-
-也可在使用`mujoco`解释器的IDE中直接运行该文件。需要固定端口时修改文件顶部的`PORT`；不连接机器人演练时将顶部`DRY_RUN`改为`True`，再运行同一文件。运行前关闭其他占用串口的程序。
-
-**小U前手调抱紧**：在Ctrl+6的 `align` 对准阶段，**Ctrl+O收紧／Ctrl+P放松Helix半径，每次1 mm**，自动平滑执行并保持，再L确认、J/G形成小U。原放松、释放和回卷半径不改，不会全程抱紧。步长／速度在顶部 `GRAVITY_GRIP_RADIUS_STEP_MM / GRAVITY_GRIP_RADIUS_RATE_MM_S` 修改；这不是模式4左右调长ARC半径。
-
-**本次实测默认**：小U为150°、半径90 mm，直尾129 mm；释放时按当前曲线分界保留前部，K显示具体数量。解旋中可L确认当前姿态，再J/G释放尾段。首次ARC→Helix速度提高至原来的1.3倍，后续重力释放回卷速度不变；顶部 `HELIX_TRANSITION_SPEED_SCALE=1.0` 可恢复原速。[参数与验证范围](docs/2026-11-08实测候选U分配与切换提速.md)。修改后需重启Python。
-
-## 自动实验
-
-自动研究实验与手调入口分开保留。例如无图形窗口运行基础急弯：
-
-```powershell
-python .\codes\Rolling_Arc_Mujoco.py --headless --scene elbow90 --start-x -0.25 --duration 60 --output validation/results/elbow90.json
-```
-
-Helix→开放半圆ARC→自动归中也保留独立仿真复现实验入口：
-
-```powershell
-python .\validation\helix_arc_experiment.py --beta 0 --output artifacts/helix_arc_manual/beta0
-```
-
-`--beta`选择初始绕管周向角（度）；本轮视频与结果见[仿真记录](validation/reports/helix_arc_20261108/README.md)。
-
-完整操作见[两端统一调试说明](docs/仿真实机统一调试说明.md)及[实机调试说明](docs/实机调试代码说明.md)；其他实验入口及记录见[开发与验证记录](docs/开发与验证记录.md)。
+更详细的专题操作：[两侧长度调整](docs/曲线积分调长实机验收.md)、[ARC→Helix与T管](docs/ARC_Helix与重力矩越障操作说明.md)、[Helix→ARC](docs/Helix_ARC实机与热键调试说明.md)、[仿真实机统一调试](docs/仿真实机统一调试说明.md)。

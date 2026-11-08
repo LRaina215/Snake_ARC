@@ -1,5 +1,7 @@
 # ARC→Helix与重力矩越障操作说明
 
+从初次上电开始操作，请先看[上电到ARC↔Helix往返切换简明说明](上电到ARC_Helix往返切换操作说明.md)。本页保留模式5／6的专题细节。
+
 更新：2026-11-07晚间。适用于 `codes/Rolling_Arc_Real.py` 和 `codes/Rolling_Arc_Debug_Mujoco.py`，两端共用控制器与Ctrl热键。首次送尾已改为原重力矩回卷；当前版本通过三种直管起态验证，实机等待用户验收，见[本轮报告](../validation/reports/source_entry_20261107/README.md)。历史10类入口结果保留，不自动视为修改后版本的回归结果。
 
 现场按[实机验收清单](ARC_Helix实机验收清单.md)逐项记录，首轮6项各1次。
