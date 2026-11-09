@@ -12,15 +12,22 @@ from snake_control.simulation import backbone
 
 def render(folder,sheet=False,speed=4.):
     trace=np.load(folder/'trace.npz');hyp=json.loads((folder/'hypothesis.json').read_text())
-    sim=VerticalScene('straight' if hyp['case']=='pilot' else 'elbow');m,d=sim.model,sim.data
-    rows=json.loads((folder/'run.json').read_text())['samples'] if (folder/'run.json').exists() else None
+    acute=hyp['case']=='acute'
+    recorded=next((path for path in (folder/'model.xml',folder.parent/'model.xml') if path.exists()),None) if acute else None
+    sim=VerticalScene('acute' if acute else 'straight' if hyp['case']=='pilot' else 'elbow',recorded);m,d=sim.model,sim.data
+    run=json.loads((folder/'run.json').read_text()) if (folder/'run.json').exists() else None
+    rows=run['samples'] if run else None
+    if acute and (folder/'review.json').exists():
+        review=json.loads((folder/'review.json').read_text(encoding='utf-8'))
+        run['summary']=review['summary'];hyp['exit_x_m']=review['summary']['exit_x_m']
+        for row, evaluated in zip(rows,review['evaluation']):row.update(evaluated)
     statuses=json.loads((folder/'controller.json').read_text()) if (folder/'controller.json').exists() else None
     commands=json.loads((folder/'operator.json').read_text()) if (folder/'operator.json').exists() else []
     font=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',20);small=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',16)
     width,height=600,430
     pipe_ids=sorted(sim.pipe_geoms);pipe_pos=m.geom_pos.copy();pipe_size=m.geom_size.copy();pipe_quat=m.geom_quat.copy();pipe_rgba=m.geom_rgba.copy()
-    ids=np.linspace(0,len(trace['time'])-1,12).astype(int) if sheet else np.searchsorted(trace['time'],np.arange(trace['time'][0],trace['time'][-1],speed/15.))
-    board=Image.new('RGB',(1200,6*330),'white') if sheet else None
+    ids=np.linspace(0,len(trace['time'])-1,12).astype(int) if sheet else np.unique(np.r_[np.searchsorted(trace['time'],np.arange(trace['time'][0],trace['time'][-1],speed/15.)),len(trace['time'])-1])
+    board=Image.new('RGB',(600,6*325),'white') if sheet else None
     path=folder/('inspection.jpg' if sheet else f'process_{speed:g}x.mp4')
     writer=None if sheet else cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*'mp4v'),15,(1200,650))
     with mujoco.Renderer(m,height=height,width=width) as rr:
@@ -43,7 +50,14 @@ def render(folder,sheet=False,speed=4.):
                     # Replay-only local pipe slice prevents the long foreground
                     # cylinder hiding the robot in the axial view.
                     center=cam.lookat.copy()
-                    if hyp['case']=='pilot':c=np.array([0.,0.,center[2]]);tilt=0.
+                    if acute:
+                        axis=np.array(rows[i]['fitted_normal']);tilt=float(np.clip(np.arctan2(axis[0],axis[2]),0.,np.pi/2))
+                        if rows[i]['clear_supported']:
+                            tilt=np.pi/2
+                        corner=hyp['corner_z_m']
+                        entry=hyp.get('entry_z_m',corner-hyp['exit_x_m'])
+                        c=np.array([0.,0.,min(corner,center[2])]) if center[2]<entry else np.array([max(0.,center[0]),0.,corner])
+                    elif hyp['case']=='pilot':c=np.array([0.,0.,center[2]]);tilt=0.
                     else:
                         a=np.clip(np.arctan2(center[2]-1.8,.3-center[0]),0,np.pi/2)
                         candidates=np.array([[0.,0.,min(center[2],1.8)],
@@ -56,18 +70,37 @@ def render(folder,sheet=False,speed=4.):
                     q=Rotation.from_matrix(np.column_stack([normal,[0.,1.,0.],tangent])).as_quat();m.geom_quat[gid]=q[[3,0,1,2]]
                     cam.elevation=min(80.,90.-np.degrees(tilt))
                 mujoco.mj_forward(m,d)
-                rr.update_scene(d,camera=cam);images.append(Image.fromarray(rr.render()))
+                rr.update_scene(d,camera=cam)
+                if acute and view==0:
+                    # Transparent plane at the actual transition-to-straight seam.
+                    geom=rr.scene.geoms[rr.scene.ngeom]
+                    mujoco.mjv_initGeom(geom,mujoco.mjtGeom.mjGEOM_BOX,np.array([.0015,.19,.24]),
+                                        np.array([hyp['exit_x_m'],0.,hyp['corner_z_m']]),np.eye(3).ravel(),
+                                        np.array([.10,.75,.9,.18],dtype=np.float32))
+                    rr.scene.ngeom+=1
+                images.append(Image.fromarray(rr.render()))
             stage='' if rows is None else rows[i]['stage']
             canvas=Image.new('RGB',(1200,650),'#f4f7fa');draw=ImageDraw.Draw(canvas)
-            draw.text((12,6),f'18关节｜竖直Helix→水平ARC｜t={trace["time"][i]:.1f}s｜{stage}',font=font,fill='#17354b')
+            title='急弯 A组·Helix' if acute and folder.name=='helix' else '急弯 B组·整圈ARC' if acute else '竖直Helix→水平ARC'
+            draw.text((12,6),f'18关节｜{title}｜t={trace["time"][i]:.1f}s｜{stage}',font=font,fill='#17354b')
             recent=[c for c in commands if c['time_s']<=trace['time'][i]]
-            cmd='自动上行/逐段退尾' if not recent else ('人工事件：进入弯头' if recent[-1]['command']=='begin_bend' else '人工事件：水平已搭稳，接原逆向解缠/成弧/归中')
+            cmd='自动上行/逐段退尾' if not recent else ('模拟操作：进入弯头' if recent[-1]['command']=='begin_bend' else '人工事件：水平已搭稳，接原逆向解缠/成弧/归中')
             phase='' if statuses is None else f'｜相位{statuses[i]["phase_rad"]:.2f}rad'
             draw.text((12,33),f'回放{speed:g}倍｜蓝=使能 紫=失能｜{cmd}{phase}',font=small,fill='#385264')
             for v,im in enumerate(images):canvas.paste(im,(v*600,60))
             draw.text((610,70),'沿局部管轴观察（管道仅作显示切片）',font=small,fill='white')
             text=f'使能 {mask.sum()}/18｜头端Z={pts[0,2]:.3f} m｜最下点Z={pts[:,2].min():.3f} m'
             if rows is not None:text+=f'｜管道支撑Fz={rows[i]["pipe_force_n"][2]:.1f} N（评价）'
+            if acute:
+                row=rows[i];clear_time=run['summary']['clear_time_s']
+                state='已完整出弯' if row.get('exit_attached',row['clear_supported']) else '尚未完整出弯'
+                last=1000*(row['last_envelope_x_m']-hyp['exit_x_m'])
+                text=(f'使能 {mask.sum()}/18｜实际包角 {row["wrap_deg"]:.0f}°｜轴向跨度 {1000*row["span_m"]:.0f} mm'
+                      f'｜尾侧离出口 {last:+.0f} mm｜{state}')
+                if clear_time is None or row['time_s']<clear_time:text+='｜续行未开始计程'
+                if row.get('physical_progress_m') is not None:text+=f'｜出弯净位移 {1000*row["physical_progress_m"]:+.0f} mm'
+                shape=('整圈形态合格' if row['ring_shape'] else '整圈形态超限') if folder.name=='arc' else 'Helix 对照'
+                draw.text((12,478),f'青色截面 = 弯头实体出口｜右图为局部观察｜{shape}',font=small,fill='#385264')
             draw.text((12,498),text,font=small,fill='#17354b')
             draw.text((2,565),'目标',font=small,fill='#385264');draw.text((2,595),'实测',font=small,fill='#385264')
             for j,on in enumerate(mask):
@@ -75,7 +108,7 @@ def render(folder,sheet=False,speed=4.):
                 draw.text((x+3,534),f'J{j+1}',font=small,fill='white');draw.text((x+3,565),f'{target[j]:.0f}' if on else '—',font=small,fill=color)
                 draw.text((x+3,595),f'{np.degrees(d.qpos[sim.drive.qadr[j]]):.0f}',font=small,fill='#17354b')
             if sheet:
-                crop=canvas.crop((0,0,600,650));crop.thumbnail((600,330));board.paste(crop,((k%2)*600,(k//2)*330))
+                crop=canvas.crop((0,0,600,650));crop.thumbnail((300,325));board.paste(crop,((k%2)*300,(k//2)*325))
             else:writer.write(cv2.cvtColor(np.asarray(canvas),cv2.COLOR_RGB2BGR))
     if sheet:board.save(path)
     else:writer.release()

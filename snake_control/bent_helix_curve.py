@@ -24,7 +24,7 @@ class BentHelixCurve:
         n=np.column_stack([np.cos(a),np.zeros_like(u),-np.sin(a)])
         return p,n
 
-    def field(self,head_u,length,theta_head=math.pi):
+    def field(self,head_u,length,theta_head=math.pi,section_compression=0.):
         # Constant helix angle: theta' includes the offset-curve metric. This
         # keeps tangent continuous where straight pipe enters constant bend.
         w=2*math.pi/self.pitch;factor=math.hypot(1,self.r*w)
@@ -36,6 +36,13 @@ class BentHelixCurve:
             f=-w*(1-self.r*k*math.cos(theta[i-1]))
             theta[i]=theta[i-1]-dv*w*(1-self.r*k*math.cos(theta[i-1]+.5*dv*f))
         p,n=self.axis(head_u-v);p+=self.r*(np.cos(theta)[:,None]*n+np.sin(theta)[:,None]*np.array([0.,1.,0.]))
+        if section_compression:
+            # Flatten the nominal swept curve along the tangent at the wrap
+            # midpoint, then resample in material length as usual.
+            mid=head_u-.5*length/factor
+            a=np.clip(mid/self.R,0.,np.pi/2)
+            tangent=np.array([np.sin(a),0.,np.cos(a)])
+            p-=section_compression*np.outer((p-p[0])@tangent,tangent)
         material=np.r_[0.,np.cumsum(np.linalg.norm(np.diff(p,axis=0),axis=1))]
         s=np.linspace(0,length,max(40,int(length/.0015)+1))
         p=np.column_stack([np.interp(s,material,p[:,j]) for j in range(3)])

@@ -10,9 +10,15 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class VerticalScene:
-    def __init__(self,scene):
+    def __init__(self,scene,recorded_model=None):
         self.model_path=ROOT/f'mujoco_model/Snake_Robot_o18_Vertical_ARC_{scene}.xml'
-        self.model=mujoco.MjModel.from_xml_path(str(self.model_path));self.data=mujoco.MjData(self.model)
+        if recorded_model is None:
+            self.model=mujoco.MjModel.from_xml_path(str(self.model_path))
+        else:
+            asset_dir=self.model_path.parent/'asset'
+            xml=Path(recorded_model).read_text(encoding='utf-8').replace('./asset/',asset_dir.as_posix()+'/')
+            self.model=mujoco.MjModel.from_xml_string(xml)
+        self.data=mujoco.MjData(self.model)
         self.p=ArcParameters(joints=18,first_joint=1,last_joint=18)
         self.drive=LocalMotorDrive(self.model,self.p)
         self.lengths=self.model.numeric('robot_lengths').data.copy()
