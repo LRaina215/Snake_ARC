@@ -70,7 +70,7 @@ class AcuteArcTransition(HelixArcTransition):
 
     def branch(self, mode):
         self.mode = mode
-        self.enter('form_ring' if mode == 'arc' else 'localize_helix')
+        self.enter('form_ring' if mode == 'arc' else 'vertical_helix')
 
     def begin_bend(self, nominal_head_u):
         self.nominal_head_u = nominal_head_u
@@ -78,21 +78,19 @@ class AcuteArcTransition(HelixArcTransition):
             self.bent = BentHelixCurve(self.wrap_radius, self.pitch, self.acute.reference_bend_radius_m)
         self.enter('bend_shift')
 
-    def localize(self, dt):
+    def form_ring(self, dt):
         opt = self.acute
-        ring = self.mode == 'arc'
         # First transfer material from the long helix to the outgoing shoulder
         # and tail. Change pitch while the wrap still spans more than one turn.
         w = min(self.elapsed / 8., 1.)
         w = w * w * (3. - 2. * w)
-        self.wrap_radius = self.radius + w * opt.ring_radius_delta_m * ring
-        self.pitch = self.fit['pitch'] + w * (opt.ring_pitch_m - self.fit['pitch']) * ring
+        self.wrap_radius = self.radius + w * opt.ring_radius_delta_m
+        self.pitch = self.fit['pitch'] + w * (opt.ring_pitch_m - self.fit['pitch'])
         self.shoulder = w * math.radians(opt.shoulder_angle_deg) * self.wrap_radius
-        turns = opt.ring_turns if ring else 1.5
-        retained = turns * helix_turn_length(self.wrap_radius, self.pitch)
+        retained = opt.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
         self.helix_length = max(retained, min(self.L - self.shoulder, self.helix_length - opt.release_m_s * dt))
         if w == 1. and self.helix_length <= retained + 1e-9:
-            self.enter('vertical_ring' if ring else 'vertical_helix')
+            self.enter('vertical_ring')
 
     def straight_reference(self):
         lead_plane = -math.pi / 2.
@@ -137,10 +135,13 @@ class AcuteArcTransition(HelixArcTransition):
                 self.compression = self.acute.section_compression * (enter*enter*(3.-2.*enter) - leave*leave*(3.-2.*leave))
             bounds, field, end_phase = self.bent.field(self.nominal_head_u, self.helix_length,
                                                        section_compression=self.compression)
-            shoulder_phase = end_phase + math.pi / 2.
-            shoulder = np.array([math.cos(shoulder_phase), math.sin(shoulder_phase)]) / self.wrap_radius
-            self.field = (np.r_[bounds, self.helix_length + self.shoulder, self.L],
-                          np.vstack([field, shoulder, [0., 0.]]))
+            if self.mode == 'helix':
+                self.field = bounds, field
+            else:
+                shoulder_phase = end_phase + math.pi / 2.
+                shoulder = np.array([math.cos(shoulder_phase), math.sin(shoulder_phase)]) / self.wrap_radius
+                self.field = (np.r_[bounds, self.helix_length + self.shoulder, self.L],
+                              np.vstack([field, shoulder, [0., 0.]]))
             self.next_field_s = self.time + .1
         return self.curve.sampled_targets(*self.field, self.phase)
 
@@ -175,8 +176,8 @@ class AcuteArcTransition(HelixArcTransition):
         self.elapsed += dt
         if self.time > 2.:
             self.phase += self.acute.roll_rate_rad_s * dt
-        if self.stage in ('form_ring', 'localize_helix'):
-            self.localize(dt)
+        if self.stage == 'form_ring':
+            self.form_ring(dt)
         if self.bent is not None:
             desired = self.bent_reference(dt)
         elif self.stage == 'bend_shift' and self.acute.lead_length_m:
@@ -185,7 +186,8 @@ class AcuteArcTransition(HelixArcTransition):
             desired = self.miter_reference()
         else:
             desired = self.straight_reference()
-        mask = self.curve.s[:-2] < self.wrap_start + self.helix_length + self.shoulder - 1e-8
+        mask = (self.curve.s[:-2] < self.wrap_start + self.helix_length + self.shoulder - 1e-8
+                if self.mode == 'arc' else np.ones(self.n, dtype=bool))
         self.target_angle_max = float(np.degrees(np.max(abs(desired))))
         self.apply_reference(desired, dt, mask)
         return self.targets.copy(), self.enabled.copy()

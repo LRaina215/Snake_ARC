@@ -35,6 +35,7 @@ def render(folder,sheet=False,speed=4.):
             d.qpos[:]=trace['qpos'][i];mask=trace['masks'][i];target=np.degrees(trace['targets'][i])
             m.geom_rgba[m.geom_bodyid>=sim.head]=[.55,.26,.7,1.]
             for j in np.flatnonzero(mask)+1:m.geom_rgba[m.geom_bodyid==m.jnt_bodyid[m.joint(f'joint{j}').id]]=[.02,.55,.85,1]
+            if acute and mask[0]:m.geom_rgba[m.geom_bodyid==sim.head]=[.02,.55,.85,1]
             mujoco.mj_forward(m,d);pts=backbone(m,d);images=[]
             for view in range(2 if not sheet else 1):
                 m.geom_pos[pipe_ids]=pipe_pos[pipe_ids];m.geom_size[pipe_ids]=pipe_size[pipe_ids]

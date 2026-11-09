@@ -3,6 +3,7 @@ import unittest,math
 import numpy as np
 from snake_control.curve_gait import CurveGait,helix
 from snake_control.bent_helix_curve import BentHelixCurve
+from snake_control.acute_arc_transition import AcuteArcTransition
 from snake_control.vertical_arc_transition import VerticalArcTransition,VerticalArcOptions
 from snake_control.helix_arc_transition import HelixArcTransition
 
@@ -23,6 +24,19 @@ class VerticalArcTests(unittest.TestCase):
             s,k,_=b.field(u,.907);gammas.append(b.gamma)
             self.assertTrue(np.isfinite(k).all());self.assertAlmostEqual(s[-1],.907)
         self.assertLess(np.max(abs(np.diff(gammas))),.2)
+
+    def test_acute_helix_keeps_full_curve_and_drives_tail(self):
+        q = self.g.targets([helix(self.g.body_length, .094, .13)], .4)
+        controller = AcuteArcTransition(q, self.lengths)
+        controller.branch('helix')
+        for _ in range(1000):
+            q, enabled = controller.step(.02, q)
+            self.assertTrue(enabled.all())
+        controller.begin_bend(-.055)
+        q, enabled = controller.step(.02, q)
+        self.assertTrue(enabled.all())
+        self.assertAlmostEqual(controller.field[0][-1], self.g.body_length)
+        self.assertGreater(np.max(abs(q[-3:])), .3)
 
     def test_shared_reference_application_and_horizontal_entry_after_localisation(self):
         q=self.g.targets([helix(self.g.body_length,.094,.13)],.4)

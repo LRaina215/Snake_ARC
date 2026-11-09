@@ -1,5 +1,5 @@
 {
-  "run_count": 13,
+  "run_count": 15,
   "runs": [
     {
       "run": "round01",
@@ -226,8 +226,14 @@
         "failure": null,
         "total_pipe_normal_peak_n": 319.9890892946044,
         "last_s": 184.95100000051906,
-        "samples": 3700
-      }
+        "samples": 3700,
+        "enabled_count_min_max": [
+          15,
+          18
+        ]
+      },
+      "helix_variant": "localized_tail_released",
+      "eligible_full_helix_baseline": false
     },
     {
       "run": "round02",
@@ -598,8 +604,14 @@
         "failure": null,
         "total_pipe_normal_peak_n": 320.0455766270054,
         "last_s": 204.95100000061456,
-        "samples": 4100
-      }
+        "samples": 4100,
+        "enabled_count_min_max": [
+          15,
+          18
+        ]
+      },
+      "helix_variant": "localized_tail_released",
+      "eligible_full_helix_baseline": false
     },
     {
       "run": "round04",
@@ -973,8 +985,14 @@
         "failure": null,
         "total_pipe_normal_peak_n": 319.64624397071117,
         "last_s": 214.9510000006623,
-        "samples": 4300
-      }
+        "samples": 4300,
+        "enabled_count_min_max": [
+          15,
+          18
+        ]
+      },
+      "helix_variant": "localized_tail_released",
+      "eligible_full_helix_baseline": false
     },
     {
       "run": "round06",
@@ -1614,6 +1632,240 @@
         "total_pipe_normal_peak_n": 439.7310161856781,
         "last_s": 129.95100000025644,
         "samples": 2600
+      }
+    },
+    {
+      "run": "full_helix_miter",
+      "mode": "helix",
+      "scene": "acute",
+      "provisional_overlap": false,
+      "helix_variant": "whole_body",
+      "eligible_full_helix_baseline": true,
+      "matched_start_of": "round06",
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.055,
+        "ring_radius_delta_m": 0.0,
+        "reference_bend_radius_m": 0.155,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0
+      },
+      "summary": {
+        "physically_cleared": true,
+        "clear_time_s": 94.60100000008765,
+        "physical_progress_m": 2.060292570844981,
+        "correct_gait_cleared": true,
+        "advance_m": 2.060292570844981,
+        "continued_72mm": true,
+        "complete_sequence": true,
+        "continuation_time_s": 98.35100000010556,
+        "vertical_supported_ring_frames": 0,
+        "last_stable_ring_time_s": null,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.022213229648249525,
+              0.13341746151283518
+            ],
+            "wrap_deg": [
+              768.8207376639119,
+              788.4364385655003
+            ],
+            "span_m": [
+              0.27726906410987573,
+              0.29929502872614955
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253404715505113
+          },
+          "vertical_helix": {
+            "time_s": [
+              10.000999999999896,
+              41.35099999999433
+            ],
+            "head_xz_delta_m": [
+              0.015966664263792757,
+              0.5277614783901203
+            ],
+            "wrap_deg": [
+              768.8091314860154,
+              779.038131643012
+            ],
+            "span_m": [
+              0.27716932742737344,
+              0.29972972440549017
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253434772360144
+          },
+          "bend_shift": {
+            "time_s": [
+              41.40099999999421,
+              198.35100000058304
+            ],
+            "head_xz_delta_m": [
+              2.4691203359073626,
+              -1.60693236903296
+            ],
+            "wrap_deg": [
+              4.259180693371457,
+              815.144606567548
+            ],
+            "span_m": [
+              0.1787454224888948,
+              0.2993069884674553
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.906351409775002
+          }
+        },
+        "furthest_last_envelope_m": 2.3683640421673653,
+        "max_tracking_deg": 63.01930877823653,
+        "max_joint_deg": 87.70644908013668,
+        "max_unlimited_reference_deg": 96.34534471324851,
+        "passive_max_nm": 0.0,
+        "floor_frames": 1,
+        "self_contact_frames": 194,
+        "saturated_frames": 3956,
+        "exit_x_m": 0.14601770049390872,
+        "failure": "ground_contact",
+        "enabled_count_min_max": [
+          18,
+          18
+        ],
+        "total_pipe_normal_peak_n": 655.1110443885317,
+        "last_s": 198.35100000058304,
+        "samples": 3968
+      }
+    },
+    {
+      "run": "full_helix_short",
+      "mode": "helix",
+      "scene": "short",
+      "provisional_overlap": false,
+      "helix_variant": "whole_body",
+      "eligible_full_helix_baseline": true,
+      "matched_start_of": "round08",
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.055,
+        "ring_radius_delta_m": 0.0,
+        "reference_bend_radius_m": 0.13,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0
+      },
+      "summary": {
+        "physically_cleared": true,
+        "clear_time_s": 86.25100000004778,
+        "physical_progress_m": 2.0638950691481273,
+        "correct_gait_cleared": true,
+        "advance_m": 2.0638950691481273,
+        "continued_72mm": true,
+        "complete_sequence": true,
+        "continuation_time_s": 89.90100000006521,
+        "vertical_supported_ring_frames": 0,
+        "last_stable_ring_time_s": null,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.022213363265089367,
+              0.13341525299477142
+            ],
+            "wrap_deg": [
+              768.8151243200142,
+              788.4364385655003
+            ],
+            "span_m": [
+              0.2772684910763833,
+              0.2992963389434762
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253404608105665
+          },
+          "vertical_helix": {
+            "time_s": [
+              10.000999999999896,
+              42.450999999991765
+            ],
+            "head_xz_delta_m": [
+              0.02659386350252381,
+              0.5527719434435892
+            ],
+            "wrap_deg": [
+              768.807844561418,
+              779.0378927740225
+            ],
+            "span_m": [
+              0.2771695694149119,
+              0.29972950810976573
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253434533993918
+          },
+          "bend_shift": {
+            "time_s": [
+              42.50099999999165,
+              191.05100000054819
+            ],
+            "head_xz_delta_m": [
+              2.2446357965925725,
+              -1.6433002621755448
+            ],
+            "wrap_deg": [
+              4.6056597945198305,
+              787.9375774939421
+            ],
+            "span_m": [
+              0.16688186094498914,
+              0.29933601651818975
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.626669332741244
+          }
+        },
+        "furthest_last_envelope_m": 2.2116899464088537,
+        "max_tracking_deg": 30.385065154617962,
+        "max_joint_deg": 88.00639651322965,
+        "max_unlimited_reference_deg": 96.56246138894325,
+        "passive_max_nm": 0.0,
+        "floor_frames": 1,
+        "self_contact_frames": 39,
+        "saturated_frames": 3812,
+        "exit_x_m": 0.10499999700265733,
+        "failure": "ground_contact",
+        "enabled_count_min_max": [
+          18,
+          18
+        ],
+        "total_pipe_normal_peak_n": 606.2376217306742,
+        "last_s": 191.05100000054819,
+        "samples": 3822
       }
     }
   ]

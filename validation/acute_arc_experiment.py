@@ -250,6 +250,7 @@ def review_saved(folder):
     rows = original['samples']
     with np.load(folder / 'trace.npz') as trace:
         points = trace['points']
+        enabled_count = np.count_nonzero(trace['masks'], axis=1)
     for row, body, status in zip(rows, points, statuses):
         start = status.get('wrap_start_m', 0.)
         stop = start + status['wrap_length_m']
@@ -262,6 +263,7 @@ def review_saved(folder):
         row.update(evaluator.wrap_shape(body, start, stop, before, clear))
     result = summarize(rows, points, statuses, folder.name, evaluator.weight)
     result.update(exit_x_m=evaluator.exit_x, failure=original['summary']['failure'],
+                  enabled_count_min_max=[int(enabled_count.min()), int(enabled_count.max())],
                   total_pipe_normal_peak_n=max(sum(r['normal_n'].values()) for r in rows),
                   last_s=rows[-1]['time_s'], samples=len(rows))
     dump(folder / 'review.json', dict(summary=result, evaluation=[
