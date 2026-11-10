@@ -174,6 +174,7 @@ def summarize(rows, points, statuses, mode, weight):
             last_stable = seq[-1]
     physical_reference = None
     first_clear = None
+    first_exit_72mm = None
     progress = 0.
     passed = None
     gait_clear = None
@@ -208,6 +209,8 @@ def summarize(rows, points, statuses, mode, weight):
                 progress = max(progress, advance)
                 if advance >= .072:
                     passed = i if passed is None else passed
+                    if physical_reference == first_clear and first_exit_72mm is None:
+                        first_exit_72mm = i
                     full_pass |= episode_correct_crossing
         else:
             physical_reference = None
@@ -228,6 +231,7 @@ def summarize(rows, points, statuses, mode, weight):
                 advance_m=progress, continued_72mm=passed is not None,
                 complete_sequence=full_pass,
                 continuation_time_s=None if passed is None else rows[passed]['time_s'],
+                first_exit_continuation_time_s=(None if first_exit_72mm is None else rows[first_exit_72mm]['time_s']),
                 vertical_supported_ring_frames=len(stable_ring),
                 last_stable_ring_time_s=None if last_stable is None else rows[last_stable]['time_s'], stages=stages,
                 furthest_last_envelope_m=max(r['last_envelope_x_m'] for r in rows),
@@ -308,7 +312,9 @@ def run(args):
                       section_keep_curvature=args.section_keep_curvature,
                       progressive_tail_release=args.progressive_tail_release,
                       section_before_bend=args.section_before_bend,
-                      section_seam_clearance=args.section_seam_clearance)
+                      section_seam_clearance=args.section_seam_clearance,
+                      outlet_end_correction=args.outlet_end_correction or args.outlet_use_spare_length,
+                      outlet_use_spare_length=args.outlet_use_spare_length)
     shutil.copyfile(sim.model_path, root / 'model.xml')
     dump(root / 'hypothesis.json', dict(case='acute', scene=args.scene,
          hypothesis='The selected curve can carry the whole robot through the elbow and keep its gait on the outlet',
@@ -391,6 +397,15 @@ def run(args):
                             manual.begin_bend()
                         events.append(dict(time_s=float(data.time), command='begin_bend',
                                            source='simulated operator observing the marked approach height'))
+                    if core.stage == 'bend_shift' and options.outlet_end_correction and mode == 'arc':
+                        latest = records[0][-1]
+                        normal = latest['normal_n']
+                        if (latest['head_x_m'] > review.exit_x + core.wrap_radius and
+                                normal['horizontal'] > 1. and normal['vertical'] + normal['elbow'] <= .1):
+                            confirmed = core.confirm_outlet() if manual is None else manual.confirm_outlet()
+                            if confirmed:
+                                events.append(dict(time_s=float(data.time), command='confirm_outlet',
+                                                   source='simulated operator observing ring on horizontal straight'))
                     if manual is None:
                         q, mask = core.step(.02, measured, feedback_time)
                     else:
@@ -465,6 +480,8 @@ if __name__ == '__main__':
     p.add_argument('--progressive-tail-release', action='store_true')
     p.add_argument('--section-before-bend', action='store_true')
     p.add_argument('--section-seam-clearance', action='store_true')
+    p.add_argument('--outlet-end-correction', action='store_true')
+    p.add_argument('--outlet-use-spare-length', action='store_true')
     p.add_argument('--manual-takeover', action='store_true')
     p.add_argument('--modes', nargs='+', choices=['helix', 'arc'], default=['helix', 'arc'])
     args = p.parse_args()

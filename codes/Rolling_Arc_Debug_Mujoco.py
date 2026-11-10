@@ -23,11 +23,13 @@ from snake_control.rolling_arc import ArcParameters
 from snake_control.simulation import ArcSimulation, ROOT, backbone
 from snake_control.sliding_section_compliance import SlidingSectionCompliance, WindowOptions
 from snake_control.sliding_section_simulation import upward_support
+from snake_control.vertical_scene import VerticalScene
 MotorFeedbackSliding = real.MotorFeedbackSliding
 
 
 # ==================== 1. 手动测试参数 ====================
 SCENE = 'straight'              # straight / bend90 / elbow90 / taper_true90 / elbow90_taper110_210 / length_taper_return / tee_up60
+VERTICAL_INITIAL_PHASE_RAD = .4  # SCENE='vertical_short' 时使用；复测另一已有起态用1.15
 START_X_M = -.5                 # 弯管常用-.35，急弯常用-.25
 SIM_FIRST_JOINT = real.FIRST_JOINT  # 本轮偏置搭管实验设5 / 10，不修改实机文件
 SIM_LAST_JOINT = real.LAST_JOINT
@@ -45,6 +47,7 @@ PUSH_DOWNWARD_RATIO = 1.0        # 水平向外+向下拉；0时只水平拉，�
 
 SIM_HELP = '''MuJoCo新增操作：
   Ctrl+1 / 2 / 3：基础圆弧 / 固定截面顺应 / 滑动窗口截面顺应
+  SCENE='vertical_short'：Ctrl+8接管预置竖直Helix，Ctrl+G连续，Ctrl+L确认入弯和水平接管
   Ctrl+A / D：按住拉动左(-Y) / 右(+Y)悬垂端；松开字母或Ctrl即停止
   Ctrl+[ / ]：扰动总力减小 / 增大；Ctrl+W：自动移窗与扩缩开/关（仅滑动模式）
   Ctrl+R：明确结束当前试验，重建初始预览；不是连续运动中的位姿修正
@@ -214,8 +217,9 @@ class DebugArcController(real.RollingArcController):
         if not real.DIY_PARAMETERS and isinstance(self.sliding, MotorFeedbackSliding) and command.strip().lower() == 'reverse':
             raise ValueError('冻结角度基准未标定反向滚动；先切换基础/固定模式')
         command = command.strip().lower()
-        if command in ('gait_helix', 'gait_gravity', 'gait_helix_arc') or (
-                (self.helix_transition is not None or self.helix_arc_transition is not None) and command.startswith('gait_')):
+        if command in ('gait_helix', 'gait_gravity', 'gait_helix_arc', 'gait_vertical_ring') or (
+                (self.helix_transition is not None or self.helix_arc_transition is not None
+                 or self.vertical_ring_transition is not None) and command.startswith('gait_')):
             return super().command(command)
         elif command.startswith('gait_'):
             self.select_gait(command[5:])
@@ -255,6 +259,16 @@ class DebugArcController(real.RollingArcController):
                 self.select_gait(kind)
             except ValueError as exc:
                 print(f'模式接入未执行：{exc}；可再次按模式热键重试。', flush=True)
+
+    def select_vertical_ring(self):
+        ready = getattr(self.session.sim, 'ready_helix_targets', None)
+        if ready is not None and not self.session.physics_started and self.vertical_ring_transition is None:
+            self.enabled = [True]*real.NUM_JOINTS
+            self.targets = ready.tolist()
+            self.first, self.last = 1, real.NUM_JOINTS
+            self.bus.prepare_enabled(self.targets, self.enabled)
+            self.mode = 'hold'
+        super().select_vertical_ring()
 
     def tick_sliding(self, dt):
         if isinstance(self.sliding, MotorFeedbackSliding):
@@ -448,6 +462,28 @@ def load_manual_arc_model(scene, joints):
 
 
 def make_manual_simulation(scene, start_x):
+    if scene == 'vertical_short':
+        if real.NUM_JOINTS != 18:
+            raise ValueError('竖直短弯手调模型需要18关节')
+        sim = VerticalScene('short')
+        sim.scene = scene
+        sim.robot_geoms = set(np.flatnonzero(sim.model.geom_bodyid >= sim.head))
+        gait = real.CurveGait(18, lengths=sim.lengths)
+        target = gait.targets([real.helix(gait.body_length, .094, .13)], VERTICAL_INITIAL_PHASE_RAD)
+        sim.place_helix(target, 1.)
+        controller = real.AcuteArcTransition(target, sim.lengths, real.vertical_short_options())
+        enabled = np.ones(18, dtype=bool)
+        substeps = round(real.CONTROL_PERIOD_S / sim.model.opt.timestep)
+        for frame in range(round(10. / real.CONTROL_PERIOD_S)):
+            if frame % round(real.COMPLIANCE_FEEDBACK_PERIOD_S / real.CONTROL_PERIOD_S) == 0:
+                measured = sim.data.qpos[sim.drive.qadr].copy()
+            target, enabled = controller.step(real.CONTROL_PERIOD_S, measured)
+            for _ in range(substeps):
+                sim.drive.apply_targets(sim.data, target, enabled)
+                mujoco.mj_step(sim.model, sim.data)
+        sim.ready_helix_targets = np.degrees(target)
+        sim.data.time = 0.
+        return sim
     p = replace(ManualArcParameters.load(ROOT/'configs/step1.json'),
                 joints=real.NUM_JOINTS, first_joint=SIM_FIRST_JOINT, last_joint=SIM_LAST_JOINT,
                 amplitude_deg=SIM_AMPLITUDE_DEG, omega_rad_s=SIM_OMEGA_RAD_S,
@@ -554,7 +590,8 @@ class DebugSession:
         # 首次接管前只是初始姿态预览，避免读操作说明期间掉管；
         # 接管/释放后再不冻结物理，暂停、保持与失能都按真实动力学执行。
         self.physics_started |= c.touched_hardware or (
-            c.helix_arc_transition is not None and c.mode in ('step', 'run'))
+            (c.helix_arc_transition is not None or c.vertical_ring_transition is not None)
+            and c.mode in ('step', 'run'))
         if not self.physics_started:
             return
         before = (c.mode, c.forming, c.settle_remaining > 0)
@@ -667,7 +704,8 @@ class DebugViewer:
                               mujoco.mjtCatBit.mjCAT_ALL, self.scene)
         viewport = mujoco.MjrRect(0, 0, width, height)
         mujoco.mjr_render(viewport, self.scene, self.context)
-        gait = 'active feeding' if c.feeding_selected else 'sliding section' if c.sliding else 'fixed section' if c.compliance else 'basic arc'
+        gait = ('vertical Helix to ring' if c.vertical_ring_transition is not None else
+                'active feeding' if c.feeding_selected else 'sliding section' if c.sliding else 'fixed section' if c.compliance else 'basic arc')
         delta = backbone(sim.model, sim.data).mean(axis=0)-self.session.initial_center
         slider = c.sliding.snapshot() if c.sliding is not None else None
         if slider is None:
@@ -700,6 +738,10 @@ class DebugViewer:
             center = slider['cycle_support_center_joint']
             cycle = f'J{center:.2f}' if center is not None else f"collecting {slider['load_observation_phase_rad']:.1f}/6.3 rad"
             handover = 'unloading' if slider['phase_hold'] else 'waiting zero phase' if slider['preparation'] else 'none'
+        if c.vertical_ring_transition is not None:
+            status = c.vertical_ring_transition.status()
+            cycle = status['stage']
+            handover = f"Tail released: {status['released_tail_count']}; outlet blend: {100*status['outlet_weight']:.0f}%"
         pull = 'off'
         if len(self.session.push_keys) == 1:
             sign = next(iter(self.session.push_keys))

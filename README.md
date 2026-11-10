@@ -39,7 +39,10 @@ python .\codes\Rolling_Arc_Debug_Mujoco.py
 | 110→210→110 mm变径直管 | `SCENE='length_taper_return'`，`START_X_M=-.35` |
 | 110→210 mm连续90°急弯变径 | `SCENE='elbow90_taper110_210'`，`START_X_M=-.25` |
 | T管，主管/支管110/60 mm | `SCENE='tee_up60'`，`START_X_M=.2` |
+| 18 关节竖直 Helix 转整圈 ARC，110 mm 短弯 | `SCENE='vertical_short'`，启动后直接按 `Ctrl+8`、`Ctrl+G` |
 
 仿真中按住**Ctrl+A或Ctrl+D**侧拉悬垂端，松开停止；**Ctrl+[或Ctrl+]**调拉力，**Ctrl+R**重建初始预览。
+
+竖直短弯在实机和仿真共用 **Ctrl+8**。实机从已搭稳且全身使能的竖直 Helix 接入。按 **Ctrl+G** 连续执行，尾部退完且到入弯标记时按 **Ctrl+L**，看到承载圈搭上水平直管时再按一次 **Ctrl+L**。**Ctrl+J** 可单步。[竖直短弯操作与验证](validation/reports/vertical_ring_20261110/README.md#出弯续行和手调入口)
 
 更详细的专题操作：[两侧长度调整](docs/曲线积分调长实机验收.md)、[ARC→Helix与T管](docs/ARC_Helix与重力矩越障操作说明.md)、[Helix→ARC](docs/Helix_ARC实机与热键调试说明.md)、[仿真实机统一调试](docs/仿真实机统一调试说明.md)。

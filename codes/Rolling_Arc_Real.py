@@ -193,6 +193,7 @@ HELP = '''圆弧滚动调试（Ctrl+字母全局热键；任何窗口均会响�
   Ctrl+6 选择 T 管重力矩越障（J1 为前端）；Ctrl+J/G 推进，Ctrl+L 确认实物姿态
   Ctrl+7 选择Helix→开放半圆ARC→自动归中；切换中J单步/G连续，完成后交回基础圆弧，J/H正反、G连续/暂停
   Ctrl+7整体调速：顶部HELIX_ARC_SPEED_SCALE；1.0原速，1.5为1.5倍动作速度，J单步秒数不变
+  Ctrl+8 从竖直管上已使能的全身Helix接入整圈ARC；J单步/G连续，L确认入弯或水平接管
   当前U目标150度、半径90mm、直尾129mm；L确认按当前曲线分界释放，不再固定前8关节
   Ctrl+6对准阶段：Ctrl+O/P 抱管半径收紧/放松1mm，平滑执行并保持；后续仍按原半径放松/释放
   模式5/6：Ctrl+J每次最多1秒；Ctrl+G按一次连续到确认点/完成，再按暂停；不必反复按J
@@ -5549,6 +5550,768 @@ class HelixArcManual:
                     end_reset_history=list(self.end_reset_history))
 # END ARC_HELIX_CORE
 
+# BEGIN VERTICAL_RING_CORE
+def helix_turn_length(radius, pitch):
+    return math.hypot(2 * math.pi * radius, pitch)
+
+
+def transport(normal,previous_tangent,tangent):
+    v=np.cross(previous_tangent,tangent);c=np.sum(previous_tangent*tangent,axis=-1)
+    return normal+np.cross(v,normal)+np.cross(v,np.cross(v,normal))/(1+c)[...,None]
+
+
+class BentHelixCurve:
+    def __init__(self,radius,pitch,bend_radius=.3,*,handedness=1):
+        self.r=radius;self.pitch=pitch;self.R=bend_radius
+        self.handedness=handedness
+        self.previous_tangent=None;self.reference_normal=None;self.gamma=0.
+
+    def axis(self,u):
+        u=np.asarray(u);a=np.clip(u/self.R,0,np.pi/2);end=self.R*np.pi/2
+        p=np.column_stack([self.R*(1-np.cos(a))+np.maximum(u-end,0),np.zeros_like(u),self.R*np.sin(a)+np.minimum(u,0)])
+        n=np.column_stack([np.cos(a),np.zeros_like(u),-np.sin(a)])
+        return p,n
+
+    def field(self,head_u,length,theta_head=math.pi,section_compression=0.):
+        # Constant helix angle: theta' includes the offset-curve metric. This
+        # keeps tangent continuous where straight pipe enters constant bend.
+        w=2*math.pi/self.pitch;factor=math.hypot(1,self.r*w)
+        vmax=length/factor/(1-self.r/self.R)*1.12
+        v=np.linspace(0,vmax,max(100,int(vmax/.0003)+1));dv=v[1]-v[0]
+        theta=np.empty(len(v));theta[0]=theta_head
+        for i in range(1,len(v)):
+            k=1/self.R if 0<head_u-(v[i]+v[i-1])/2<self.R*np.pi/2 else 0.
+            f=-self.handedness*w*(1-self.r*k*math.cos(theta[i-1]))
+            theta[i]=theta[i-1]-dv*self.handedness*w*(1-self.r*k*math.cos(theta[i-1]+.5*dv*f))
+        p,n=self.axis(head_u-v);p+=self.r*(np.cos(theta)[:,None]*n+np.sin(theta)[:,None]*np.array([0.,1.,0.]))
+        if section_compression:
+            # Flatten the nominal swept curve along the tangent at the wrap
+            # midpoint, then resample in material length as usual.
+            mid=head_u-.5*length/factor
+            a=np.clip(mid/self.R,0.,np.pi/2)
+            tangent=np.array([np.sin(a),0.,np.cos(a)])
+            p-=section_compression*np.outer((p-p[0])@tangent,tangent)
+        material=np.r_[0.,np.cumsum(np.linalg.norm(np.diff(p,axis=0),axis=1))]
+        s=np.linspace(0,length,max(40,int(length/.0015)+1))
+        p=np.column_stack([np.interp(s,material,p[:,j]) for j in range(3)])
+        return self.material_field(s,p)
+
+    def material_field(self,s,p):
+        """Bishop curvature of a backbone already sampled in material length."""
+        t=np.gradient(p,s,axis=0,edge_order=2);t/=np.linalg.norm(t,axis=1)[:,None]
+        kvec=np.gradient(t,s,axis=0,edge_order=2);kvec-=t*(kvec*t).sum(1)[:,None]
+        kappa=np.linalg.norm(kvec,axis=1);norm=kvec/np.maximum(kappa[:,None],1e-10)
+        transported=transport(norm[:-1],t[:-1],t[1:])
+        delta=np.arctan2((np.cross(transported,norm[1:])*t[1:]).sum(1),(transported*norm[1:]).sum(1))
+        psi=np.r_[0.,np.cumsum(delta)]
+        if self.previous_tangent is None:self.reference_normal=norm[0].copy()
+        else:self.reference_normal=transport(self.reference_normal,self.previous_tangent,t[0])
+        self.reference_normal-=t[0]*(self.reference_normal@t[0]);self.reference_normal/=np.linalg.norm(self.reference_normal)
+        self.previous_tangent=t[0].copy()
+        gamma=math.atan2(np.cross(self.reference_normal,norm[0])@t[0],self.reference_normal@norm[0])
+        self.gamma+=math.atan2(math.sin(gamma-self.gamma),math.cos(gamma-self.gamma))
+        psi+=self.gamma
+        components=np.column_stack([kappa*np.cos(psi),kappa*np.sin(psi)])
+        return s,(components[:-1]+components[1:])/2,float(psi[-1])
+
+
+class SectionRingCurve(BentHelixCurve):
+    def __init__(self, radius, pitch, bend_radius, link_spacing, shell_diameter, *, handedness=1,
+                 endpoint_allowance=False, seam_clearance=False):
+        super().__init__(radius, pitch, bend_radius, handedness=handedness)
+        self.link_spacing = link_spacing
+        self.shell_diameter = shell_diameter
+        self.endpoint_allowance = endpoint_allowance
+        self.seam_clearance = seam_clearance
+
+    def section_field(self, head_u, outlet_overlap_m=0.):
+        # The lead and return share one moving frame. The nearly planar body
+        # spans the full section. Most axial displacement is allocated to the
+        # ends, over two link spacings, to keep the shell envelopes apart.
+        # A half link covers the joint-centred discretisation at the two ends.
+        # The resulting angular overlap is separated by the two axial ramps.
+        overlap = self.link_spacing / 2. if self.endpoint_allowance else outlet_overlap_m
+        extent = 2. * math.pi * self.r + overlap
+        fraction = np.linspace(0., 1., 481)
+        theta = math.pi - self.handedness * (extent / self.r) * fraction
+        if self.seam_clearance:
+            transition = 2. * self.link_spacing
+            plateau = overlap + self.link_spacing / 2.
+
+            def end_weight(distance):
+                w = np.clip(1. - (distance - plateau) / transition, 0., 1.)
+                return w**3 * (10. - 15.*w + 6.*w*w)
+
+            # Keep the axial separation across the overlap. The ramps meet
+            # the clearance plateaus and the central ring with zero slope.
+            ends = end_weight(fraction * extent) - end_weight((1. - fraction) * extent)
+        else:
+            transition = 2. * self.link_spacing / extent
+            ends = (np.maximum(0., 1. - fraction / transition)**3
+                    - np.maximum(0., 1. - (1. - fraction) / transition)**3)
+        # Use the measured shell diameter for tip clearance. Leave the shallow
+        # material advance of one head length on the bearing segment itself.
+        bearing_advance = min(self.pitch, self.shell_diameter * .4)
+        separation = max(self.pitch, self.shell_diameter)
+        axial = bearing_advance * (.5 - fraction) + .5 * (separation - bearing_advance) * ends
+        u = head_u - separation * .5
+        center, normal = self.axis(np.array([u]))
+        normal = normal[0]
+        tangent = np.array([-normal[2], 0., normal[0]])
+        radial = np.cos(theta)[:, None] * normal + np.sin(theta)[:, None] * [0., 1., 0.]
+        points = center[0] + self.r * radial + axial[:, None] * tangent
+        material = np.r_[0., np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))]
+        samples = np.linspace(0., material[-1], 481)
+        points = np.column_stack([np.interp(samples, material, axis) for axis in points.T])
+        bounds, field, end_phase = self.material_field(samples, points)
+        tangents = np.gradient(points, samples, axis=0, edge_order=2)
+        tangents /= np.linalg.norm(tangents, axis=1)[:, None]
+        tip = tangents[-1]
+        curvature = (tangents[-1] - tangents[-2]) / (samples[-1] - samples[-2])
+        curvature -= tip * (tip @ curvature)
+        # The outgoing shoulder curves toward the freely hanging tail. This
+        # direction is part of the nominal vertical-to-horizontal geometry.
+        down = np.array([0., 0., -1.])
+        shoulder_angle = math.atan2(np.cross(curvature, down) @ tip, curvature @ down)
+        return bounds, field, end_phase + shoulder_angle
+
+
+class VerticalSampledCurveGait(CurveGait):
+    def sampled_targets(self,bounds,components,roll=0.):
+        """Exact interval integral of a piecewise constant Bishop curvature field.
+
+        This accepts a sampled bent-axis reference using the same adjacent-link
+        integral and parity as targets(). No joint inverse-kinematic placement.
+        """
+        bounds=np.asarray(bounds);components=np.asarray(components)
+        integrated=np.vstack([np.zeros(2),np.cumsum(np.diff(bounds)[:,None]*components,axis=0)])
+        lo,hi=self.s[:-2],self.s[2:]
+        turn=np.column_stack([np.interp(hi,bounds,integrated[:,k])-np.interp(lo,bounds,integrated[:,k]) for k in (0,1)])
+        c,s=math.cos(roll),math.sin(roll)
+        rotated=np.column_stack([c*turn[:,0]-s*turn[:,1],s*turn[:,0]+c*turn[:,1]])
+        odd=np.arange(self.joints)%2==0
+        return np.where(odd,rotated[:,0],self.direction*rotated[:,1])
+
+
+class VerticalRingReference(HelixArcTransition):
+    def __init__(self, angles_rad, lengths, options):
+        super().__init__(angles_rad, lengths, options)
+        self.curve = VerticalSampledCurveGait(self.n, self.l, lengths=self.lengths)
+
+    def apply_reference(self,desired,dt,mask):
+        """Shared measured-angle preload and slew limiting for any curve reference."""
+        entering=mask&~self.enabled
+        self.targets[entering]=self.measured[entering]
+        self.enabled=mask
+        limit=math.radians(self.o.target_rate_deg_s)*self.o.speed_scale*dt
+        self.targets+=np.clip(desired-self.targets,-limit,limit)
+        self.targets=np.clip(self.targets,-math.radians(88),math.radians(88))
+        self.targets[~mask]=self.measured[~mask]
+
+
+@dataclass(frozen=True)
+class AcuteOptions:
+    ring_pitch_m: float = .075
+    ring_turns: float = 1.055
+    ring_radius_delta_m: float = 0.
+    reference_bend_radius_m: float = .155
+    roll_rate_rad_s: float = -.5
+    feed_m_s: float = .012
+    ring_feed_m_s: float = .007
+    release_m_s: float = .024
+    shoulder_angle_deg: float = 40.
+    miter_section: bool = False
+    lead_length_m: float = 0.
+    corner_pitch_m: Optional[float] = None
+    exit_pitch_m: Optional[float] = None
+    corner_turns: Optional[float] = None
+    section_compression: float = 0.
+    corner_shape_delay_m: float = 0.
+    exit_shape_delay_m: float = 0.
+    encoder_spacing: bool = False
+    encoder_spacing_start_m: float = .210
+    encoder_compaction: bool = False
+    initial_hold_s: float = 2.
+    encoder_tip_clearance: bool = False
+    encoder_feed_sync: bool = False
+    section_shell_diameter_m: Optional[float] = None
+    section_endpoint_allowance: bool = False
+    section_handoff_from_tilt: bool = False
+    section_keep_curvature: bool = False
+    progressive_tail_release: bool = False
+    section_before_bend: bool = False
+    section_seam_clearance: bool = False
+    outlet_end_correction: bool = False
+    outlet_use_spare_length: bool = False
+
+
+def observed_ring(measured, lengths, material, start, stop):
+    """Shape of the active interval in the head frame, from encoders only."""
+    points = forward(measured, lengths)
+    s = np.linspace(start, stop, 65)
+    ring = np.column_stack([np.interp(s, material, axis) for axis in points.T])
+    centered = ring - ring.mean(axis=0)
+    _, _, axes = np.linalg.svd(centered, full_matrices=False)
+    xy = centered @ axes[:2].T
+    radius_sq = np.sum(xy**2, axis=1)
+    center = np.linalg.lstsq(np.c_[2.*xy, np.ones(len(xy))], radius_sq, rcond=None)[0][:2]
+    x, y = (xy - center).T
+    azimuth = np.unwrap(np.arctan2(y, x))
+    tail = points[-1] - points[-5]
+    tail_length = np.linalg.norm(tail)
+    tail_straightness = tail_length / sum(lengths[-4:])
+    tilt = None
+    if tail_straightness >= .90:
+        tilt = float(np.degrees(np.arccos(np.clip(abs(axes[2] @ tail) / tail_length, 0., 1.))))
+    return dict(turn_deg=float(abs(np.degrees(azimuth[-1] - azimuth[0]))),
+                width_m=float(np.ptp(centered @ axes[2])),
+                end_gap_m=float(np.linalg.norm(ring[-1] - ring[0])),
+                tilt_from_tail_deg=tilt)
+
+
+def elliptic_field(radius, major_scale, pitch, turns, azimuth):
+    """Curvature in the transported frame of an elliptic, shallow-pitch turn."""
+    a, b = radius * major_scale, radius
+    c = pitch / (2. * math.pi)
+    theta = np.linspace(azimuth, azimuth + 2. * math.pi * turns, 481)
+    sine, cosine = np.sin(theta), np.cos(theta)
+    speed = np.sqrt((a * sine)**2 + (b * cosine)**2 + c*c)
+    cross_sq = (b*c*sine)**2 + (a*c*cosine)**2 + (a*b)**2
+    curvature = np.sqrt(cross_sq) / speed**3
+    torsion = a*b*c / cross_sq
+    ds = (speed[:-1] + speed[1:]) * np.diff(theta) * .5
+    bounds = np.r_[0., np.cumsum(ds)]
+    psi = np.r_[0., np.cumsum((torsion[:-1] + torsion[1:]) * ds * .5)]
+    field = curvature[:, None] * np.column_stack([np.cos(psi), np.sin(psi)])
+    return bounds, (field[:-1] + field[1:]) * .5, psi[-1]
+
+
+class AcuteArcTransition(VerticalRingReference):
+    def __init__(self, measured, lengths, options=AcuteOptions()):
+        if options.section_before_bend and (not options.progressive_tail_release
+                                            or not options.section_shell_diameter_m):
+            raise ValueError('Pre-bend section transfer needs progressive release and shell dimensions')
+        super().__init__(measured, lengths, HelixArcOptions(target_rate_deg_s=45.))
+        self.acute = options
+        self.stage = 'common_climb'
+        self.mode = 'common'
+        self.nominal_head_u = None
+        self.bent = None
+        self.field = None
+        self.next_field_s = 0.
+        self.wrap_radius = self.radius
+        self.pitch = self.fit['pitch']
+        self.shoulder = 0.
+        self.target_angle_max = 0.
+        self.major_scale = 1.
+        self.wrap_start = 0.
+        self.compression = 0.
+        self.handedness = 1 if self.tau >= 0. else -1
+        self.encoder_shape = None
+        self.last_feedback_time = None
+        self.spacing_trim = 0.
+        self.compaction_trim = 0.
+        self.tip_turn = 0.
+        self.tip_demand = 0.
+        self.tip_sample_time = None
+        self.tip_gap_m = None
+        self.feed_fraction = 1.
+        self.section_ring = None
+        self.section_weight = 0.
+        self.section_handoff_u = None
+        self.release_feedback_time = None
+        self.release_joint = None
+        self.release_count = 0
+        self.vertical_section = None
+        self.outlet_weight = 0.
+        self.outlet_length_budget = 0.
+
+    def branch(self, mode):
+        self.mode = mode
+        self.enter('form_ring' if mode == 'arc' else 'vertical_helix')
+
+    def begin_bend(self, nominal_head_u):
+        if self.mode == 'arc' and self.acute.progressive_tail_release and self.stage != 'vertical_ring':
+            raise ValueError('The tail release must finish before the ring enters the bend')
+        self.nominal_head_u = nominal_head_u
+        if self.mode != 'arc' or not (self.acute.miter_section or self.acute.lead_length_m):
+            self.bent = BentHelixCurve(self.wrap_radius, self.pitch, self.acute.reference_bend_radius_m,
+                                       handedness=self.handedness)
+            if self.mode == 'arc' and self.acute.section_shell_diameter_m is not None and self.section_ring is None:
+                self.section_ring = self.make_section()
+        self.enter('bend_shift')
+
+    def confirm_outlet(self):
+        """Operator cue that the active ring is on the outgoing straight."""
+        if self.stage != 'bend_shift' or not self.acute.outlet_end_correction or self.vertical_section is None:
+            return False
+        last = int(np.flatnonzero(self.enabled)[-1])
+        if last + 1 < self.n:
+            self.outlet_length_budget = max(0., self.curve.s[last + 1] - self.helix_length - .001)
+        self.enter('outlet_roll')
+        return True
+
+    def make_section(self):
+        return SectionRingCurve(self.wrap_radius, self.pitch, self.acute.reference_bend_radius_m,
+                                self.l, self.acute.section_shell_diameter_m, handedness=self.handedness,
+                                endpoint_allowance=self.acute.section_endpoint_allowance,
+                                seam_clearance=self.acute.section_seam_clearance)
+
+    def ring_profile(self):
+        opt = self.acute
+        w = min(self.elapsed / 8., 1.)
+        w = w * w * (3. - 2. * w)
+        self.wrap_radius = self.radius + w * opt.ring_radius_delta_m
+        self.pitch = self.fit['pitch'] + w * (opt.ring_pitch_m - self.fit['pitch'])
+        return w
+
+    def form_ring(self, dt):
+        opt = self.acute
+        # First transfer material from the long helix to the outgoing shoulder
+        # and tail. Change pitch while the wrap still spans more than one turn.
+        w = self.ring_profile()
+        self.shoulder = w * math.radians(opt.shoulder_angle_deg) * self.wrap_radius
+        retained = opt.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
+        self.helix_length = max(retained, min(self.L - self.shoulder, self.helix_length - opt.release_m_s * dt))
+        if w == 1. and self.helix_length <= retained + 1e-9:
+            self.enter('vertical_ring')
+
+    def progressive_ring(self, dt, feedback_time):
+        """Establish the front turn, then move the release boundary tail-first."""
+        opt = self.acute
+        fresh = feedback_time is not None and (
+            self.release_feedback_time is None or feedback_time > self.release_feedback_time)
+        if fresh:
+            self.release_feedback_time = feedback_time
+        if self.stage == 'form_ring':
+            w = self.ring_profile()
+        retained = opt.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
+        if self.stage == 'form_ring':
+            if fresh and w == 1.:
+                self.encoder_shape = observed_ring(self.measured, self.lengths, self.curve.s, 0., retained)
+                if 325. <= self.encoder_shape['turn_deg'] <= 395.:
+                    if opt.section_before_bend:
+                        self.section_ring = self.make_section()
+                        self.vertical_section = self.section_ring.section_field(-.055)[:2]
+                    self.enter('release_tail')
+            return self.enabled.copy()
+
+        # Use the same curvature integral for the moving boundary. The pending
+        # prefix follows its curve until the distal joint's integral vanishes.
+        if self.vertical_section is not None:
+            retained = self.vertical_section[0][-1]
+        self.helix_length = max(retained, self.helix_length - opt.release_m_s * dt)
+        mask = self.enabled.copy()
+        tail = int(np.flatnonzero(mask)[-1])
+        self.release_joint = None
+        if fresh and self.curve.s[tail] >= self.helix_length - 1e-8:
+            mask[tail] = False
+            self.release_joint = tail + 1
+            self.release_count += 1
+            self.events.append(dict(time_s=self.time, stage=self.stage, released_joint=self.release_joint,
+                                    feedback_time_s=feedback_time))
+        if self.helix_length <= retained + 1e-9 and np.array_equal(mask, self.ring_mask()):
+            self.enter('vertical_ring')
+        return mask
+
+    def ring_mask(self):
+        # A joint owns the integral of curvature over its two adjacent links.
+        start = self.wrap_start
+        end = start + self.helix_length + self.shoulder
+        return (self.curve.s[2:] > start + 1e-8) & (self.curve.s[:-2] < end - 1e-8)
+
+    def straight_reference(self):
+        lead_plane = -self.handedness * math.pi / 2.
+        segments = [arc(self.wrap_start, 1. / self.wrap_radius, lead_plane),
+                    helix(self.helix_length, self.wrap_radius, self.pitch, handed=self.handedness, psi=-lead_plane),
+                    arc(self.shoulder, 1. / self.wrap_radius, -lead_plane),
+                    line(max(0., self.L - self.wrap_start - self.helix_length - self.shoulder))]
+        return self.curve.targets(segments, self.phase - segments[1].tau * self.wrap_start)
+
+    def vertical_section_reference(self):
+        cut, compact = self.vertical_section
+        nominal = self.acute.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
+        lead = min(nominal, self.helix_length)
+        blend = float(np.clip((nominal + 2.*self.l - self.helix_length) / (2.*self.l), 0., 1.))
+        blend = blend*blend*(3. - 2.*blend)
+        self.section_weight = blend
+        helix_segment = helix(lead, self.wrap_radius, self.pitch, handed=self.handedness)
+        bounds = np.linspace(0., lead, 481)
+        angle = helix_segment.tau * (bounds[:-1] + bounds[1:]) * .5
+        swept = helix_segment.kappa * np.column_stack([np.cos(angle), np.sin(angle)])
+        bounds, field = self.blend_fields(bounds, swept, cut, compact, blend)
+        if self.helix_length > bounds[-1] + 1e-8:
+            rest = np.linspace(bounds[-1], self.helix_length, 81)
+            end = math.atan2(field[-1, 1], field[-1, 0])
+            angle = end + helix_segment.tau*((rest[1:] + rest[:-1])*.5 - rest[0])
+            tail = helix_segment.kappa * np.column_stack([np.cos(angle), np.sin(angle)])
+            bounds = np.r_[bounds, rest[1:]]
+            field = np.vstack([field, tail])
+        return self.curve.sampled_targets(np.r_[bounds, self.L], np.vstack([field, [0., 0.]]), self.phase)
+
+    def update_corner_section(self):
+        opt = self.acute
+        u = self.nominal_head_u
+        exit_u = opt.reference_bend_radius_m * math.pi / 2.
+
+        def ramp(start, stop):
+            w = float(np.clip((u - start) / (stop - start), 0., 1.))
+            return w*w*(3. - 2.*w)
+
+        enter = ramp(-.045 + opt.corner_shape_delay_m, .045 + opt.corner_shape_delay_m)
+        leave = ramp(exit_u - .015 + opt.exit_shape_delay_m, exit_u + .025 + opt.exit_shape_delay_m)
+        turns = opt.ring_turns
+        if opt.corner_turns is not None:
+            turns += (enter - leave) * (opt.corner_turns - opt.ring_turns)
+        self.pitch = opt.ring_pitch_m
+        if opt.corner_pitch_m is not None:
+            self.pitch += enter * (opt.corner_pitch_m - opt.ring_pitch_m)
+            if opt.exit_pitch_m is not None:
+                self.pitch += leave * (opt.exit_pitch_m - opt.corner_pitch_m)
+        if opt.encoder_spacing:
+            if opt.exit_pitch_m is not None:
+                self.pitch = min(self.pitch + self.spacing_trim * (1. - leave), opt.exit_pitch_m + .004)
+            else:
+                self.pitch += self.spacing_trim
+            self.pitch = float(np.clip(self.pitch, .024, .105))
+        self.bent.pitch = self.pitch
+        self.helix_length = turns * helix_turn_length(self.wrap_radius, self.pitch)
+
+    def observe_encoders(self, feedback_time):
+        previous = self.last_feedback_time
+        if feedback_time is None or (previous is not None and feedback_time <= previous):
+            return
+        self.last_feedback_time = feedback_time
+        self.encoder_shape = observed_ring(self.measured, self.lengths, self.curve.s, self.wrap_start,
+                                           self.wrap_start + self.helix_length)
+        if self.stage != 'bend_shift' or previous is None:
+            return
+        if self.section_ring is not None and self.acute.section_handoff_from_tilt and self.section_handoff_u is None:
+            tilt = self.encoder_shape['tilt_from_tail_deg']
+            if tilt is not None and tilt >= 22.5 and not self.enabled[-4:].any():
+                self.section_handoff_u = self.nominal_head_u
+        width = self.encoder_shape['width_m']
+        gap = self.encoder_shape['end_gap_m']
+        elapsed = min(feedback_time - previous, .25)
+        if self.acute.encoder_feed_sync:
+            u = self.nominal_head_u
+            deficit = max((width - .100) / .035, (340. - self.encoder_shape['turn_deg']) / 35.)
+            desired = 1. - .55 * float(np.clip(deficit, 0., 1.)) if .050 < u < .25 else 1.
+            self.feed_fraction += float(np.clip(desired - self.feed_fraction, -2. * elapsed, elapsed))
+        if self.acute.encoder_compaction:
+            u = self.nominal_head_u
+            demand = np.clip(8. * (width - .094), 0., .22) if .04 < u < .22 and gap > .096 else 0.
+            self.compaction_trim += float(np.clip(demand - self.compaction_trim, -.6 * elapsed, .6 * elapsed))
+        if not self.acute.encoder_spacing or self.nominal_head_u < self.acute.encoder_spacing_start_m:
+            return
+        # Whole-ring pitch is part of the approach grip. Adjust it only as
+        # the reference seats on the outlet, where the two ends get close.
+        correction = np.clip(.25 * min(0., .093 - width) + 1.6 * max(0., .090 - gap), -.006, .030)
+        change = np.clip(correction - self.spacing_trim, -.040 * elapsed, .065 * elapsed)
+        self.spacing_trim += float(change)
+
+    def tip_field(self, bounds, field, turn):
+        mid = (bounds[:-1] + bounds[1:]) * .5
+        angle = turn * np.clip(1. - mid / .15, 0., 1.)
+        c, s = np.cos(angle), np.sin(angle)
+        return np.column_stack([c*field[:, 0] - s*field[:, 1], s*field[:, 0] + c*field[:, 1]])
+
+    def tip_clearance(self, q):
+        points = forward(q, self.lengths)
+        front = np.linspace(0., .100, 13)
+        rear = self.helix_length + np.linspace(-.070, .060, 17)
+        a = np.column_stack([np.interp(front, self.curve.s, axis) for axis in points.T])
+        b = np.column_stack([np.interp(rear, self.curve.s, axis) for axis in points.T])
+        return float(np.linalg.norm(a[:, None] - b, axis=2).min())
+
+    def steer_tip(self, bounds, field, dt):
+        limit = math.radians(88.)
+        if not .195 <= self.nominal_head_u <= .33:
+            self.tip_demand = 0.
+        elif self.tip_sample_time != self.last_feedback_time:
+            self.tip_sample_time = self.last_feedback_time
+            current = self.tip_field(bounds, field, self.tip_turn)
+            base = np.clip(self.curve.sampled_targets(bounds, current, self.phase), -limit, limit)
+            self.tip_gap_m = self.tip_clearance(self.measured)
+            choices = (0., -.35, .35, -.70, .70)
+            scores = []
+            for turn in choices:
+                trial = self.tip_field(bounds, field, turn)
+                q = np.clip(self.curve.sampled_targets(bounds, trial, self.phase), -limit, limit)
+                predicted = np.clip(self.measured + q - base, -limit, limit)
+                scores.append(min(self.tip_clearance(predicted), .073) - .003 * abs(turn))
+            self.tip_demand = choices[int(np.argmax(scores))]
+        self.tip_turn += float(np.clip(self.tip_demand - self.tip_turn, -1.4 * dt, 1.4 * dt))
+        return self.tip_field(bounds, field, self.tip_turn)
+
+    def transfer_to_section(self, bounds, field, shoulder_phase):
+        section = self.section_ring
+        cut, compact, compact_shoulder = section.section_field(self.nominal_head_u)
+        # Start blending a half link before the plane starts to turn. The
+        # blend takes one link of nominal travel, at unchanged roll/feed rates.
+        if self.acute.section_handoff_from_tilt:
+            if self.section_handoff_u is None:
+                self.helix_length = bounds[-1]
+                return bounds, field, shoulder_phase
+            w = float(np.clip((self.nominal_head_u - self.section_handoff_u) / (.5 * self.l), 0., 1.))
+        else:
+            w = float(np.clip(self.nominal_head_u / self.l + .5, 0., 1.))
+        w = w*w*(3. - 2.*w)
+        self.section_weight = w
+        s, values = self.blend_fields(bounds, field, cut, compact, w)
+        angle = math.atan2(math.sin(compact_shoulder - shoulder_phase), math.cos(compact_shoulder - shoulder_phase))
+        self.helix_length = s[-1]
+        return s, values, shoulder_phase + w*angle
+
+    def blend_fields(self, bounds, field, cut, compact, w):
+        sampled = np.linspace(0., 1., 481)
+
+        def resample(s, values):
+            u = (s[1:] + s[:-1]) / (2.*s[-1])
+            return np.column_stack([np.interp(sampled, u, axis) for axis in values.T])
+
+        length = (1. - w)*bounds[-1] + w*cut[-1]
+        swept = bounds[-1]*resample(bounds, field)
+        fixed = cut[-1]*resample(cut, compact)
+        if self.acute.section_keep_curvature:
+            # Blend the turning budget and the direction separately. Mixing
+            # vectors can cancel their curvature and briefly open the ring.
+            direction = np.arctan2(swept[:, 1], swept[:, 0])
+            delta = np.arctan2(fixed[:, 1], fixed[:, 0]) - direction
+            delta = np.unwrap(np.arctan2(np.sin(delta), np.cos(delta)))
+            direction += w*delta
+            turning = (1. - w)*np.linalg.norm(swept, axis=1) + w*np.linalg.norm(fixed, axis=1)
+            integrated = turning[:, None]*np.column_stack([np.cos(direction), np.sin(direction)])
+        else:
+            integrated = (1. - w)*swept + w*fixed
+        return sampled*length, (integrated[1:] + integrated[:-1]) / (2.*length)
+
+    def bent_reference(self, dt):
+        rate = self.acute.ring_feed_m_s if self.mode == 'arc' else self.acute.feed_m_s
+        if self.mode == 'arc':
+            rate *= self.feed_fraction
+        self.nominal_head_u = min(self.nominal_head_u + rate * dt,
+                                  self.acute.reference_bend_radius_m * math.pi / 2. + .65)
+        if self.stage == 'outlet_roll':
+            # Blend the end transitions over one link of circumferential travel.
+            w = float(np.clip(self.elapsed * self.wrap_radius * abs(self.acute.roll_rate_rad_s) / self.l, 0., 1.))
+            self.outlet_weight = w*w*(3. - 2.*w)
+        if self.time >= self.next_field_s - 1e-9:
+            if self.mode == 'arc' and (self.acute.corner_pitch_m is not None or self.acute.corner_turns is not None
+                                       or self.acute.encoder_spacing):
+                self.update_corner_section()
+            if self.mode == 'arc' and self.acute.section_compression:
+                exit_u = self.acute.reference_bend_radius_m * math.pi / 2.
+                enter = np.clip((self.nominal_head_u + .015) / .07, 0., 1.)
+                leave = np.clip((self.nominal_head_u - exit_u + .015) / .04, 0., 1.)
+                self.compression = self.acute.section_compression * (enter*enter*(3.-2.*enter) - leave*leave*(3.-2.*leave))
+            length = self.helix_length
+            if self.section_ring is not None:
+                length = self.acute.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
+            if self.vertical_section is not None:
+                overlap = self.outlet_weight * self.outlet_length_budget if self.acute.outlet_use_spare_length else 0.
+                bounds, field, end_phase = self.section_ring.section_field(self.nominal_head_u, overlap)
+                if overlap:
+                    self.helix_length = min(bounds[-1], self.vertical_section[0][-1] + self.outlet_length_budget)
+                    bounds *= self.helix_length / bounds[-1]
+            else:
+                bounds, field, end_phase = self.bent.field(self.nominal_head_u, length,
+                                                           section_compression=self.compression + self.compaction_trim)
+            if self.mode == 'helix':
+                self.field = bounds, field
+            else:
+                shoulder_phase = end_phase + self.handedness * math.pi / 2.
+                if self.section_ring is not None and self.vertical_section is None:
+                    bounds, field, shoulder_phase = self.transfer_to_section(bounds, field, shoulder_phase)
+                if self.shoulder > 0.:
+                    shoulder = np.array([math.cos(shoulder_phase), math.sin(shoulder_phase)]) / self.wrap_radius
+                    bounds = np.r_[bounds, self.helix_length + self.shoulder]
+                    field = np.vstack([field, shoulder])
+                self.field = np.r_[bounds, self.L], np.vstack([field, [0., 0.]])
+            self.next_field_s = self.time + .1
+        bounds, field = self.field
+        if self.stage == 'outlet_roll' and not self.acute.outlet_use_spare_length:
+            # Shape the two end ramps without changing the material interval or
+            # the drive clock. Use two link spans to blend into the bearing arc.
+            mid = (bounds[1:] + bounds[:-1])*.5
+            distance = np.minimum(mid, np.maximum(0., self.helix_length-mid))
+            end = np.clip(1. - distance / (2.*self.l), 0., 1.)
+            end[mid >= self.helix_length] = 0.
+            field = field * (1. + .30*self.outlet_weight*end*end)[:, None]
+        if self.mode == 'arc' and self.acute.encoder_tip_clearance:
+            field = self.steer_tip(bounds, field, dt)
+        return self.curve.sampled_targets(bounds, field, self.phase)
+
+    def miter_reference(self):
+        # At 45 degrees a cylinder cuts an ellipse with major radius sqrt(2) r.
+        # Widen only during the corner transfer. The added section length is
+        # taken from the free tail, then returned to it on the horizontal leg.
+        ramp = np.clip((self.elapsed - 10.) / 14., 0., 1.)
+        retreat = np.clip((self.elapsed - 46.) / 14., 0., 1.)
+        angle = math.pi / 4. * (ramp - retreat)
+        self.major_scale = 1. / math.cos(angle)
+        bounds, field, psi = elliptic_field(self.wrap_radius, self.major_scale, self.pitch,
+                                             self.acute.ring_turns, -2.1)
+        self.helix_length = bounds[-1]
+        shoulder_phase = psi + math.pi / 2.
+        shoulder = np.array([math.cos(shoulder_phase), math.sin(shoulder_phase)]) / self.wrap_radius
+        bounds = np.r_[bounds, self.helix_length + self.shoulder, self.L]
+        return self.curve.sampled_targets(bounds, np.vstack([field, shoulder, [0., 0.]]), self.phase)
+
+    def lead_reference(self):
+        # Shift the retained ring toward the tail to allocate material to a
+        # short, out-of-plane lead. The lead seats toward the outgoing leg
+        # while the ring supplies the main support.
+        grow = np.clip((self.elapsed - 10.) / 7., 0., 1.)
+        shrink = np.clip((self.elapsed - 42.) / 9., 0., 1.)
+        self.wrap_start = self.acute.lead_length_m * (grow - shrink)
+        return self.straight_reference()
+
+    def step(self, dt, measured, feedback_time=None):
+        self.measured = measured
+        self.time += dt
+        self.elapsed += dt
+        if self.time > self.acute.initial_hold_s:
+            self.phase += self.handedness * self.acute.roll_rate_rad_s * dt
+        mask = None
+        self.release_joint = None
+        if self.acute.progressive_tail_release and self.stage in ('form_ring', 'release_tail'):
+            mask = self.progressive_ring(dt, feedback_time)
+        elif self.stage == 'form_ring':
+            self.form_ring(dt)
+        if ((self.acute.encoder_spacing or self.acute.encoder_compaction or self.acute.encoder_tip_clearance
+             or self.acute.encoder_feed_sync or self.acute.section_handoff_from_tilt) and
+                self.stage in ('vertical_ring', 'bend_shift') and self.mode == 'arc'):
+            self.observe_encoders(feedback_time)
+        if self.bent is not None:
+            desired = self.bent_reference(dt)
+        elif self.stage == 'bend_shift' and self.acute.lead_length_m:
+            desired = self.lead_reference()
+        elif self.stage == 'bend_shift':
+            desired = self.miter_reference()
+        elif self.vertical_section is not None:
+            desired = self.vertical_section_reference()
+        else:
+            desired = self.straight_reference()
+        if mask is None:
+            if self.mode != 'arc':
+                mask = np.ones(self.n, dtype=bool)
+            elif self.acute.progressive_tail_release:
+                mask = self.enabled & self.ring_mask()
+            else:
+                mask = self.curve.s[:-2] < self.wrap_start + self.helix_length + self.shoulder - 1e-8
+        self.target_angle_max = float(np.degrees(np.max(abs(desired))))
+        self.apply_reference(desired, dt, mask)
+        return self.targets.copy(), self.enabled.copy()
+
+    def status(self):
+        return dict(stage=self.stage, phase_rad=self.phase, nominal_head_u_m=self.nominal_head_u,
+                    wrap_start_m=self.wrap_start, wrap_length_m=self.helix_length, shoulder_m=self.shoulder,
+                    free_tail_m=max(0., self.L - self.wrap_start - self.helix_length - self.shoulder),
+                    pitch_m=self.pitch, radius_m=self.wrap_radius, section_major_scale=self.major_scale,
+                    section_compression=self.compression,
+                    encoder_shape=self.encoder_shape, spacing_trim_m=self.spacing_trim,
+                    encoder_compaction=self.compaction_trim,
+                    tip_turn_rad=self.tip_turn, tip_gap_m=self.tip_gap_m,
+                    feed_fraction=self.feed_fraction,
+                    section_weight=self.section_weight,
+                    section_handoff_u_m=self.section_handoff_u,
+                    outlet_weight=self.outlet_weight,
+                    released_tail_joint=self.release_joint, released_tail_count=self.release_count,
+                    requested_max_deg=self.target_angle_max,
+                    curvature_frame_rad=None if self.bent is None else self.bent.gamma,
+                    options=asdict(self.acute))
+
+
+def vertical_short_options():
+    """Shared profile verified on the 18-joint, 110 mm short-elbow scene."""
+    return AcuteOptions(reference_bend_radius_m=.13, ring_turns=1.12, ring_radius_delta_m=-.003,
+                        section_shell_diameter_m=.058, section_keep_curvature=True,
+                        progressive_tail_release=True, section_before_bend=True,
+                        outlet_end_correction=True, outlet_use_spare_length=True)
+
+
+class VerticalRingManual:
+    def __init__(self, measured_deg, lengths, options=AcuteOptions(), *, helix_targets_deg=None,
+                 step_s=1., max_feedback_age_s=.8):
+        measured = np.asarray(measured_deg, dtype=float)
+        reference = measured if helix_targets_deg is None else np.asarray(helix_targets_deg, dtype=float)
+        if measured.ndim != 1 or reference.shape != measured.shape or not np.isfinite(measured).all():
+            raise ValueError('Expected one complete Helix encoder sample and matching targets')
+        self.core = AcuteArcTransition(np.radians(reference), lengths, replace(options, initial_hold_s=0.))
+        self.core.measured = np.radians(measured)
+        self.core.branch('arc')
+        self.step_s = step_s
+        self.max_feedback_age_s = max_feedback_age_s
+        self.running = False
+        self.step_remaining_s = 0.
+        self.feedback_wait = False
+        self.latest_sample_s = None
+
+    @property
+    def targets(self):
+        return np.degrees(self.core.targets)
+
+    @property
+    def enabled(self):
+        return self.core.enabled.copy()
+
+    @property
+    def stage(self):
+        return self.core.stage
+
+    def pause(self):
+        self.running = False
+        self.step_remaining_s = 0.
+
+    def toggle_continuous(self):
+        if self.running:
+            self.pause()
+        else:
+            self.step_remaining_s = 0.
+            self.running = True
+
+    def step_once(self):
+        self.running = False
+        self.step_remaining_s = self.step_s
+
+    def begin_bend(self, nominal_head_u=-.055):
+        if self.core.stage != 'vertical_ring':
+            return False
+        self.core.begin_bend(nominal_head_u)
+        return True
+
+    def confirm_outlet(self):
+        return self.core.confirm_outlet()
+
+    def advance(self, dt, now, feedback_time, measured_deg):
+        if not math.isfinite(dt) or dt <= 0.:
+            raise ValueError('Expected a positive control step')
+        if not self.running and self.step_remaining_s <= 0.:
+            return False
+        if (feedback_time is None or not math.isfinite(feedback_time) or not math.isfinite(now) or
+                not 0. <= now - feedback_time <= self.max_feedback_age_s or
+                (self.latest_sample_s is not None and feedback_time < self.latest_sample_s)):
+            self.feedback_wait = True
+            return False
+        measured = np.asarray(measured_deg, dtype=float)
+        if measured.shape != self.core.targets.shape or not np.isfinite(measured).all():
+            self.feedback_wait = True
+            return False
+        self.feedback_wait = False
+        self.latest_sample_s = feedback_time
+        used = dt if self.running else min(dt, self.step_remaining_s)
+        self.core.step(used, np.radians(measured), feedback_time)
+        self.step_remaining_s = max(0., self.step_remaining_s - used)
+        if self.step_remaining_s < 1e-9:
+            self.step_remaining_s = 0.
+        return True
+
+    def status(self):
+        return dict(self.core.status(), running=self.running, step_remaining_s=self.step_remaining_s,
+                    feedback_wait=self.feedback_wait, enabled_joints=(np.flatnonzero(self.enabled) + 1).tolist())
+# END VERTICAL_RING_CORE
+
 # BEGIN CURVE_FEEDING_CORE
 # 模式4、5/6调长准备、7归中共用：曲线积分、参数工厂与同一个调长执行器。
 # 相对调长、准备位置、归中只改变目标；角反馈、预置使能与退出逻辑统一。
@@ -5969,6 +6732,7 @@ class RollingArcController:
         self.feeding_last_diagnostic_s = None
         self.helix_transition = None
         self.helix_arc_transition = None
+        self.vertical_ring_transition = None
         self.helix_arc_last = None
         self.basic_arc_reference = None
         self.end_reset = None
@@ -6155,6 +6919,67 @@ class RollingArcController:
         self.feeding_inputs = None
         self.section_block_reason = None
         self.pending_phase, self.mode, self.freeze_targets = 0., 'hold', True
+
+    def select_vertical_ring(self):
+        if self.vertical_ring_transition is not None:
+            self.vertical_ring_transition.pause()
+        else:
+            if self.mode == 'released' or not all(self.enabled):
+                raise ValueError('Ctrl+8需要已在竖直管上搭稳且全身使能的Helix')
+            self.refresh_compliance_feedback()
+            self.vertical_ring_transition = VerticalRingManual(
+                self.measured_angles(), LINK_LENGTHS_M, vertical_short_options(),
+                helix_targets_deg=self.targets, step_s=HELIX_ARC_STEP_S, max_feedback_age_s=MAX_FEEDBACK_AGE_S)
+            self.helix_transition = self.helix_arc_transition = None
+        self.hold_for_helix_mode()
+        self.forming, self.settle_remaining = False, 0.
+        print('竖直Helix→整圈ARC已选择。Ctrl+J单步，Ctrl+G连续，Ctrl+L确认入弯或水平接管。', flush=True)
+
+    def command_vertical_ring(self, command):
+        manual = self.vertical_ring_transition
+        if command in ('pause', 'hold') or (command == 'toggle' and manual.running):
+            manual.pause()
+            self.mode, self.freeze_targets = 'hold', True
+        elif command == 'step':
+            if manual.step_remaining_s > 0.:
+                return 'in_progress'
+            manual.step_once()
+            self.mode, self.freeze_targets = 'step', False
+        elif command in ('run', 'toggle'):
+            if not manual.running:
+                manual.toggle_continuous()
+            self.mode, self.freeze_targets = 'run', False
+        elif command == 'feed_tick':
+            if not (manual.begin_bend() or manual.confirm_outlet()):
+                raise ValueError('Ctrl+L用于退尾完成后的入弯确认，或弯中已搭上水平直管后的确认')
+            self.show_status()
+        else:
+            raise ValueError('Ctrl+8流程使用Ctrl+J/G/L、空格暂停、K状态、X全部失能')
+        return True
+
+    def tick_vertical_ring(self, dt):
+        manual = self.vertical_ring_transition
+        before = manual.stage
+        now, sample_time = self.motor_sample_clock()
+        if not manual.advance(dt, now, sample_time, self.measured_angles()):
+            return
+        enabled = manual.enabled.tolist()
+        targets = np.clip(manual.targets, MIN_ANGLE_DEG, MAX_ANGLE_DEG).tolist()
+        for i, active in enumerate(enabled):
+            if active:
+                angle_to_raw(i, targets[i])
+        if enabled != self.enabled:
+            self.bus.set_enabled(enabled)
+        self.bus.send_targets(targets, enabled)
+        self.touched_hardware = True
+        self.enabled, self.targets = enabled, targets
+        active = np.flatnonzero(enabled) + 1
+        self.first, self.last = int(active[0]), int(active[-1])
+        self.command_phase = self.phase = manual.core.phase
+        if not manual.running and manual.step_remaining_s <= 0.:
+            self.mode, self.freeze_targets = 'hold', True
+        if before != manual.stage:
+            self.show_status()
 
     def read_gravity_entry(self, from_helix, helix_only=False):
         self.refresh_compliance_feedback()
@@ -6947,6 +7772,7 @@ class RollingArcController:
         self.end_reset_pending = False
         self.helix_transition = None
         self.helix_arc_transition = None
+        self.vertical_ring_transition = None
         self.feeding_selected, self.feeding = False, None
         self.feeding_inputs = None
         self.sliding, self.pending_gait = None, None
@@ -7038,6 +7864,21 @@ class RollingArcController:
         if self.end_reset is not None and command in ('pause', 'hold', 'toggle', 'run', 'step', 'back'):
             # 人工运动/暂停立即结束本次归零，恢复两端失能，再按原热键处理。
             self.cancel_end_reset()
+        if command == 'gait_vertical_ring':
+            return self.select_vertical_ring()
+        if self.vertical_ring_transition is not None:
+            if command.startswith('gait_'):
+                previous = self.vertical_ring_transition
+                previous.pause()
+                self.mode, self.freeze_targets = 'hold', True
+                self.vertical_ring_transition = None
+                try:
+                    return self.command(command)
+                except (ValueError, RuntimeError):
+                    self.vertical_ring_transition = previous
+                    raise
+            if command not in ('release', 'quit', 'exit', 'status'):
+                return self.command_vertical_ring(command)
         if command == 'gait_helix_arc':
             self.select_helix_arc()
             return
@@ -7133,6 +7974,9 @@ class RollingArcController:
         step_finished = False
         # 不追赶阻塞期间漏发的帧，防止串口延迟后突然跳过一大段相位。
         dt = min(dt, CONTROL_PERIOD_S)
+        if self.vertical_ring_transition is not None:
+            self.tick_vertical_ring(dt)
+            return
         if self.end_reset is not None or (self.end_reset_pending and not self.forming and self.settle_remaining<=0):
             self.tick_end_reset(dt)
             return
@@ -7199,7 +8043,8 @@ class RollingArcController:
             section.update(block_reason=self.section_block_reason, actual_body_geometry=self.actual_section,
                            options=asdict(self.options), input='measured_joint_angles', window_fixed=self.sliding is None)
         age = None if self.feedback_wall_s is None else time.monotonic()-self.feedback_wall_s
-        gait = ('helix_to_arc' if self.helix_arc_transition is not None else
+        gait = ('vertical_ring' if self.vertical_ring_transition is not None else
+                'helix_to_arc' if self.helix_arc_transition is not None else
                 'gravity_crossing' if isinstance(self.helix_transition, GravityCrossing) and not self.helix_transition.helix_only else
                 'arc_to_helix' if self.helix_transition is not None else
                 'active_feeding' if self.feeding_selected else 'sliding_section_compliance' if self.sliding is not None else
@@ -7221,6 +8066,7 @@ class RollingArcController:
                     pending_gait=self.pending_gait,
                     helix_transition=None if self.helix_transition is None else self.helix_transition.status(),
                     helix_arc_transition=None if self.helix_arc_transition is None else self.helix_arc_transition.status(),
+                    vertical_ring_transition=None if self.vertical_ring_transition is None else self.vertical_ring_transition.status(),
                     helix_arc_last=copy.deepcopy(self.helix_arc_last),
                     basic_arc_reference=None if self.basic_arc_reference is None else self.basic_arc_reference.status(),
                     feeding=None if self.feeding is None else copy.deepcopy(self.feeding.snapshot()),
@@ -7235,6 +8081,16 @@ class RollingArcController:
 
     def show_status(self, include_feedback=False):
         label = {'released': '未接管/已释放', 'hold': '保持', 'run': '连续', 'step': '单步'}[self.mode]
+        if self.vertical_ring_transition is not None:
+            h = self.vertical_ring_transition.status()
+            stages = {'form_ring':'成环', 'release_tail':'从尾端逐节失能', 'vertical_ring':'单圈上行，L确认入弯',
+                      'bend_shift':'单圈过弯，搭稳水平段后L确认', 'outlet_roll':'水平整圈滚动'}
+            print(f"竖直Helix→整圈ARC | {label} | J{self.first}–J{self.last} | "
+                  f"{stages[h['stage']]} | 已释放尾侧{h['released_tail_count']}关节 | "
+                  f"等待角反馈={h['feedback_wait']}", flush=True)
+            if include_feedback:
+                print('实测角：'+' '.join(f'J{i+1}={v:.1f}°' for i, v in self.last_feedback.items()), flush=True)
+            return
         if self.feeding_selected and self.mode=='run':
             label = '执行本步'
         if self.forming:
@@ -7922,6 +8778,7 @@ def decode_hotkey(vk, control_down):
     special = {32: 'pause', 38: 'amplitude_up', 40: 'amplitude_down',
                39: 'omega_up', 37: 'omega_down', 189: 'delta-', 187: 'delta+',
                49: 'gait_basic', 50: 'gait_fixed', 51: 'gait_sliding', 52: 'gait_feeding', 53: 'gait_helix', 54: 'gait_gravity', 55: 'gait_helix_arc',
+               56: 'gait_vertical_ring', 104: 'gait_vertical_ring',
                97: 'gait_basic', 98: 'gait_fixed', 99: 'gait_sliding', 100: 'gait_feeding', 101: 'gait_helix', 102: 'gait_gravity', 103: 'gait_helix_arc'}
     return special.get(vk) or HOTKEY_COMMANDS.get(chr(vk) if vk is not None and 65 <= vk <= 90 else '')
 
@@ -8039,7 +8896,7 @@ def process_control_commands(controller, commands, elapsed):
     """实机与MuJoCo手调共用同一命令分派和状态提示。"""
     for _ in range(commands.qsize()):
         command = commands.get_nowait()
-        core = (controller.helix_arc_transition or controller.helix_transition or
+        core = (controller.vertical_ring_transition or controller.helix_arc_transition or controller.helix_transition or
                 (controller.feeding if controller.feeding_selected else None))
         event = dict(time_s=elapsed, command=command, mode_before=controller.mode,
                      stage_before=None if core is None else core.stage, result='accepted', reason=None)
@@ -8060,7 +8917,7 @@ def process_control_commands(controller, commands, elapsed):
             event.update(result='rejected', reason=str(exc))
             print(f'参数/操作未执行: {exc}', flush=True)
         finally:
-            core = (controller.helix_arc_transition or controller.helix_transition or
+            core = (controller.vertical_ring_transition or controller.helix_arc_transition or controller.helix_transition or
                     (controller.feeding if controller.feeding_selected else None))
             controller.control_command_sequence += 1
             event.update(sequence=controller.control_command_sequence, mode_after=controller.mode,
@@ -8072,7 +8929,8 @@ def process_control_commands(controller, commands, elapsed):
 def poll_control_feedback(controller, elapsed, next_feedback):
     """顺应或构型预览都读全关节；预览读角也可在未接管/失能时进行。"""
     full_feedback = (controller.end_reset is not None or controller.compliance is not None or controller.feeding_selected or
-                     controller.helix_transition is not None or controller.helix_arc_transition is not None or controller.preview_feedback)
+                     controller.helix_transition is not None or controller.helix_arc_transition is not None or
+                     controller.vertical_ring_transition is not None or controller.preview_feedback)
     compliance_due = (full_feedback and
                       (controller.feedback_time_s is None or
                        elapsed-controller.feedback_time_s >= COMPLIANCE_FEEDBACK_PERIOD_S))

@@ -15,13 +15,13 @@ class SectionRingCurve(BentHelixCurve):
         self.endpoint_allowance = endpoint_allowance
         self.seam_clearance = seam_clearance
 
-    def section_field(self, head_u):
+    def section_field(self, head_u, outlet_overlap_m=0.):
         # The lead and return share one moving frame. The nearly planar body
         # spans the full section. Most axial displacement is allocated to the
         # ends, over two link spacings, to keep the shell envelopes apart.
         # A half link covers the joint-centred discretisation at the two ends.
         # The resulting angular overlap is separated by the two axial ramps.
-        overlap = self.link_spacing / 2. if self.endpoint_allowance else 0.
+        overlap = self.link_spacing / 2. if self.endpoint_allowance else outlet_overlap_m
         extent = 2. * math.pi * self.r + overlap
         fraction = np.linspace(0., 1., 481)
         theta = math.pi - self.handedness * (extent / self.r) * fraction

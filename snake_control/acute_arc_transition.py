@@ -48,6 +48,8 @@ class AcuteOptions:
     progressive_tail_release: bool = False
     section_before_bend: bool = False
     section_seam_clearance: bool = False
+    outlet_end_correction: bool = False
+    outlet_use_spare_length: bool = False
 
 
 def observed_ring(measured, lengths, material, start, stop):
@@ -128,6 +130,8 @@ class AcuteArcTransition(HelixArcTransition):
         self.release_joint = None
         self.release_count = 0
         self.vertical_section = None
+        self.outlet_weight = 0.
+        self.outlet_length_budget = 0.
 
     def branch(self, mode):
         self.mode = mode
@@ -143,6 +147,16 @@ class AcuteArcTransition(HelixArcTransition):
             if self.mode == 'arc' and self.acute.section_shell_diameter_m is not None and self.section_ring is None:
                 self.section_ring = self.make_section()
         self.enter('bend_shift')
+
+    def confirm_outlet(self):
+        """Operator cue that the active ring is on the outgoing straight."""
+        if self.stage != 'bend_shift' or not self.acute.outlet_end_correction or self.vertical_section is None:
+            return False
+        last = int(np.flatnonzero(self.enabled)[-1])
+        if last + 1 < self.n:
+            self.outlet_length_budget = max(0., self.curve.s[last + 1] - self.helix_length - .001)
+        self.enter('outlet_roll')
+        return True
 
     def make_section(self):
         return SectionRingCurve(self.wrap_radius, self.pitch, self.acute.reference_bend_radius_m,
@@ -385,6 +399,10 @@ class AcuteArcTransition(HelixArcTransition):
             rate *= self.feed_fraction
         self.nominal_head_u = min(self.nominal_head_u + rate * dt,
                                   self.acute.reference_bend_radius_m * math.pi / 2. + .65)
+        if self.stage == 'outlet_roll':
+            # Blend the end transitions over one link of circumferential travel.
+            w = float(np.clip(self.elapsed * self.wrap_radius * abs(self.acute.roll_rate_rad_s) / self.l, 0., 1.))
+            self.outlet_weight = w*w*(3. - 2.*w)
         if self.time >= self.next_field_s - 1e-9:
             if self.mode == 'arc' and (self.acute.corner_pitch_m is not None or self.acute.corner_turns is not None
                                        or self.acute.encoder_spacing):
@@ -398,7 +416,11 @@ class AcuteArcTransition(HelixArcTransition):
             if self.section_ring is not None:
                 length = self.acute.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
             if self.vertical_section is not None:
-                bounds, field, end_phase = self.section_ring.section_field(self.nominal_head_u)
+                overlap = self.outlet_weight * self.outlet_length_budget if self.acute.outlet_use_spare_length else 0.
+                bounds, field, end_phase = self.section_ring.section_field(self.nominal_head_u, overlap)
+                if overlap:
+                    self.helix_length = min(bounds[-1], self.vertical_section[0][-1] + self.outlet_length_budget)
+                    bounds *= self.helix_length / bounds[-1]
             else:
                 bounds, field, end_phase = self.bent.field(self.nominal_head_u, length,
                                                            section_compression=self.compression + self.compaction_trim)
@@ -415,6 +437,14 @@ class AcuteArcTransition(HelixArcTransition):
                 self.field = np.r_[bounds, self.L], np.vstack([field, [0., 0.]])
             self.next_field_s = self.time + .1
         bounds, field = self.field
+        if self.stage == 'outlet_roll' and not self.acute.outlet_use_spare_length:
+            # Shape the two end ramps without changing the material interval or
+            # the drive clock. Use two link spans to blend into the bearing arc.
+            mid = (bounds[1:] + bounds[:-1])*.5
+            distance = np.minimum(mid, np.maximum(0., self.helix_length-mid))
+            end = np.clip(1. - distance / (2.*self.l), 0., 1.)
+            end[mid >= self.helix_length] = 0.
+            field = field * (1. + .30*self.outlet_weight*end*end)[:, None]
         if self.mode == 'arc' and self.acute.encoder_tip_clearance:
             field = self.steer_tip(bounds, field, dt)
         return self.curve.sampled_targets(bounds, field, self.phase)
@@ -493,6 +523,7 @@ class AcuteArcTransition(HelixArcTransition):
                     feed_fraction=self.feed_fraction,
                     section_weight=self.section_weight,
                     section_handoff_u_m=self.section_handoff_u,
+                    outlet_weight=self.outlet_weight,
                     released_tail_joint=self.release_joint, released_tail_count=self.release_count,
                     requested_max_deg=self.target_angle_max,
                     curvature_frame_rad=None if self.bent is None else self.bent.gamma,

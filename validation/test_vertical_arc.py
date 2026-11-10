@@ -7,6 +7,7 @@ from snake_control.acute_arc_transition import AcuteArcTransition, AcuteOptions
 from snake_control.vertical_arc_transition import VerticalArcTransition,VerticalArcOptions
 from snake_control.helix_arc_transition import HelixArcTransition
 from snake_control.vertical_ring_manual import VerticalRingManual
+from snake_control.vertical_ring_manual import vertical_short_options
 
 
 class VerticalArcTests(unittest.TestCase):
@@ -37,6 +38,31 @@ class VerticalArcTests(unittest.TestCase):
         self.assertFalse(manual.advance(.02, 3.04, 2.9, q))
         manual.pause()
         self.assertFalse(manual.running)
+
+    def test_standalone_vertical_controller_matches_research_at_outlet(self):
+        from codes import Rolling_Arc_Real as real
+
+        angles = np.degrees(self.g.targets([helix(self.g.body_length, .094, .13)], .4))
+        shared = VerticalRingManual(angles, self.lengths, vertical_short_options(), helix_targets_deg=angles)
+        standalone = real.VerticalRingManual(angles, self.lengths, real.vertical_short_options(), helix_targets_deg=angles)
+        for manual in (shared, standalone):
+            core = manual.core
+            core.wrap_radius -= .003
+            core.pitch = .075
+            core.section_ring = core.make_section()
+            core.vertical_section = core.section_ring.section_field(-.055)[:2]
+            core.helix_length = core.vertical_section[0][-1]
+            core.enabled = core.ring_mask()
+            core.enter('vertical_ring')
+            self.assertTrue(manual.begin_bend(.24))
+            self.assertTrue(manual.confirm_outlet())
+            manual.toggle_continuous()
+        for i in range(100):
+            now = i*.02
+            self.assertTrue(shared.advance(.02, now, now, angles))
+            self.assertTrue(standalone.advance(.02, now, now, angles))
+            np.testing.assert_allclose(shared.targets, standalone.targets, rtol=0., atol=1e-9)
+            np.testing.assert_array_equal(shared.enabled, standalone.enabled)
 
     def test_frame_finite_and_continuous_across_vertical_bend_and_horizontal(self):
         b=BentHelixCurve(.094,.13);gammas=[]

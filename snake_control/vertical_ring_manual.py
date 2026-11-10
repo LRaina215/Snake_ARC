@@ -12,6 +12,14 @@ import numpy as np
 from .acute_arc_transition import AcuteArcTransition, AcuteOptions
 
 
+def vertical_short_options():
+    """Shared profile verified on the 18-joint, 110 mm short-elbow scene."""
+    return AcuteOptions(reference_bend_radius_m=.13, ring_turns=1.12, ring_radius_delta_m=-.003,
+                        section_shell_diameter_m=.058, section_keep_curvature=True,
+                        progressive_tail_release=True, section_before_bend=True,
+                        outlet_end_correction=True, outlet_use_spare_length=True)
+
+
 class VerticalRingManual:
     def __init__(self, measured_deg, lengths, options=AcuteOptions(), *, helix_targets_deg=None,
                  step_s=1., max_feedback_age_s=.8):
@@ -37,6 +45,10 @@ class VerticalRingManual:
     def enabled(self):
         return self.core.enabled.copy()
 
+    @property
+    def stage(self):
+        return self.core.stage
+
     def pause(self):
         self.running = False
         self.step_remaining_s = 0.
@@ -57,6 +69,9 @@ class VerticalRingManual:
             return False
         self.core.begin_bend(nominal_head_u)
         return True
+
+    def confirm_outlet(self):
+        return self.core.confirm_outlet()
 
     def advance(self, dt, now, feedback_time, measured_deg):
         if not math.isfinite(dt) or dt <= 0.:
