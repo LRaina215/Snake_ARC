@@ -1,0 +1,1641 @@
+{
+  "scene": "18 joints, 110 mm pipe, 105 mm centreline elbow",
+  "cases": [
+    {
+      "case": "approved_release01",
+      "phase_rad": 0.4,
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.12,
+        "ring_radius_delta_m": -0.003,
+        "reference_bend_radius_m": 0.13,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0,
+        "corner_shape_delay_m": 0.0,
+        "exit_shape_delay_m": 0.0,
+        "encoder_spacing": false,
+        "encoder_spacing_start_m": 0.21,
+        "encoder_compaction": false,
+        "initial_hold_s": 2.0,
+        "encoder_tip_clearance": false,
+        "encoder_feed_sync": false,
+        "section_shell_diameter_m": 0.058,
+        "section_endpoint_allowance": false,
+        "section_handoff_from_tilt": false,
+        "section_keep_curvature": true,
+        "progressive_tail_release": true
+      },
+      "summary": {
+        "physically_cleared": true,
+        "clear_time_s": 86.10100000004707,
+        "physical_progress_m": 1.126670643832126,
+        "correct_gait_cleared": false,
+        "advance_m": 0.12757709311107518,
+        "continued_72mm": true,
+        "complete_sequence": false,
+        "continuation_time_s": 90.75100000006927,
+        "vertical_supported_ring_frames": 147,
+        "last_stable_ring_time_s": 61.15099999994818,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.022213363265089367,
+              0.13341525299477142
+            ],
+            "wrap_deg": [
+              768.8151243200142,
+              788.4364385655003
+            ],
+            "span_m": [
+              0.2772684910763833,
+              0.2992963389434762
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253404608105665
+          },
+          "form_ring": {
+            "time_s": [
+              10.000999999999896,
+              17.950999999998956
+            ],
+            "head_xz_delta_m": [
+              0.014384541830163022,
+              0.11611433875363031
+            ],
+            "wrap_deg": [
+              755.7790247672937,
+              781.0502253948614
+            ],
+            "span_m": [
+              0.19536156357545842,
+              0.28621339231966836
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 21.29880138796619
+          },
+          "release_tail": {
+            "time_s": [
+              18.000999999999017,
+              46.900999999981394
+            ],
+            "head_xz_delta_m": [
+              0.0105923581748823,
+              0.37982789670904005
+            ],
+            "wrap_deg": [
+              341.71997222344504,
+              778.6229338632694
+            ],
+            "span_m": [
+              0.0998792497111971,
+              0.2085944775265407
+            ],
+            "ring_frames": 1,
+            "maximum_curvature_per_m": 21.588720096748013
+          },
+          "vertical_ring": {
+            "time_s": [
+              46.95099999998128,
+              52.35099999996869
+            ],
+            "head_xz_delta_m": [
+              -0.005951764868383724,
+              0.05555845701836781
+            ],
+            "wrap_deg": [
+              340.9033344673573,
+              362.5313664327553
+            ],
+            "span_m": [
+              0.09373065268625935,
+              0.11253716895948562
+            ],
+            "ring_frames": 46,
+            "maximum_curvature_per_m": 21.584222753681882
+          },
+          "bend_shift": {
+            "time_s": [
+              52.400999999968576,
+              152.95100000036626
+            ],
+            "head_xz_delta_m": [
+              1.4768387830571488,
+              0.10911410131470367
+            ],
+            "wrap_deg": [
+              316.6740698286656,
+              362.37420957215903
+            ],
+            "span_m": [
+              0.0528138409470021,
+              0.10775451612396858
+            ],
+            "ring_frames": 899,
+            "maximum_curvature_per_m": 21.442284841300932
+          }
+        },
+        "furthest_last_envelope_m": 1.2447303190644678,
+        "max_tracking_deg": 27.33206527071695,
+        "max_joint_deg": 87.61855968795025,
+        "max_unlimited_reference_deg": 99.80771878210942,
+        "passive_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 0,
+        "saturated_frames": 3059,
+        "exit_x_m": 0.10499999700265733,
+        "failure": null,
+        "enabled_count_min_max": [
+          9,
+          18
+        ],
+        "total_pipe_normal_peak_n": 319.64624397071145,
+        "last_s": 152.95100000036626,
+        "samples": 3060,
+        "enable_changes": [
+          {
+            "time_s": 24.801000000007328,
+            "stage": "release_tail",
+            "off": [
+              18
+            ],
+            "on": []
+          },
+          {
+            "time_s": 27.801000000010994,
+            "stage": "release_tail",
+            "off": [
+              17
+            ],
+            "on": []
+          },
+          {
+            "time_s": 30.80100000001466,
+            "stage": "release_tail",
+            "off": [
+              16
+            ],
+            "on": []
+          },
+          {
+            "time_s": 33.801000000011925,
+            "stage": "release_tail",
+            "off": [
+              15
+            ],
+            "on": []
+          },
+          {
+            "time_s": 36.80100000000493,
+            "stage": "release_tail",
+            "off": [
+              14
+            ],
+            "on": []
+          },
+          {
+            "time_s": 39.80099999999794,
+            "stage": "release_tail",
+            "off": [
+              13
+            ],
+            "on": []
+          },
+          {
+            "time_s": 42.80099999999095,
+            "stage": "release_tail",
+            "off": [
+              12
+            ],
+            "on": []
+          },
+          {
+            "time_s": 45.80099999998396,
+            "stage": "release_tail",
+            "off": [
+              11
+            ],
+            "on": []
+          },
+          {
+            "time_s": 61.7009999999469,
+            "stage": "bend_shift",
+            "off": [
+              10
+            ],
+            "on": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "approved_release_endpoints",
+      "phase_rad": 0.4,
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.12,
+        "ring_radius_delta_m": -0.003,
+        "reference_bend_radius_m": 0.13,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0,
+        "corner_shape_delay_m": 0.0,
+        "exit_shape_delay_m": 0.0,
+        "encoder_spacing": false,
+        "encoder_spacing_start_m": 0.21,
+        "encoder_compaction": false,
+        "initial_hold_s": 2.0,
+        "encoder_tip_clearance": false,
+        "encoder_feed_sync": false,
+        "section_shell_diameter_m": 0.058,
+        "section_endpoint_allowance": true,
+        "section_handoff_from_tilt": false,
+        "section_keep_curvature": true,
+        "progressive_tail_release": true
+      },
+      "summary": {
+        "physically_cleared": true,
+        "clear_time_s": 92.35100000007691,
+        "physical_progress_m": 0.8596193128576713,
+        "correct_gait_cleared": false,
+        "advance_m": 0.028891075294454227,
+        "continued_72mm": false,
+        "complete_sequence": false,
+        "continuation_time_s": null,
+        "vertical_supported_ring_frames": 145,
+        "last_stable_ring_time_s": 61.15099999994818,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.022213363265089367,
+              0.13341525299477142
+            ],
+            "wrap_deg": [
+              768.8151243200142,
+              788.4364385655003
+            ],
+            "span_m": [
+              0.2772684910763833,
+              0.2992963389434762
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253404608105665
+          },
+          "form_ring": {
+            "time_s": [
+              10.000999999999896,
+              17.950999999998956
+            ],
+            "head_xz_delta_m": [
+              0.014384541830163022,
+              0.11611433875363031
+            ],
+            "wrap_deg": [
+              755.7790247672937,
+              781.0502253948614
+            ],
+            "span_m": [
+              0.19536156357545842,
+              0.28621339231966836
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 21.29880138796619
+          },
+          "release_tail": {
+            "time_s": [
+              18.000999999999017,
+              46.900999999981394
+            ],
+            "head_xz_delta_m": [
+              0.0105923581748823,
+              0.37982789670904005
+            ],
+            "wrap_deg": [
+              341.71997222344504,
+              778.6229338632694
+            ],
+            "span_m": [
+              0.0998792497111971,
+              0.2085944775265407
+            ],
+            "ring_frames": 1,
+            "maximum_curvature_per_m": 21.588720096748013
+          },
+          "vertical_ring": {
+            "time_s": [
+              46.95099999998128,
+              52.35099999996869
+            ],
+            "head_xz_delta_m": [
+              -0.005951764868383724,
+              0.05555845701836781
+            ],
+            "wrap_deg": [
+              340.9033344673573,
+              362.5313664327553
+            ],
+            "span_m": [
+              0.09373065268625935,
+              0.11253716895948562
+            ],
+            "ring_frames": 46,
+            "maximum_curvature_per_m": 21.584222753681882
+          },
+          "bend_shift": {
+            "time_s": [
+              52.400999999968576,
+              139.9510000003042
+            ],
+            "head_xz_delta_m": [
+              1.2408930808780867,
+              0.13144333793806218
+            ],
+            "wrap_deg": [
+              322.2872183626705,
+              364.9633808914765
+            ],
+            "span_m": [
+              0.05141649347278142,
+              0.10749640368149982
+            ],
+            "ring_frames": 1573,
+            "maximum_curvature_per_m": 21.442284841300932
+          }
+        },
+        "furthest_last_envelope_m": 0.9671659991147351,
+        "max_tracking_deg": 27.33206527071695,
+        "max_joint_deg": 87.77367114370116,
+        "max_unlimited_reference_deg": 99.80771878210942,
+        "passive_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 288,
+        "saturated_frames": 2799,
+        "exit_x_m": 0.10499999700265733,
+        "failure": null,
+        "enabled_count_min_max": [
+          10,
+          18
+        ],
+        "total_pipe_normal_peak_n": 319.64624397071145,
+        "last_s": 139.9510000003042,
+        "samples": 2800,
+        "enable_changes": [
+          {
+            "time_s": 24.801000000007328,
+            "stage": "release_tail",
+            "off": [
+              18
+            ],
+            "on": []
+          },
+          {
+            "time_s": 27.801000000010994,
+            "stage": "release_tail",
+            "off": [
+              17
+            ],
+            "on": []
+          },
+          {
+            "time_s": 30.80100000001466,
+            "stage": "release_tail",
+            "off": [
+              16
+            ],
+            "on": []
+          },
+          {
+            "time_s": 33.801000000011925,
+            "stage": "release_tail",
+            "off": [
+              15
+            ],
+            "on": []
+          },
+          {
+            "time_s": 36.80100000000493,
+            "stage": "release_tail",
+            "off": [
+              14
+            ],
+            "on": []
+          },
+          {
+            "time_s": 39.80099999999794,
+            "stage": "release_tail",
+            "off": [
+              13
+            ],
+            "on": []
+          },
+          {
+            "time_s": 42.80099999999095,
+            "stage": "release_tail",
+            "off": [
+              12
+            ],
+            "on": []
+          },
+          {
+            "time_s": 45.80099999998396,
+            "stage": "release_tail",
+            "off": [
+              11
+            ],
+            "on": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "approved_release_fixed",
+      "phase_rad": 0.4,
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.12,
+        "ring_radius_delta_m": -0.003,
+        "reference_bend_radius_m": 0.13,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0,
+        "corner_shape_delay_m": 0.0,
+        "exit_shape_delay_m": 0.0,
+        "encoder_spacing": false,
+        "encoder_spacing_start_m": 0.21,
+        "encoder_compaction": false,
+        "initial_hold_s": 2.0,
+        "encoder_tip_clearance": false,
+        "encoder_feed_sync": false,
+        "section_shell_diameter_m": 0.058,
+        "section_endpoint_allowance": false,
+        "section_handoff_from_tilt": false,
+        "section_keep_curvature": true,
+        "progressive_tail_release": true,
+        "section_before_bend": true
+      },
+      "summary": {
+        "physically_cleared": true,
+        "clear_time_s": 92.75100000007882,
+        "physical_progress_m": 1.3627226525057816,
+        "correct_gait_cleared": false,
+        "advance_m": 0.12991286673121555,
+        "continued_72mm": true,
+        "complete_sequence": false,
+        "continuation_time_s": 97.35100000010078,
+        "vertical_supported_ring_frames": 67,
+        "last_stable_ring_time_s": 60.450999999949815,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.022213363265089367,
+              0.13341525299477142
+            ],
+            "wrap_deg": [
+              768.8151243200142,
+              788.4364385655003
+            ],
+            "span_m": [
+              0.2772684910763833,
+              0.2992963389434762
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253404608105665
+          },
+          "form_ring": {
+            "time_s": [
+              10.000999999999896,
+              17.950999999998956
+            ],
+            "head_xz_delta_m": [
+              0.014384541830163022,
+              0.11611433875363031
+            ],
+            "wrap_deg": [
+              755.7790247672937,
+              781.0502253948614
+            ],
+            "span_m": [
+              0.19536156357545842,
+              0.28621339231966836
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 21.29880138796619
+          },
+          "release_tail": {
+            "time_s": [
+              18.000999999999017,
+              49.55099999997522
+            ],
+            "head_xz_delta_m": [
+              0.003518168055762272,
+              0.40561646153653363
+            ],
+            "wrap_deg": [
+              313.1501902817042,
+              778.6229338632694
+            ],
+            "span_m": [
+              0.08871102642601536,
+              0.2085944775265407
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 21.588436738377148
+          },
+          "vertical_ring": {
+            "time_s": [
+              49.6009999999751,
+              54.4509999999638
+            ],
+            "head_xz_delta_m": [
+              -0.015172794749450491,
+              0.031565988546337964
+            ],
+            "wrap_deg": [
+              313.96942623817995,
+              329.1928326012618
+            ],
+            "span_m": [
+              0.0767449572130019,
+              0.09644965906826819
+            ],
+            "ring_frames": 29,
+            "maximum_curvature_per_m": 21.32144393438675
+          },
+          "bend_shift": {
+            "time_s": [
+              54.50099999996368,
+              172.95100000046176
+            ],
+            "head_xz_delta_m": [
+              1.7215569987203647,
+              0.10535320725848152
+            ],
+            "wrap_deg": [
+              312.75383350999874,
+              341.1340332604596
+            ],
+            "span_m": [
+              0.052060484466126565,
+              0.10588852091860135
+            ],
+            "ring_frames": 897,
+            "maximum_curvature_per_m": 21.32275462934678
+          }
+        },
+        "furthest_last_envelope_m": 1.4727681614675057,
+        "max_tracking_deg": 27.398717157214612,
+        "max_joint_deg": 87.79007998536318,
+        "max_unlimited_reference_deg": 99.80771878210942,
+        "passive_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 0,
+        "saturated_frames": 3459,
+        "exit_x_m": 0.10499999700265733,
+        "failure": null,
+        "enabled_count_min_max": [
+          9,
+          18
+        ],
+        "total_pipe_normal_peak_n": 319.64624397071145,
+        "last_s": 172.95100000046176,
+        "samples": 3460,
+        "enable_changes": [
+          {
+            "time_s": 24.801000000007328,
+            "stage": "release_tail",
+            "off": [
+              18
+            ],
+            "on": []
+          },
+          {
+            "time_s": 27.801000000010994,
+            "stage": "release_tail",
+            "off": [
+              17
+            ],
+            "on": []
+          },
+          {
+            "time_s": 30.80100000001466,
+            "stage": "release_tail",
+            "off": [
+              16
+            ],
+            "on": []
+          },
+          {
+            "time_s": 33.801000000011925,
+            "stage": "release_tail",
+            "off": [
+              15
+            ],
+            "on": []
+          },
+          {
+            "time_s": 36.80100000000493,
+            "stage": "release_tail",
+            "off": [
+              14
+            ],
+            "on": []
+          },
+          {
+            "time_s": 39.80099999999794,
+            "stage": "release_tail",
+            "off": [
+              13
+            ],
+            "on": []
+          },
+          {
+            "time_s": 42.80099999999095,
+            "stage": "release_tail",
+            "off": [
+              12
+            ],
+            "on": []
+          },
+          {
+            "time_s": 45.80099999998396,
+            "stage": "release_tail",
+            "off": [
+              11
+            ],
+            "on": []
+          },
+          {
+            "time_s": 48.800999999976966,
+            "stage": "release_tail",
+            "off": [
+              10
+            ],
+            "on": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "approved_release_fixed_phase",
+      "phase_rad": 1.15,
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.12,
+        "ring_radius_delta_m": -0.003,
+        "reference_bend_radius_m": 0.13,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0,
+        "corner_shape_delay_m": 0.0,
+        "exit_shape_delay_m": 0.0,
+        "encoder_spacing": false,
+        "encoder_spacing_start_m": 0.21,
+        "encoder_compaction": false,
+        "initial_hold_s": 2.0,
+        "encoder_tip_clearance": false,
+        "encoder_feed_sync": false,
+        "section_shell_diameter_m": 0.058,
+        "section_endpoint_allowance": false,
+        "section_handoff_from_tilt": false,
+        "section_keep_curvature": true,
+        "progressive_tail_release": true,
+        "section_before_bend": true,
+        "section_seam_clearance": false
+      },
+      "summary": {
+        "physically_cleared": true,
+        "clear_time_s": 89.2510000000621,
+        "physical_progress_m": 1.031326760932679,
+        "correct_gait_cleared": false,
+        "advance_m": 0.0015210967092358398,
+        "continued_72mm": false,
+        "complete_sequence": false,
+        "continuation_time_s": null,
+        "vertical_supported_ring_frames": 34,
+        "last_stable_ring_time_s": 55.650999999961,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.010688029829841975,
+              0.14599868702842
+            ],
+            "wrap_deg": [
+              768.8125143874693,
+              784.3096010626377
+            ],
+            "span_m": [
+              0.277269110795342,
+              0.29978462785566395
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253406168902213
+          },
+          "form_ring": {
+            "time_s": [
+              10.000999999999896,
+              17.950999999998956
+            ],
+            "head_xz_delta_m": [
+              -0.0006319075423299042,
+              0.11885610300144678
+            ],
+            "wrap_deg": [
+              756.7152694844654,
+              783.4021540235319
+            ],
+            "span_m": [
+              0.17698885877213022,
+              0.29041096910083075
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 21.537925890004065
+          },
+          "release_tail": {
+            "time_s": [
+              18.000999999999017,
+              49.55099999997522
+            ],
+            "head_xz_delta_m": [
+              0.00013275522632023862,
+              0.4204428614331326
+            ],
+            "wrap_deg": [
+              321.7932898022053,
+              780.1776965854583
+            ],
+            "span_m": [
+              0.07136657575299554,
+              0.20183097318438348
+            ],
+            "ring_frames": 51,
+            "maximum_curvature_per_m": 21.592714373384794
+          },
+          "vertical_ring": {
+            "time_s": [
+              49.6009999999751,
+              49.6009999999751
+            ],
+            "head_xz_delta_m": [
+              0.0,
+              0.0
+            ],
+            "wrap_deg": [
+              321.2684068775449,
+              321.2684068775449
+            ],
+            "span_m": [
+              0.07084473758696208,
+              0.07084473758696208
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.857684756290876
+          },
+          "bend_shift": {
+            "time_s": [
+              49.650999999974985,
+              149.95100000035194
+            ],
+            "head_xz_delta_m": [
+              1.3729867110317047,
+              0.10578966297973413
+            ],
+            "wrap_deg": [
+              314.511932156389,
+              338.85047225111293
+            ],
+            "span_m": [
+              0.05251519613224651,
+              0.10585453115300092
+            ],
+            "ring_frames": 731,
+            "maximum_curvature_per_m": 21.32595773115324
+          }
+        },
+        "furthest_last_envelope_m": 1.1265727612562375,
+        "max_tracking_deg": 19.057113095042393,
+        "max_joint_deg": 87.60690152806433,
+        "max_unlimited_reference_deg": 100.56484003512425,
+        "passive_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 0,
+        "saturated_frames": 2999,
+        "exit_x_m": 0.10499999700265733,
+        "failure": null,
+        "enabled_count_min_max": [
+          9,
+          18
+        ],
+        "total_pipe_normal_peak_n": 324.62823401087223,
+        "last_s": 149.95100000035194,
+        "samples": 3000,
+        "enable_changes": [
+          {
+            "time_s": 24.801000000007328,
+            "stage": "release_tail",
+            "off": [
+              18
+            ],
+            "on": []
+          },
+          {
+            "time_s": 27.801000000010994,
+            "stage": "release_tail",
+            "off": [
+              17
+            ],
+            "on": []
+          },
+          {
+            "time_s": 30.80100000001466,
+            "stage": "release_tail",
+            "off": [
+              16
+            ],
+            "on": []
+          },
+          {
+            "time_s": 33.801000000011925,
+            "stage": "release_tail",
+            "off": [
+              15
+            ],
+            "on": []
+          },
+          {
+            "time_s": 36.80100000000493,
+            "stage": "release_tail",
+            "off": [
+              14
+            ],
+            "on": []
+          },
+          {
+            "time_s": 39.80099999999794,
+            "stage": "release_tail",
+            "off": [
+              13
+            ],
+            "on": []
+          },
+          {
+            "time_s": 42.80099999999095,
+            "stage": "release_tail",
+            "off": [
+              12
+            ],
+            "on": []
+          },
+          {
+            "time_s": 45.80099999998396,
+            "stage": "release_tail",
+            "off": [
+              11
+            ],
+            "on": []
+          },
+          {
+            "time_s": 48.800999999976966,
+            "stage": "release_tail",
+            "off": [
+              10
+            ],
+            "on": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "approved_release_phase",
+      "phase_rad": 1.15,
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.12,
+        "ring_radius_delta_m": -0.003,
+        "reference_bend_radius_m": 0.13,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0,
+        "corner_shape_delay_m": 0.0,
+        "exit_shape_delay_m": 0.0,
+        "encoder_spacing": false,
+        "encoder_spacing_start_m": 0.21,
+        "encoder_compaction": false,
+        "initial_hold_s": 2.0,
+        "encoder_tip_clearance": false,
+        "encoder_feed_sync": false,
+        "section_shell_diameter_m": 0.058,
+        "section_endpoint_allowance": false,
+        "section_handoff_from_tilt": false,
+        "section_keep_curvature": true,
+        "progressive_tail_release": true
+      },
+      "summary": {
+        "physically_cleared": true,
+        "clear_time_s": 94.60100000008765,
+        "physical_progress_m": 0.8259126194150979,
+        "correct_gait_cleared": false,
+        "advance_m": 0.13068375357978534,
+        "continued_72mm": true,
+        "complete_sequence": false,
+        "continuation_time_s": 98.8010000001077,
+        "vertical_supported_ring_frames": 119,
+        "last_stable_ring_time_s": 55.9509999999603,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.010688029829841975,
+              0.14599868702842
+            ],
+            "wrap_deg": [
+              768.8125143874693,
+              784.3096010626377
+            ],
+            "span_m": [
+              0.277269110795342,
+              0.29978462785566395
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253406168902213
+          },
+          "form_ring": {
+            "time_s": [
+              10.000999999999896,
+              17.950999999998956
+            ],
+            "head_xz_delta_m": [
+              -0.0006319075423299042,
+              0.11885610300144678
+            ],
+            "wrap_deg": [
+              756.7152694844654,
+              783.4021540235319
+            ],
+            "span_m": [
+              0.17698885877213022,
+              0.29041096910083075
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 21.537925890004065
+          },
+          "release_tail": {
+            "time_s": [
+              18.000999999999017,
+              46.900999999981394
+            ],
+            "head_xz_delta_m": [
+              0.013995166693656469,
+              0.40553683622402836
+            ],
+            "wrap_deg": [
+              356.6013252302726,
+              780.1776965854583
+            ],
+            "span_m": [
+              0.09364282257380752,
+              0.20177659737250608
+            ],
+            "ring_frames": 14,
+            "maximum_curvature_per_m": 21.59272205021813
+          },
+          "vertical_ring": {
+            "time_s": [
+              46.95099999998128,
+              47.350999999980345
+            ],
+            "head_xz_delta_m": [
+              -0.00020465590353273277,
+              0.013006197867456493
+            ],
+            "wrap_deg": [
+              358.9815994042801,
+              360.9587893624239
+            ],
+            "span_m": [
+              0.0940678117755751,
+              0.10219246457896625
+            ],
+            "ring_frames": 6,
+            "maximum_curvature_per_m": 19.658420858353978
+          },
+          "bend_shift": {
+            "time_s": [
+              47.40099999998023,
+              142.95100000031852
+            ],
+            "head_xz_delta_m": [
+              1.1691677830927865,
+              0.10554389622503502
+            ],
+            "wrap_deg": [
+              314.0108870298372,
+              360.1758961931093
+            ],
+            "span_m": [
+              0.0518405597677377,
+              0.10754282723192721
+            ],
+            "ring_frames": 801,
+            "maximum_curvature_per_m": 21.447792884296092
+          }
+        },
+        "furthest_last_envelope_m": 0.9349937401487787,
+        "max_tracking_deg": 17.969054973997967,
+        "max_joint_deg": 87.79082668188518,
+        "max_unlimited_reference_deg": 100.56484003512425,
+        "passive_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 0,
+        "saturated_frames": 2859,
+        "exit_x_m": 0.10499999700265733,
+        "failure": null,
+        "enabled_count_min_max": [
+          9,
+          18
+        ],
+        "total_pipe_normal_peak_n": 324.62823401087223,
+        "last_s": 142.95100000031852,
+        "samples": 2860,
+        "enable_changes": [
+          {
+            "time_s": 24.801000000007328,
+            "stage": "release_tail",
+            "off": [
+              18
+            ],
+            "on": []
+          },
+          {
+            "time_s": 27.801000000010994,
+            "stage": "release_tail",
+            "off": [
+              17
+            ],
+            "on": []
+          },
+          {
+            "time_s": 30.80100000001466,
+            "stage": "release_tail",
+            "off": [
+              16
+            ],
+            "on": []
+          },
+          {
+            "time_s": 33.801000000011925,
+            "stage": "release_tail",
+            "off": [
+              15
+            ],
+            "on": []
+          },
+          {
+            "time_s": 36.80100000000493,
+            "stage": "release_tail",
+            "off": [
+              14
+            ],
+            "on": []
+          },
+          {
+            "time_s": 39.80099999999794,
+            "stage": "release_tail",
+            "off": [
+              13
+            ],
+            "on": []
+          },
+          {
+            "time_s": 42.80099999999095,
+            "stage": "release_tail",
+            "off": [
+              12
+            ],
+            "on": []
+          },
+          {
+            "time_s": 45.80099999998396,
+            "stage": "release_tail",
+            "off": [
+              11
+            ],
+            "on": []
+          },
+          {
+            "time_s": 56.700999999958555,
+            "stage": "bend_shift",
+            "off": [
+              10
+            ],
+            "on": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "approved_release_seam",
+      "phase_rad": 0.4,
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.12,
+        "ring_radius_delta_m": -0.003,
+        "reference_bend_radius_m": 0.13,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0,
+        "corner_shape_delay_m": 0.0,
+        "exit_shape_delay_m": 0.0,
+        "encoder_spacing": false,
+        "encoder_spacing_start_m": 0.21,
+        "encoder_compaction": false,
+        "initial_hold_s": 2.0,
+        "encoder_tip_clearance": false,
+        "encoder_feed_sync": false,
+        "section_shell_diameter_m": 0.058,
+        "section_endpoint_allowance": true,
+        "section_handoff_from_tilt": false,
+        "section_keep_curvature": true,
+        "progressive_tail_release": true,
+        "section_before_bend": true,
+        "section_seam_clearance": true
+      },
+      "summary": {
+        "physically_cleared": false,
+        "clear_time_s": null,
+        "physical_progress_m": 0.0,
+        "correct_gait_cleared": false,
+        "advance_m": 0.0,
+        "continued_72mm": false,
+        "complete_sequence": false,
+        "continuation_time_s": null,
+        "vertical_supported_ring_frames": 4,
+        "last_stable_ring_time_s": null,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.022213363265089367,
+              0.13341525299477142
+            ],
+            "wrap_deg": [
+              768.8151243200142,
+              788.4364385655003
+            ],
+            "span_m": [
+              0.2772684910763833,
+              0.2992963389434762
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253404608105665
+          },
+          "form_ring": {
+            "time_s": [
+              10.000999999999896,
+              17.950999999998956
+            ],
+            "head_xz_delta_m": [
+              0.014384541830163022,
+              0.11611433875363031
+            ],
+            "wrap_deg": [
+              755.7790247672937,
+              781.0502253948614
+            ],
+            "span_m": [
+              0.19536156357545842,
+              0.28621339231966836
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 21.29880138796619
+          },
+          "release_tail": {
+            "time_s": [
+              18.000999999999017,
+              48.050999999978714
+            ],
+            "head_xz_delta_m": [
+              0.007351525139907458,
+              0.34501471726093325
+            ],
+            "wrap_deg": [
+              323.48233147495995,
+              778.6229338632694
+            ],
+            "span_m": [
+              0.08754511111208285,
+              0.2085944775265407
+            ],
+            "ring_frames": 10,
+            "maximum_curvature_per_m": 22.21290919197791
+          },
+          "vertical_ring": {
+            "time_s": [
+              48.1009999999786,
+              149.95100000035194
+            ],
+            "head_xz_delta_m": [
+              -0.006540348827144368,
+              -0.283893268620639
+            ],
+            "wrap_deg": [
+              304.9007272782365,
+              330.9904903905266
+            ],
+            "span_m": [
+              0.09464057243248014,
+              0.20670167226477054
+            ],
+            "ring_frames": 4,
+            "maximum_curvature_per_m": 22.212375804679176
+          }
+        },
+        "furthest_last_envelope_m": -0.10835038740935543,
+        "max_tracking_deg": 42.33415033862847,
+        "max_joint_deg": 87.68911156962248,
+        "max_unlimited_reference_deg": 99.80771878210942,
+        "passive_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 0,
+        "saturated_frames": 2999,
+        "exit_x_m": 0.10499999700265733,
+        "failure": null,
+        "enabled_count_min_max": [
+          10,
+          18
+        ],
+        "total_pipe_normal_peak_n": 319.64624397071145,
+        "last_s": 149.95100000035194,
+        "samples": 3000,
+        "enable_changes": [
+          {
+            "time_s": 24.801000000007328,
+            "stage": "release_tail",
+            "off": [
+              18
+            ],
+            "on": []
+          },
+          {
+            "time_s": 27.801000000010994,
+            "stage": "release_tail",
+            "off": [
+              17
+            ],
+            "on": []
+          },
+          {
+            "time_s": 30.80100000001466,
+            "stage": "release_tail",
+            "off": [
+              16
+            ],
+            "on": []
+          },
+          {
+            "time_s": 33.801000000011925,
+            "stage": "release_tail",
+            "off": [
+              15
+            ],
+            "on": []
+          },
+          {
+            "time_s": 36.80100000000493,
+            "stage": "release_tail",
+            "off": [
+              14
+            ],
+            "on": []
+          },
+          {
+            "time_s": 39.80099999999794,
+            "stage": "release_tail",
+            "off": [
+              13
+            ],
+            "on": []
+          },
+          {
+            "time_s": 42.80099999999095,
+            "stage": "release_tail",
+            "off": [
+              12
+            ],
+            "on": []
+          },
+          {
+            "time_s": 45.80099999998396,
+            "stage": "release_tail",
+            "off": [
+              11
+            ],
+            "on": []
+          }
+        ]
+      }
+    },
+    {
+      "case": "approved_release_seam_smooth",
+      "phase_rad": 0.4,
+      "options": {
+        "ring_pitch_m": 0.075,
+        "ring_turns": 1.12,
+        "ring_radius_delta_m": -0.003,
+        "reference_bend_radius_m": 0.13,
+        "roll_rate_rad_s": -0.5,
+        "feed_m_s": 0.012,
+        "ring_feed_m_s": 0.007,
+        "release_m_s": 0.024,
+        "shoulder_angle_deg": 40.0,
+        "miter_section": false,
+        "lead_length_m": 0.0,
+        "corner_pitch_m": null,
+        "exit_pitch_m": null,
+        "corner_turns": null,
+        "section_compression": 0.0,
+        "corner_shape_delay_m": 0.0,
+        "exit_shape_delay_m": 0.0,
+        "encoder_spacing": false,
+        "encoder_spacing_start_m": 0.21,
+        "encoder_compaction": false,
+        "initial_hold_s": 2.0,
+        "encoder_tip_clearance": false,
+        "encoder_feed_sync": false,
+        "section_shell_diameter_m": 0.058,
+        "section_endpoint_allowance": true,
+        "section_handoff_from_tilt": false,
+        "section_keep_curvature": true,
+        "progressive_tail_release": true,
+        "section_before_bend": true,
+        "section_seam_clearance": true
+      },
+      "summary": {
+        "physically_cleared": false,
+        "clear_time_s": null,
+        "physical_progress_m": 0.0,
+        "correct_gait_cleared": false,
+        "advance_m": 0.0,
+        "continued_72mm": false,
+        "complete_sequence": false,
+        "continuation_time_s": null,
+        "vertical_supported_ring_frames": 10,
+        "last_stable_ring_time_s": 48.800999999976966,
+        "stages": {
+          "common_climb": {
+            "time_s": [
+              0.001,
+              9.950999999999924
+            ],
+            "head_xz_delta_m": [
+              -0.022213363265089367,
+              0.13341525299477142
+            ],
+            "wrap_deg": [
+              768.8151243200142,
+              788.4364385655003
+            ],
+            "span_m": [
+              0.2772684910763833,
+              0.2992963389434762
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 20.253404608105665
+          },
+          "form_ring": {
+            "time_s": [
+              10.000999999999896,
+              17.950999999998956
+            ],
+            "head_xz_delta_m": [
+              0.014384541830163022,
+              0.11611433875363031
+            ],
+            "wrap_deg": [
+              755.7790247672937,
+              781.0502253948614
+            ],
+            "span_m": [
+              0.19536156357545842,
+              0.28621339231966836
+            ],
+            "ring_frames": 0,
+            "maximum_curvature_per_m": 21.29880138796619
+          },
+          "release_tail": {
+            "time_s": [
+              18.000999999999017,
+              48.15099999997848
+            ],
+            "head_xz_delta_m": [
+              0.028090967429584487,
+              0.3934360672169319
+            ],
+            "wrap_deg": [
+              322.84975317725525,
+              778.6229338632694
+            ],
+            "span_m": [
+              0.09514346366909265,
+              0.2085944775265407
+            ],
+            "ring_frames": 5,
+            "maximum_curvature_per_m": 21.97626246776255
+          },
+          "vertical_ring": {
+            "time_s": [
+              48.200999999978364,
+              54.4509999999638
+            ],
+            "head_xz_delta_m": [
+              0.02160514366131222,
+              0.04132334691077144
+            ],
+            "wrap_deg": [
+              323.1388926452652,
+              340.6167605204639
+            ],
+            "span_m": [
+              0.09559489139165733,
+              0.12483362205494664
+            ],
+            "ring_frames": 10,
+            "maximum_curvature_per_m": 21.976930964541186
+          },
+          "bend_shift": {
+            "time_s": [
+              54.50099999996368,
+              149.95100000035194
+            ],
+            "head_xz_delta_m": [
+              0.19350679669597698,
+              0.13695121483514083
+            ],
+            "wrap_deg": [
+              317.9497670837996,
+              355.6434855170903
+            ],
+            "span_m": [
+              0.05647182946561606,
+              0.14089570878492808
+            ],
+            "ring_frames": 1768,
+            "maximum_curvature_per_m": 21.976560718586164
+          }
+        },
+        "furthest_last_envelope_m": 0.06163196072634926,
+        "max_tracking_deg": 36.494175507971775,
+        "max_joint_deg": 87.50398576616251,
+        "max_unlimited_reference_deg": 99.80771878210942,
+        "passive_max_nm": 0.0,
+        "floor_frames": 0,
+        "self_contact_frames": 201,
+        "saturated_frames": 2999,
+        "exit_x_m": 0.10499999700265733,
+        "failure": null,
+        "enabled_count_min_max": [
+          10,
+          18
+        ],
+        "total_pipe_normal_peak_n": 319.64624397071145,
+        "last_s": 149.95100000035194,
+        "samples": 3000,
+        "enable_changes": [
+          {
+            "time_s": 24.801000000007328,
+            "stage": "release_tail",
+            "off": [
+              18
+            ],
+            "on": []
+          },
+          {
+            "time_s": 27.801000000010994,
+            "stage": "release_tail",
+            "off": [
+              17
+            ],
+            "on": []
+          },
+          {
+            "time_s": 30.80100000001466,
+            "stage": "release_tail",
+            "off": [
+              16
+            ],
+            "on": []
+          },
+          {
+            "time_s": 33.801000000011925,
+            "stage": "release_tail",
+            "off": [
+              15
+            ],
+            "on": []
+          },
+          {
+            "time_s": 36.80100000000493,
+            "stage": "release_tail",
+            "off": [
+              14
+            ],
+            "on": []
+          },
+          {
+            "time_s": 39.80099999999794,
+            "stage": "release_tail",
+            "off": [
+              13
+            ],
+            "on": []
+          },
+          {
+            "time_s": 42.80099999999095,
+            "stage": "release_tail",
+            "off": [
+              12
+            ],
+            "on": []
+          },
+          {
+            "time_s": 45.80099999998396,
+            "stage": "release_tail",
+            "off": [
+              11
+            ],
+            "on": []
+          }
+        ]
+      }
+    }
+  ]
+}

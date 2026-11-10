@@ -85,8 +85,15 @@ def render(folder,sheet=False,speed=4.):
             title='急弯 A组·Helix' if acute and folder.name=='helix' else '急弯 B组·整圈ARC' if acute else '竖直Helix→水平ARC'
             draw.text((12,6),f'18关节｜{title}｜t={trace["time"][i]:.1f}s｜{stage}',font=font,fill='#17354b')
             recent=[c for c in commands if c['time_s']<=trace['time'][i]]
-            cmd='自动上行/逐段退尾' if not recent else ('模拟操作：进入弯头' if recent[-1]['command']=='begin_bend' else '人工事件：水平已搭稳，接原逆向解缠/成弧/归中')
+            cmd='自动上行/逐段退尾'
+            if recent:
+                cmd={'begin_bend':'模拟操作：进入弯头','takeover_and_continuous':'实机接口：接管并连续执行'}.get(
+                    recent[-1]['command'],'人工事件：水平已搭稳，接原逆向解缠/成弧/归中')
             phase='' if statuses is None else f'｜相位{statuses[i]["phase_rad"]:.2f}rad'
+            if acute and statuses is not None and statuses[i].get('options',{}).get('section_shell_diameter_m') is not None:
+                phase+=f'｜单截面交接{100*statuses[i].get("section_weight",0.):.0f}%'
+            if acute and statuses is not None and statuses[i].get('options',{}).get('progressive_tail_release'):
+                phase+=f'｜尾端已逐节释放{statuses[i]["released_tail_count"]}关节'
             draw.text((12,33),f'回放{speed:g}倍｜蓝=使能 紫=失能｜{cmd}{phase}',font=small,fill='#385264')
             for v,im in enumerate(images):canvas.paste(im,(v*600,60))
             draw.text((610,70),'沿局部管轴观察（管道仅作显示切片）',font=small,fill='white')

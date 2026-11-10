@@ -14,8 +14,9 @@ def transport(normal,previous_tangent,tangent):
 
 
 class BentHelixCurve:
-    def __init__(self,radius,pitch,bend_radius=.3):
+    def __init__(self,radius,pitch,bend_radius=.3,*,handedness=1):
         self.r=radius;self.pitch=pitch;self.R=bend_radius
+        self.handedness=handedness
         self.previous_tangent=None;self.reference_normal=None;self.gamma=0.
 
     def axis(self,u):
@@ -33,8 +34,8 @@ class BentHelixCurve:
         theta=np.empty(len(v));theta[0]=theta_head
         for i in range(1,len(v)):
             k=1/self.R if 0<head_u-(v[i]+v[i-1])/2<self.R*np.pi/2 else 0.
-            f=-w*(1-self.r*k*math.cos(theta[i-1]))
-            theta[i]=theta[i-1]-dv*w*(1-self.r*k*math.cos(theta[i-1]+.5*dv*f))
+            f=-self.handedness*w*(1-self.r*k*math.cos(theta[i-1]))
+            theta[i]=theta[i-1]-dv*self.handedness*w*(1-self.r*k*math.cos(theta[i-1]+.5*dv*f))
         p,n=self.axis(head_u-v);p+=self.r*(np.cos(theta)[:,None]*n+np.sin(theta)[:,None]*np.array([0.,1.,0.]))
         if section_compression:
             # Flatten the nominal swept curve along the tangent at the wrap
@@ -46,6 +47,10 @@ class BentHelixCurve:
         material=np.r_[0.,np.cumsum(np.linalg.norm(np.diff(p,axis=0),axis=1))]
         s=np.linspace(0,length,max(40,int(length/.0015)+1))
         p=np.column_stack([np.interp(s,material,p[:,j]) for j in range(3)])
+        return self.material_field(s,p)
+
+    def material_field(self,s,p):
+        """Bishop curvature of a backbone already sampled in material length."""
         t=np.gradient(p,s,axis=0,edge_order=2);t/=np.linalg.norm(t,axis=1)[:,None]
         kvec=np.gradient(t,s,axis=0,edge_order=2);kvec-=t*(kvec*t).sum(1)[:,None]
         kappa=np.linalg.norm(kvec,axis=1);norm=kvec/np.maximum(kappa[:,None],1e-10)

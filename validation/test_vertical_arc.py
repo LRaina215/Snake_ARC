@@ -3,9 +3,10 @@ import unittest,math
 import numpy as np
 from snake_control.curve_gait import CurveGait,helix
 from snake_control.bent_helix_curve import BentHelixCurve
-from snake_control.acute_arc_transition import AcuteArcTransition
+from snake_control.acute_arc_transition import AcuteArcTransition, AcuteOptions
 from snake_control.vertical_arc_transition import VerticalArcTransition,VerticalArcOptions
 from snake_control.helix_arc_transition import HelixArcTransition
+from snake_control.vertical_ring_manual import VerticalRingManual
 
 
 class VerticalArcTests(unittest.TestCase):
@@ -13,10 +14,29 @@ class VerticalArcTests(unittest.TestCase):
         self.lengths=[.025]+[.072]*17+[.091];self.g=CurveGait(18,lengths=self.lengths)
 
     def test_bent_reference_straight_limit_matches_existing_helix_integral(self):
-        b=BentHelixCurve(.094,.13);s,k,_=b.field(-.1,self.g.body_length)
-        for roll in (0.,.4,1.57):
-            a=self.g.sampled_targets(s,k,roll);q=self.g.targets([helix(self.g.body_length,.094,.13)],roll)
-            self.assertLess(np.max(abs(np.degrees(a-q))),.3)
+        for handedness in (-1, 1):
+            b=BentHelixCurve(.094,.13,handedness=handedness);s,k,_=b.field(-.1,self.g.body_length)
+            for roll in (0.,.4,1.57):
+                a=self.g.sampled_targets(s,k,roll)
+                q=self.g.targets([helix(self.g.body_length,.094,.13,handed=handedness)],roll)
+                self.assertLess(np.max(abs(np.degrees(a-q))),.3)
+
+    def test_manual_takeover_freezes_clock_during_hold_or_stale_read(self):
+        q = np.degrees(self.g.targets([helix(self.g.body_length, .094, .13)], .4))
+        manual = VerticalRingManual(q, self.lengths, helix_targets_deg=q, step_s=.04)
+        np.testing.assert_allclose(manual.targets, q)
+        self.assertFalse(manual.advance(.02, 3., 3., q))
+        manual.step_once()
+        self.assertFalse(manual.advance(.02, 3., 2., q))
+        self.assertTrue(manual.feedback_wait)
+        self.assertTrue(manual.advance(.02, 3., 3., q))
+        self.assertTrue(manual.advance(.02, 3.02, 3., q))
+        self.assertFalse(manual.advance(.02, 3.04, 3.04, q))
+        self.assertAlmostEqual(manual.core.time, .04)
+        manual.toggle_continuous()
+        self.assertFalse(manual.advance(.02, 3.04, 2.9, q))
+        manual.pause()
+        self.assertFalse(manual.running)
 
     def test_frame_finite_and_continuous_across_vertical_bend_and_horizontal(self):
         b=BentHelixCurve(.094,.13);gammas=[]
@@ -37,6 +57,21 @@ class VerticalArcTests(unittest.TestCase):
         self.assertTrue(enabled.all())
         self.assertAlmostEqual(controller.field[0][-1], self.g.body_length)
         self.assertGreater(np.max(abs(q[-3:])), .3)
+
+    def test_progressive_tail_releases_only_one_joint_per_fresh_read(self):
+        q = self.g.targets([helix(self.g.body_length, .094, .13)], .4)
+        controller = AcuteArcTransition(q, self.lengths, AcuteOptions(progressive_tail_release=True))
+        controller.branch('arc')
+        controller.enter('release_tail')
+        # Let the desired boundary advance while feedback is stale, then check
+        # that it cannot turn off several pending joints on the next read.
+        controller.helix_length = .75
+        _, first = controller.step(.02, q, 1.)
+        _, repeat = controller.step(.02, q, 1.)
+        _, second = controller.step(.02, q, 1.2)
+        np.testing.assert_array_equal(np.flatnonzero(~first), [17])
+        np.testing.assert_array_equal(repeat, first)
+        np.testing.assert_array_equal(np.flatnonzero(~second), [16, 17])
 
     def test_shared_reference_application_and_horizontal_entry_after_localisation(self):
         q=self.g.targets([helix(self.g.body_length,.094,.13)],.4)

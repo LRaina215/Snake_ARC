@@ -58,3 +58,5 @@ python validation/render_vertical_arc.py artifacts/my_short_arc/arc --speed 4
 ```
 
 原始模型、参数、实测状态、目标、角反馈、使能掩码、力矩和事件保存在本机 `artifacts/acute_arc_20261109/`。`run.json` 为运行时记录，`review.json` 用同一版判据离线复核。结论以复核结果为准。实机和现有热键入口未修改。
+
+后续的[单截面承载环与实机接管接口](../vertical_ring_20261110/README.md)沿用上述模型、全身 Helix 对照与出弯口径。

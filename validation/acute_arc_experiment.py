@@ -17,6 +17,7 @@ from snake_control.acute_arc_transition import AcuteArcTransition, AcuteOptions
 from snake_control.curve_gait import CurveGait, helix
 from snake_control.simulation import backbone
 from snake_control.vertical_scene import VerticalScene
+from snake_control.vertical_ring_manual import VerticalRingManual
 from validation.vertical_arc_experiment import json_default
 
 
@@ -250,7 +251,8 @@ def review_saved(folder):
     rows = original['samples']
     with np.load(folder / 'trace.npz') as trace:
         points = trace['points']
-        enabled_count = np.count_nonzero(trace['masks'], axis=1)
+        masks = trace['masks']
+        enabled_count = np.count_nonzero(masks, axis=1)
     for row, body, status in zip(rows, points, statuses):
         start = status.get('wrap_start_m', 0.)
         stop = start + status['wrap_length_m']
@@ -266,6 +268,13 @@ def review_saved(folder):
                   enabled_count_min_max=[int(enabled_count.min()), int(enabled_count.max())],
                   total_pipe_normal_peak_n=max(sum(r['normal_n'].values()) for r in rows),
                   last_s=rows[-1]['time_s'], samples=len(rows))
+    if hypothesis['options'].get('progressive_tail_release') and folder.name == 'arc':
+        changes = []
+        for index in np.flatnonzero(np.any(masks[1:] != masks[:-1], axis=1)) + 1:
+            changes.append(dict(time_s=rows[index]['time_s'], stage=rows[index]['stage'],
+                                off=(np.flatnonzero(masks[index-1] & ~masks[index]) + 1).tolist(),
+                                on=(np.flatnonzero(~masks[index-1] & masks[index]) + 1).tolist()))
+        result['enable_changes'] = changes
     dump(folder / 'review.json', dict(summary=result, evaluation=[
         {key: r[key] for key in ('time_s', 'wrap_deg', 'span_m', 'plane_rms_m', 'ring_shape', 'clear_supported',
                                 'exit_attached', 'last_envelope_x_m', 'physical_progress_m')} for r in rows]))
@@ -281,21 +290,34 @@ def run(args):
     source = root / 'source'
     source.mkdir()
     for name in ('snake_control/acute_arc_transition.py', 'snake_control/bent_helix_curve.py',
-                 'snake_control/curve_gait.py', 'tools/build_vertical_arc_scene.py', __file__):
+                 'snake_control/curve_gait.py', 'snake_control/vertical_ring_manual.py', 'snake_control/section_ring_curve.py',
+                 'tools/build_vertical_arc_scene.py', __file__):
         shutil.copyfile(name, source / Path(name).name)
     options = replace(AcuteOptions(), ring_pitch_m=args.ring_pitch, ring_turns=args.ring_turns,
                       ring_radius_delta_m=args.ring_radius_delta, ring_feed_m_s=args.ring_feed,
                       reference_bend_radius_m=args.reference_radius, miter_section=args.miter_section,
                       lead_length_m=args.lead_length, corner_pitch_m=args.corner_pitch, exit_pitch_m=args.exit_pitch,
-                      corner_turns=args.corner_turns, section_compression=args.section_compression)
+                      corner_turns=args.corner_turns, section_compression=args.section_compression,
+                      corner_shape_delay_m=args.corner_shape_delay, exit_shape_delay_m=args.exit_shape_delay,
+                      encoder_spacing=args.encoder_spacing,
+                      encoder_compaction=args.encoder_compaction,
+                      encoder_tip_clearance=args.encoder_tip_clearance, encoder_feed_sync=args.encoder_feed_sync,
+                      section_shell_diameter_m=args.section_shell_diameter,
+                      section_endpoint_allowance=args.section_endpoint_allowance,
+                      section_handoff_from_tilt=args.section_handoff_from_tilt,
+                      section_keep_curvature=args.section_keep_curvature,
+                      progressive_tail_release=args.progressive_tail_release,
+                      section_before_bend=args.section_before_bend,
+                      section_seam_clearance=args.section_seam_clearance)
     shutil.copyfile(sim.model_path, root / 'model.xml')
     dump(root / 'hypothesis.json', dict(case='acute', scene=args.scene,
-         hypothesis='Only the compact ring may be able to clear the matched elbow',
+         hypothesis='The selected curve can carry the whole robot through the elbow and keep its gait on the outlet',
          diameter_m=2 * model.geom_size[review.horizontal, 0], vertical_axis=[0, 0, 1], horizontal_axis=[1, 0, 0],
          corner_z_m=review.corner_z, entry_z_m=review.entry_z, exit_x_m=review.exit_x,
          meshes=review.bend_meshes, lengths_m=sim.lengths,
          friction=model.geom_friction[review.horizontal], mass_kg=model.body_mass[sim.head:].sum(),
          phase_rad=args.phase, options=options.__dict__,
+         manual_takeover=args.manual_takeover,
          acceptance='actual last shell clears and supported by horizontal pipe; 72 mm after exit with correct shape',
          shape_limits=dict(turn_deg=[325,395], axial_span_m=.100, plane_rms_m=.027, max_radius_m=.170)))
     gait = CurveGait(18, lengths=sim.lengths)
@@ -335,27 +357,45 @@ def run(args):
     common_climb = common_records[0][-1]['head_z_m'] - common_records[0][40]['head_z_m']
     print(f'common climb after settle: {common_climb:.3f} m', flush=True)
     for mode in args.modes:
-        core = deepcopy(common_core)
-        core.branch(mode)
         mujoco.mj_setState(model, data, saved, state)
         mujoco.mj_forward(model, data)
         q, mask = common_q.copy(), common_mask.copy()
         records = tuple(list(stream) for stream in common_records)
         events = []
+        manual = None
+        if args.manual_takeover and mode == 'arc':
+            initial_feedback = np.degrees(data.qpos[sim.drive.qadr])
+            manual = VerticalRingManual(initial_feedback, sim.lengths, options, helix_targets_deg=np.degrees(q))
+            manual.toggle_continuous()
+            core = manual.core
+            events.append(dict(time_s=float(data.time), command='takeover_and_continuous',
+                               source='hardware-facing command adapter'))
+        else:
+            core = deepcopy(common_core)
+            core.branch(mode)
         failure = None
         previous = None
         low_since = None
+        feedback_time = float(data.time)
         for tick in range(round(10. / timestep), round(args.duration / timestep)):
             if tick % 200 == 0:
                 measured = data.qpos[sim.drive.qadr].copy()
+                feedback_time = float(data.time)
             if tick % 20 == 0:
                 try:
                     nominal_entry = review.corner_z - options.reference_bend_radius_m - .055
                     if core.stage in ('vertical_helix', 'vertical_ring') and data.site('s_head').xpos[2] >= nominal_entry:
-                        core.begin_bend(-.055)
+                        if manual is None:
+                            core.begin_bend(-.055)
+                        else:
+                            manual.begin_bend()
                         events.append(dict(time_s=float(data.time), command='begin_bend',
                                            source='simulated operator observing the marked approach height'))
-                    q, mask = core.step(.02, measured)
+                    if manual is None:
+                        q, mask = core.step(.02, measured, feedback_time)
+                    else:
+                        manual.advance(.02, float(data.time), feedback_time, np.degrees(measured))
+                        q, mask = np.radians(manual.targets), manual.enabled
                 except (ValueError, FloatingPointError, np.linalg.LinAlgError) as exc:
                     failure = str(exc)
                     break
@@ -385,6 +425,8 @@ def run(args):
         dump(out / 'run.json', dict(summary=summary, samples=rows))
         dump(out / 'controller.json', statuses)
         dump(out / 'operator.json', events)
+        if options.progressive_tail_release and mode == 'arc':
+            dump(out / 'tail_release.json', [event for event in core.events if 'released_joint' in event])
         shutil.copyfile(root / 'model.xml', out / 'model.xml')
         shutil.copyfile(root / 'hypothesis.json', out / 'hypothesis.json')
         np.savez_compressed(out / 'trace.npz', qpos=states, qvel=speeds, targets=targets, masks=masks,
@@ -410,8 +452,24 @@ if __name__ == '__main__':
     p.add_argument('--exit-pitch', type=float)
     p.add_argument('--corner-turns', type=float)
     p.add_argument('--section-compression', type=float, default=0.)
+    p.add_argument('--corner-shape-delay', type=float, default=0.)
+    p.add_argument('--exit-shape-delay', type=float, default=0.)
+    p.add_argument('--encoder-spacing', action='store_true')
+    p.add_argument('--encoder-compaction', action='store_true')
+    p.add_argument('--encoder-tip-clearance', action='store_true')
+    p.add_argument('--encoder-feed-sync', action='store_true')
+    p.add_argument('--section-shell-diameter', type=float)
+    p.add_argument('--section-endpoint-allowance', action='store_true')
+    p.add_argument('--section-handoff-from-tilt', action='store_true')
+    p.add_argument('--section-keep-curvature', action='store_true')
+    p.add_argument('--progressive-tail-release', action='store_true')
+    p.add_argument('--section-before-bend', action='store_true')
+    p.add_argument('--section-seam-clearance', action='store_true')
+    p.add_argument('--manual-takeover', action='store_true')
     p.add_argument('--modes', nargs='+', choices=['helix', 'arc'], default=['helix', 'arc'])
     args = p.parse_args()
+    if args.section_before_bend and not (args.progressive_tail_release and args.section_shell_diameter):
+        p.error('--section-before-bend requires --progressive-tail-release and --section-shell-diameter')
     if args.review:
         for folder in args.review:
             print(folder, json.dumps(review_saved(folder), default=json_default), flush=True)
