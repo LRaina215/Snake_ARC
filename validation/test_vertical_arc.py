@@ -9,6 +9,7 @@ from snake_control.vertical_arc_transition import VerticalArcTransition,Vertical
 from snake_control.helix_arc_transition import HelixArcTransition
 from snake_control.vertical_ring_manual import VerticalRingManual
 from snake_control.vertical_ring_manual import vertical_short_options
+from validation.acute_arc_experiment import summarize_straight
 
 
 class VerticalArcTests(unittest.TestCase):
@@ -121,6 +122,17 @@ class VerticalArcTests(unittest.TestCase):
         c.step(.02, changed, 1.2)
         np.testing.assert_array_equal(c.section_feedback[0], positions)
         self.assertFalse(np.array_equal(c.section_feedback[1], correction))
+
+    def test_straight_review_distinguishes_transient_and_sustained_clearance(self):
+        rows = [dict(stage='vertical_ring', time_s=i*.1, ring_center_m=[0.,0.,1.+i*.01],
+                     last_envelope_z_m=.99 if i in (0, 4) else 1.01,
+                     ring_shape=True, supporting_links=[2, 5], floor_force_n=0., self_contacts=[],
+                     normal_n={'vertical': 20.}) for i in range(20)]
+        result = summarize_straight(rows, 2.*math.pi, 1., 'arc')
+        self.assertAlmostEqual(result['first_clear_time_s'], .1)
+        self.assertFalse(result['continuation']['above_feature_all'])
+        self.assertAlmostEqual(result['sustained_continuation']['time_s'][0], .5)
+        self.assertTrue(result['sustained_continuation']['above_feature_all'])
 
     def test_shared_reference_application_and_horizontal_entry_after_localisation(self):
         q=self.g.targets([helix(self.g.body_length,.094,.13)],.4)

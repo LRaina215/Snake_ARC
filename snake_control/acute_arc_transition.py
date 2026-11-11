@@ -54,9 +54,18 @@ class AcuteOptions:
     section_feedback_gain: float = .02
     vertical_use_spare_length: bool = False
     vertical_adaptive_material: bool = False
+    vertical_material_radius_gain: float = .85
+    vertical_material_handoff_m: float = 0.
+    vertical_material_minimum_wrap_deg: float = 0.
+    vertical_material_max_extra_m: float = .060
+    vertical_material_wrap_only: bool = False
+    vertical_material_return_phase_rad: float = 0.
+    vertical_return_advance_m: Optional[float] = None
     section_bearing_advance_m: Optional[float] = None
     section_feedback_during_release: bool = False
     section_preserve_mean_turn: bool = False
+    section_local_handoff: bool = False
+    bend_section_radius_trim_m: float = 0.
 
 
 def observed_ring(measured, lengths, material, start, stop):
@@ -111,9 +120,32 @@ class AcuteArcTransition(HelixArcTransition):
             raise ValueError('Ring section feedback requires the material curve formed before the bend')
         if options.vertical_adaptive_material and not (options.section_feedback_weight and options.vertical_use_spare_length):
             raise ValueError('Vertical material adjustment needs measured section feedback and an end transition')
+        if not 0. <= options.vertical_material_radius_gain <= 1.:
+            raise ValueError('Invalid ring radius response gain')
+        if options.vertical_material_handoff_m < 0.:
+            raise ValueError('Invalid material handoff length')
+        if not 0. <= options.vertical_material_minimum_wrap_deg <= 360.:
+            raise ValueError('Material allocation requires a valid wrap target')
+        if not math.isfinite(options.vertical_material_max_extra_m) or options.vertical_material_max_extra_m <= 0.:
+            raise ValueError('Invalid limit for added ring material')
+        if options.vertical_material_wrap_only and not (options.vertical_adaptive_material and
+                                                        options.vertical_material_minimum_wrap_deg):
+            raise ValueError('Wrap-based allocation requires adaptive material and a wrap target')
+        if not math.isfinite(options.vertical_material_return_phase_rad) or options.vertical_material_return_phase_rad < 0.:
+            raise ValueError('Invalid material return phase span')
+        if options.section_local_handoff and not options.section_before_bend:
+            raise ValueError('Local handoff requires a separately constructed bearing ring')
+        if options.bend_section_radius_trim_m < 0. or (options.bend_section_radius_trim_m and
+                                                       not options.vertical_use_spare_length):
+            raise ValueError('Bend reshaping requires a fixed material interval with spare arc length')
         if options.section_bearing_advance_m is not None and not 0. <= options.section_bearing_advance_m <= options.ring_pitch_m:
             raise ValueError('Bearing advance must fit inside the available axial offset')
+        if options.vertical_return_advance_m is not None and (not options.vertical_adaptive_material or
+                not 0. < options.vertical_return_advance_m < (options.section_bearing_advance_m or 0.)):
+            raise ValueError('Return advance requires an adaptive ring and a smaller bearing advance')
         super().__init__(measured, lengths, HelixArcOptions(target_rate_deg_s=45.))
+        if options.bend_section_radius_trim_m >= self.radius + min(0., options.ring_radius_delta_m):
+            raise ValueError('Bend reshaping must retain a positive ring radius')
         self.acute = options
         self.stage = 'common_climb'
         self.mode = 'common'
@@ -145,6 +177,7 @@ class AcuteArcTransition(HelixArcTransition):
         self.release_joint = None
         self.release_count = 0
         self.vertical_section = None
+        self.ring_formed_time = None
         self.outlet_weight = 0.
         self.outlet_length_budget = 0.
         self.section_feedback_time = None
@@ -157,6 +190,9 @@ class AcuteArcTransition(HelixArcTransition):
         self.ring_radius_filtered = None
         self.ring_turn_error_filtered = 0.
         self.ring_overlap_offset = 0.
+        self.ring_narrow_since_phase = None
+        self.ring_material_extended = False
+        self.vertical_advance_trim = 0.
 
     def branch(self, mode):
         self.mode = mode
@@ -179,12 +215,14 @@ class AcuteArcTransition(HelixArcTransition):
             return False
         last = int(np.flatnonzero(self.enabled)[-1])
         if last + 1 < self.n:
-            self.outlet_length_budget = max(0., self.curve.s[last + 1] - self.helix_length - .001)
+            baseline_end = self.vertical_section[0][-1] if self.acute.vertical_use_spare_length else self.helix_length
+            self.outlet_length_budget = max(0., self.curve.s[last + 1] - baseline_end - .001)
         self.enter('outlet_roll')
         return True
 
     def make_section(self):
-        return SectionRingCurve(self.wrap_radius, self.pitch, self.acute.reference_bend_radius_m,
+        pitch = self.acute.ring_pitch_m if self.acute.section_local_handoff else self.pitch
+        return SectionRingCurve(self.wrap_radius, pitch, self.acute.reference_bend_radius_m,
                                 self.l, self.acute.section_shell_diameter_m, handedness=self.handedness,
                                 endpoint_allowance=self.acute.section_endpoint_allowance,
                                 seam_clearance=self.acute.section_seam_clearance,
@@ -195,7 +233,8 @@ class AcuteArcTransition(HelixArcTransition):
         w = min(self.elapsed / 8., 1.)
         w = w * w * (3. - 2. * w)
         self.wrap_radius = self.radius + w * opt.ring_radius_delta_m
-        self.pitch = self.fit['pitch'] + w * (opt.ring_pitch_m - self.fit['pitch'])
+        if not opt.section_local_handoff:
+            self.pitch = self.fit['pitch'] + w * (opt.ring_pitch_m - self.fit['pitch'])
         return w
 
     def form_ring(self, dt):
@@ -245,6 +284,7 @@ class AcuteArcTransition(HelixArcTransition):
                                     feedback_time_s=feedback_time))
         if self.helix_length <= retained + 1e-9 and np.array_equal(mask, self.ring_mask()):
             self.enter('vertical_ring')
+            self.ring_formed_time = self.time
         return mask
 
     def ring_mask(self):
@@ -266,16 +306,23 @@ class AcuteArcTransition(HelixArcTransition):
         first_unused = int(np.searchsorted(self.curve.s, end, side='left'))
         return max(0., self.curve.s[first_unused] - end - .001)
 
+    def ring_spare_overlap(self):
+        if not self.acute.vertical_use_spare_length or self.ring_formed_time is None:
+            return 0.
+        age = self.time - self.ring_formed_time
+        w = np.clip(age * self.wrap_radius * abs(self.acute.roll_rate_rad_s) / self.l, 0., 1.)
+        return self.ring_spare_length() * w*w*(3. - 2.*w)
+
     def vertical_section_reference(self, feedback_time=None):
         cut, compact = self.vertical_section
         if self.acute.vertical_use_spare_length and self.stage == 'vertical_ring':
             # Extend the end of the curve within the existing torque mask.
             # Keep both axial ramps, including the clearance across the overlap.
-            w = np.clip(self.elapsed * self.wrap_radius * abs(self.acute.roll_rate_rad_s) / self.l, 0., 1.)
-            overlap = self.ring_spare_length() * w*w*(3. - 2.*w) + self.ring_overlap_offset
+            overlap = self.ring_spare_overlap() + self.ring_overlap_offset
             if overlap > 0.:
-                cut, compact, _ = self.section_ring.section_field(-.055, overlap,
-                                                                  self.wrap_radius + self.ring_radius_offset)
+                bearing = self.section_ring.bearing_advance_m - self.vertical_advance_trim
+                cut, compact, _ = self.section_ring.section_field(
+                    -.055, overlap, self.wrap_radius + self.ring_radius_offset, bearing_advance_m=bearing)
                 self.helix_length = cut[-1]
         nominal = self.acute.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
         lead = min(nominal, self.helix_length)
@@ -374,7 +421,7 @@ class AcuteArcTransition(HelixArcTransition):
         return self.curve.sampled_targets(bounds, field, self.phase)
 
     def observe_ring_material(self, geometry, lengths, coverage, dt):
-        """Estimate material demand of a nearly circular ring from its own shape."""
+        """Estimate material demand of the active ring from its own shape."""
         radius, residual, center = section_circle(geometry['fit_projected'])
         material = np.r_[0., np.cumsum(lengths)]
         coords = np.linspace(0., coverage, 65)
@@ -383,6 +430,20 @@ class AcuteArcTransition(HelixArcTransition):
         turn = abs(azimuth[-1] - azimuth[0])
         self.section_feedback_diagnostic.update(observed_radius_m=radius, circle_residual_m=residual,
                                                 observed_ring_wrap_deg=math.degrees(turn))
+        if self.acute.vertical_material_wrap_only:
+            # The centre only sets the winding origin. On a noncircular
+            # section use the measured arc length per radian, not a radius
+            # change, to decide how much material the ring needs.
+            if .04 < radius < .18 and residual <= .30 * radius and turn > math.pi:
+                weight = 1. - math.exp(-dt / 1.8)
+                error = math.radians(self.acute.vertical_material_minimum_wrap_deg) - turn
+                self.ring_turn_error_filtered += weight * (error - self.ring_turn_error_filtered)
+                change = .25 * coverage * self.ring_turn_error_filtered / turn
+                limit = min(self.acute.vertical_material_max_extra_m, 2. * self.l - self.ring_spare_length())
+                rate = .008 if change > 0. else .002
+                increment = float(np.clip(change, -rate * dt, rate * dt))
+                self.ring_overlap_offset = float(np.clip(self.ring_overlap_offset + increment, 0., limit))
+            return
         if not .04 < radius < .18 or residual > .12 * radius:
             return
         phase = self.phase % (2. * math.pi)
@@ -399,20 +460,42 @@ class AcuteArcTransition(HelixArcTransition):
         difference = radius - phase_radius
         weight = 1. - math.exp(-dt / 1.8)
         self.ring_radius_filtered += weight * (difference - self.ring_radius_filtered)
-        self.ring_turn_error_filtered += weight * (phase_turn - turn - self.ring_turn_error_filtered)
-        desired = np.clip(.85 * (self.ring_radius_filtered - .001), 0., 2. * self.l / (2. * math.pi))
+        target = max(phase_turn, math.radians(self.acute.vertical_material_minimum_wrap_deg))
+        self.ring_turn_error_filtered += weight * (target - turn - self.ring_turn_error_filtered)
+        desired = np.clip(self.acute.vertical_material_radius_gain * (self.ring_radius_filtered - .001),
+                          0., 2. * self.l / (2. * math.pi))
         self.ring_radius_offset += float(np.clip(desired - self.ring_radius_offset, -.003*dt, .003*dt))
         # Widening the reference is only part of the handover. If measured
         # coverage has shortened, extend material without forcing a further
         # global radius release. Use the same ring's phase-calibrated shape.
         gap = self.ring_turn_error_filtered
-        if self.ring_radius_filtered >= .002:
-            requested = self.ring_overlap_offset + radius * gap
+        wider = self.ring_radius_filtered >= .002
+        if wider:
+            self.ring_narrow_since_phase = None
+            # Distribute the correction over several encoder samples. The
+            # ring should not repeatedly give back material at a single roll
+            # phase while the fitted section remains wider than at entry.
+            adjustment = .25 if self.acute.vertical_material_minimum_wrap_deg else 1.
+            requested = self.ring_overlap_offset + adjustment * radius * gap
         else:
-            requested = 0.
+            if self.ring_narrow_since_phase is None:
+                self.ring_narrow_since_phase = self.phase
+            travel = abs(self.phase - self.ring_narrow_since_phase)
+            # A part of the ring can encounter the smaller diameter before
+            # the rest clears the slope. Require narrow evidence across roll
+            # phases before returning material to the passive end.
+            requested = self.ring_overlap_offset if travel < self.acute.vertical_material_return_phase_rad else 0.
         budget = max(0., 2. * self.l - 2. * math.pi * self.ring_radius_offset - self.ring_spare_length())
-        requested = float(np.clip(requested, 0., min(.060, budget)))
-        self.ring_overlap_offset += float(np.clip(requested - self.ring_overlap_offset, -.008*dt, .008*dt))
+        requested = float(np.clip(requested, 0., min(self.acute.vertical_material_max_extra_m, budget)))
+        withdrawal = .002 if wider and self.acute.vertical_material_minimum_wrap_deg else .008
+        self.ring_overlap_offset += float(np.clip(requested - self.ring_overlap_offset, -withdrawal*dt, .008*dt))
+        if self.ring_overlap_offset >= .012:
+            self.ring_material_extended = True
+        if self.ring_material_extended and self.acute.vertical_return_advance_m is not None:
+            returned = float(np.clip(1. - self.ring_overlap_offset / .012, 0., 1.))
+            difference = self.section_ring.bearing_advance_m - self.acute.vertical_return_advance_m
+            wanted_trim = returned * difference
+            self.vertical_advance_trim += float(np.clip(wanted_trim - self.vertical_advance_trim, -.006*dt, .006*dt))
 
     def update_corner_section(self):
         opt = self.acute
@@ -574,10 +657,37 @@ class AcuteArcTransition(HelixArcTransition):
             if self.section_ring is not None:
                 length = self.acute.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
             if self.vertical_section is not None:
-                overlap = self.outlet_weight * self.outlet_length_budget if self.acute.outlet_use_spare_length else 0.
-                bounds, field, end_phase = self.section_ring.section_field(self.nominal_head_u, overlap)
+                reserve = self.ring_spare_overlap()
+                outlet = self.outlet_weight * self.outlet_length_budget if self.acute.outlet_use_spare_length else 0.
+                overlap = max(reserve, outlet)
+                trim = self.acute.bend_section_radius_trim_m
+                if trim:
+                    # Reallocate material from axial separation to planar
+                    # coverage while the bearing ring straddles the bend.
+                    # Maintain the J1–J9 interval and restore the normal outlet.
+                    entry = np.clip((self.nominal_head_u + .055) / (.5 * self.l), 0., 1.)
+                    reshaping = entry*entry*(3. - 2.*entry) * (1. - self.outlet_weight)
+                    delta = trim * reshaping
+                    # The ring is widest while the transported section first
+                    # tilts. Restore axial clearance before the ends overlap.
+                    radius = self.acute.reference_bend_radius_m
+                    centres = (radius * math.pi / 10., radius * 1.05)
+                    distance = min(abs(self.nominal_head_u - centre) for centre in centres)
+                    bump = np.clip(1. - distance / (.30 * self.l), 0., 1.)
+                    compaction = bump*bump*(3. - 2.*bump)
+                    if self.encoder_shape is not None:
+                        shell = self.section_ring.shell_diameter
+                        gap = self.encoder_shape['end_gap_m']
+                        clearance = np.clip((gap - 1.12 * shell) / (.35 * shell), 0., 1.)
+                        entry_bump = np.clip(1. - abs(self.nominal_head_u + .05 * radius) / (.25 * self.l), 0., 1.)
+                        compaction = max(compaction, .6 * clearance * entry_bump**2 * (3. - 2.*entry_bump))
+                    separation = self.section_ring.pitch - 2. * math.pi * delta * compaction
+                    bounds, field, end_phase = self.section_ring.section_field(
+                        self.nominal_head_u, overlap + 2. * math.pi * delta, self.wrap_radius - delta, separation)
+                else:
+                    bounds, field, end_phase = self.section_ring.section_field(self.nominal_head_u, overlap)
                 if overlap or self.acute.vertical_use_spare_length:
-                    self.helix_length = min(bounds[-1], self.vertical_section[0][-1] + self.outlet_length_budget)
+                    self.helix_length = min(bounds[-1], self.vertical_section[0][-1] + max(reserve, self.outlet_length_budget))
                     bounds *= self.helix_length / bounds[-1]
             else:
                 bounds, field, end_phase = self.bent.field(self.nominal_head_u, length,
@@ -647,7 +757,8 @@ class AcuteArcTransition(HelixArcTransition):
         elif self.stage == 'form_ring':
             self.form_ring(dt)
         if ((self.acute.encoder_spacing or self.acute.encoder_compaction or self.acute.encoder_tip_clearance
-             or self.acute.encoder_feed_sync or self.acute.section_handoff_from_tilt) and
+             or self.acute.encoder_feed_sync or self.acute.section_handoff_from_tilt or
+             self.acute.bend_section_radius_trim_m) and
                 self.stage in ('vertical_ring', 'bend_shift') and self.mode == 'arc'):
             self.observe_encoders(feedback_time)
         if self.bent is not None:
@@ -668,6 +779,15 @@ class AcuteArcTransition(HelixArcTransition):
                     ends = self.curve.s[:-2]
                     occupancy = self.helix_length - ends
                     mask = (occupancy >= .008) | (self.enabled & (occupancy >= .003))
+                    handoff = self.acute.vertical_material_handoff_m
+                    if handoff:
+                        # A newly selected boundary hinge begins by following
+                        # its measured angle. Give it the full target only
+                        # when the carrier reaches across its material span.
+                        joining = mask & (ends >= self.vertical_section[0][-1])
+                        weight = np.clip((occupancy[joining] - .008) / handoff, 0., 1.)
+                        weight = weight*weight*(3. - 2.*weight)
+                        desired[joining] = self.measured[joining] + weight * (desired[joining] - self.measured[joining])
                 else:
                     mask = self.enabled & self.ring_mask()
             else:
@@ -690,6 +810,7 @@ class AcuteArcTransition(HelixArcTransition):
                     section_feedback=self.section_feedback_diagnostic,
                     ring_radius_offset_m=self.ring_radius_offset,
                     ring_overlap_offset_m=self.ring_overlap_offset,
+                    vertical_advance_trim_m=self.vertical_advance_trim,
                     section_handoff_u_m=self.section_handoff_u,
                     outlet_weight=self.outlet_weight,
                     released_tail_joint=self.release_joint, released_tail_count=self.release_count,

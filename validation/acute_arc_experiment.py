@@ -23,7 +23,7 @@ from tools.build_vertical_arc_scene import build
 from validation.vertical_arc_experiment import json_default
 from validation.tro_helix_baseline import TroHelixBaseline, REFERENCE
 
-STRAIGHT_SCENES = ('straight', 'straight_wide', 'variable', 'square', 'round_to_square')
+STRAIGHT_SCENES = ('straight', 'straight_wide', 'variable', 'variable_return', 'square', 'round_to_square')
 
 
 def dump(path, value):
@@ -317,8 +317,12 @@ def summarize_straight(rows, rate, feature_exit, mode, square=False):
     times = np.array([r['time_s'] for r in ring])
     shape = np.array([r['ring_shape'] if mode == 'arc' else
                       r['fitted_pitch_m'] >= .095 and r['wrap_deg'] >= 365. for r in ring])
-    allowed = np.flatnonzero(shape) if feature_exit is None else [] if clear is None else [ring.index(clear)]
+    above = np.array([feature_exit is None or r['last_envelope_z_m'] >= feature_exit for r in ring])
+    contact = np.array([bool(r['supporting_links']) for r in ring])
+    collision_free = np.array([not r['self_contacts'] and r['floor_force_n'] <= .1 for r in ring])
+    allowed = np.flatnonzero(shape) if feature_exit is None else np.flatnonzero(above)
     continuation = None
+    sustained = None
     for begin in allowed:
         end = int(np.searchsorted(times, times[begin] + period))
         if end >= len(ring):
@@ -327,30 +331,34 @@ def summarize_straight(rows, rate, feature_exit, mode, square=False):
         corners = sorted({tuple(corner) for r in window for corner in r.get('square_corner_contacts', [])})
         candidate = dict(time_s=[float(times[begin]), float(times[end])],
                             net_up_m=float(height[end] - height[begin]), gait_shape_all=bool(shape[begin:end + 1].all()),
-                            contact_all=all(r['supporting_links'] for r in window),
+                            contact_all=bool(contact[begin:end + 1].all()),
                             square_corners=corners if square else None,
-                            collision_free_all=all(not r['self_contacts'] and r['floor_force_n'] <= .1 for r in window),
-                            above_feature_all=feature_exit is None or
-                            all(r['last_envelope_z_m'] >= feature_exit for r in window))
-        if feature_exit is not None or (candidate['gait_shape_all'] and candidate['contact_all'] and
-                                        candidate['collision_free_all'] and candidate['net_up_m'] > 0. and
-                                        (not square or len(corners) == 4)):
+                            collision_free_all=bool(collision_free[begin:end + 1].all()),
+                            above_feature_all=bool(above[begin:end + 1].all()))
+        valid = (candidate['gait_shape_all'] and candidate['contact_all'] and candidate['collision_free_all'] and
+                 candidate['above_feature_all'] and candidate['net_up_m'] > 0. and (not square or len(corners) == 4))
+        if feature_exit is not None and continuation is None:
             continuation = candidate
+        if valid:
+            sustained = candidate
+            if feature_exit is None:
+                continuation = candidate
             break
     return dict(ring_reached=True, ring_time_s=times[0], ring_net_up_m=float(height[-1] - height[0]),
                 maximum_backslide_m=float(np.max(np.maximum.accumulate(height) - height)),
                 minimum_normal_n=min(r['normal_n']['vertical'] for r in ring),
                 maximum_normal_n=max(r['normal_n']['vertical'] for r in ring),
                 end_envelope_z_m=ring[-1]['last_envelope_z_m'],
-                first_clear_time_s=None if clear is None else clear['time_s'], continuation=continuation)
+                first_clear_time_s=None if clear is None else clear['time_s'], continuation=continuation,
+                sustained_continuation=sustained)
 
 
 def run(args):
     root = args.output
     root.mkdir(parents=True, exist_ok=False)
     model_copy = root / 'model.xml'
-    if args.scene in ('straight_wide', 'variable', 'square', 'round_to_square'):
-        build(args.scene, model_copy, taper_length_m=args.taper_length)
+    if args.scene in ('straight_wide', 'variable', 'variable_return', 'square', 'round_to_square'):
+        build(args.scene, model_copy, taper_length_m=args.taper_length, upper_diameter_m=args.upper_pipe_diameter)
     sim = VerticalScene(args.scene, recorded_model=model_copy if model_copy.exists() else None)
     model, data = sim.model, sim.data
     review = AcuteReview(sim)
@@ -384,13 +392,22 @@ def run(args):
                       section_feedback_weight=args.section_feedback_weight, section_feedback_gain=args.section_feedback_gain,
                       vertical_use_spare_length=args.vertical_use_spare_length,
                       vertical_adaptive_material=args.vertical_adaptive_material,
+                      vertical_material_radius_gain=args.vertical_material_radius_gain,
+                      vertical_material_handoff_m=args.vertical_material_handoff,
+                      vertical_material_minimum_wrap_deg=args.vertical_material_minimum_wrap,
+                      vertical_material_max_extra_m=args.vertical_material_max_extra,
+                      vertical_material_wrap_only=args.vertical_material_wrap_only,
+                      vertical_material_return_phase_rad=args.vertical_material_return_phase,
+                      vertical_return_advance_m=args.vertical_return_advance,
                       section_bearing_advance_m=args.section_bearing_advance,
                       section_feedback_during_release=args.section_feedback_during_release,
-                      section_preserve_mean_turn=args.section_preserve_mean_turn)
+                      section_preserve_mean_turn=args.section_preserve_mean_turn,
+                      section_local_handoff=args.section_local_handoff,
+                      bend_section_radius_trim_m=args.bend_section_radius_trim)
     if not model_copy.exists():
         shutil.copyfile(sim.model_path, model_copy)
     route = model.numeric('pipe_centerline').data.reshape(-1, 4)
-    feature_exit = float(route[-2, 2]) if args.scene in ('variable', 'round_to_square') else None
+    feature_exit = float(route[-2, 2]) if args.scene in ('variable', 'variable_return', 'round_to_square') else None
     pipe = review.vertical if review.straight else review.horizontal
     dump(root / 'hypothesis.json', dict(case='straight' if review.straight else 'acute', scene=args.scene,
          hypothesis=('The measured section maintains ring shape and vertical grip through the vertical course' if review.straight
@@ -563,6 +580,7 @@ if __name__ == '__main__':
     p.add_argument('--phase', type=float, default=.4)
     p.add_argument('--initial-helix-radius', type=float, default=.094)
     p.add_argument('--taper-length', type=float, default=.15)
+    p.add_argument('--upper-pipe-diameter', type=float, default=.140)
     p.add_argument('--ring-pitch', type=float, default=AcuteOptions.ring_pitch_m)
     p.add_argument('--ring-turns', type=float, default=AcuteOptions.ring_turns)
     p.add_argument('--ring-radius-delta', type=float, default=AcuteOptions.ring_radius_delta_m)
@@ -593,14 +611,26 @@ if __name__ == '__main__':
     p.add_argument('--section-feedback-gain', type=float, default=.02)
     p.add_argument('--vertical-use-spare-length', action='store_true')
     p.add_argument('--vertical-adaptive-material', action='store_true')
+    p.add_argument('--vertical-material-radius-gain', type=float, default=AcuteOptions.vertical_material_radius_gain)
+    p.add_argument('--vertical-material-handoff', type=float, default=0.)
+    p.add_argument('--vertical-material-minimum-wrap', type=float, default=0.)
+    p.add_argument('--vertical-material-max-extra', type=float, default=AcuteOptions.vertical_material_max_extra_m)
+    p.add_argument('--vertical-material-wrap-only', action='store_true')
+    p.add_argument('--vertical-material-return-phase', type=float, default=0.)
+    p.add_argument('--vertical-return-advance', type=float)
     p.add_argument('--section-bearing-advance', type=float)
     p.add_argument('--section-feedback-during-release', action='store_true')
     p.add_argument('--section-preserve-mean-turn', action='store_true')
+    p.add_argument('--section-local-handoff', action='store_true')
+    p.add_argument('--bend-section-radius-trim', type=float, default=0.)
     p.add_argument('--manual-takeover', action='store_true')
     p.add_argument('--modes', nargs='+', choices=['helix', 'arc', 'tro'], default=['helix', 'arc'])
     args = p.parse_args()
-    if not 0. < args.taper_length < 2.1:
+    maximum_taper_length = .90 if args.scene == 'variable_return' else 2.1
+    if not 0. < args.taper_length < maximum_taper_length:
         p.error('--taper-length must fit between the taper start and pipe top')
+    if not args.upper_pipe_diameter > .110:
+        p.error('--upper-pipe-diameter must exceed the lower pipe diameter of .110 m')
     if args.section_before_bend and not (args.progressive_tail_release and args.section_shell_diameter):
         p.error('--section-before-bend requires --progressive-tail-release and --section-shell-diameter')
     if args.review:

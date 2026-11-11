@@ -29,7 +29,7 @@ def add_vertical_section(assets, pipe, name, first, last, common):
     ET.SubElement(pipe, 'geom', name=name, type='mesh', mesh=name, **common)
 
 
-def build(scene, output=None, *, taper_length_m=.15):
+def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140):
     root=ET.parse(ROOT/'mujoco_model/Snake_Robot_o18_Tee_straight.xml').getroot()
     root.set('model','vertical-arc18-'+scene)
     world=root.find('worldbody');assets=root.find('asset')
@@ -96,8 +96,8 @@ def build(scene, output=None, *, taper_length_m=.15):
         cylinder.set('size', str(upper_radius))
         cylinder.set('fromto', '0 0 -.2 0 0 4')
         route = np.array([[0.,0.,-.2,upper_radius], [0.,0.,4.,upper_radius]])
-    elif scene in ('variable', 'square', 'round_to_square'):
-        start, upper_radius = 1.9, .070
+    elif scene in ('variable', 'variable_return', 'square', 'round_to_square'):
+        start, upper_radius = 1.9, upper_diameter_m * .5
         end = start + taper_length_m
         cylinder = pipe.find('geom')
         if scene == 'square':
@@ -109,10 +109,11 @@ def build(scene, output=None, *, taper_length_m=.15):
             cylinder.set('fromto', f'0 0 -.2 0 0 {start}')
             theta = np.arange(64) * 2 * np.pi / 64
             directions = np.column_stack([np.cos(theta), np.sin(theta)])
-            if scene == 'variable':
+            if scene in ('variable', 'variable_return'):
                 section = upper_radius * directions
+                plateau_end = end + .30 if scene == 'variable_return' else 4.
                 ET.SubElement(pipe, 'geom', name='pipe_upper', type='cylinder', size=str(upper_radius),
-                              fromto=f'0 0 {end} 0 0 4', **common)
+                              fromto=f'0 0 {end} 0 0 {plateau_end}', **common)
             else:
                 end = 2.2
                 upper_radius = PIPE_RADIUS  # perimeter-equivalent, only for route metadata
@@ -121,8 +122,17 @@ def build(scene, output=None, *, taper_length_m=.15):
                               size=f'{SQUARE_HALF_WIDTH} {SQUARE_HALF_WIDTH} {(4.-end)/2.}',
                               pos=f'0 0 {(4.+end)/2.}', **common)
             add_vertical_section(assets, pipe, 'pipe_taper', (start, PIPE_RADIUS * directions), (end, section), common)
-            route = np.array([[0.,0.,z,r] for z, r in ((-.2, PIPE_RADIUS), (start, PIPE_RADIUS),
-                                                       (end, upper_radius), (4., upper_radius))])
+            route = [(-.2, PIPE_RADIUS), (start, PIPE_RADIUS), (end, upper_radius)]
+            if scene == 'variable_return':
+                end = plateau_end + taper_length_m
+                add_vertical_section(assets, pipe, 'pipe_return', (plateau_end, section),
+                                     (end, PIPE_RADIUS * directions), common)
+                ET.SubElement(pipe, 'geom', name='pipe_exit', type='cylinder', size=str(PIPE_RADIUS),
+                              fromto=f'0 0 {end} 0 0 4', **common)
+                route += [(plateau_end, upper_radius), (end, PIPE_RADIUS), (4., PIPE_RADIUS)]
+            else:
+                route += [(4., upper_radius)]
+            route = np.array([[0.,0.,z,r] for z, r in route])
     else:
         pipe.find('geom').set('fromto','0 0 -.2 0 0 4')
         route=np.array([[0.,0.,z,.055] for z in np.linspace(-.2,4.,85)])
@@ -133,7 +143,7 @@ def build(scene, output=None, *, taper_length_m=.15):
         feature=(entry+.2,entry+.2+2*SHARP_LEG)
     elif scene in ('elbow','short'):
         feature=(entry+.2,entry+.2+np.pi*radius/2)
-    elif scene in ('variable', 'round_to_square'):
+    elif scene in ('variable', 'variable_return', 'round_to_square'):
         feature=(start+.2,end+.2)
     elif scene in ('square', 'straight_wide'):
         feature=(0.,0.)

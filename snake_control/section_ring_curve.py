@@ -16,7 +16,7 @@ class SectionRingCurve(BentHelixCurve):
         self.seam_clearance = seam_clearance
         self.bearing_advance_m = shell_diameter * .4 if bearing_advance_m is None else bearing_advance_m
 
-    def section_field(self, head_u, outlet_overlap_m=0., radius_m=None):
+    def section_field(self, head_u, outlet_overlap_m=0., radius_m=None, separation_m=None, bearing_advance_m=None):
         # The lead and return share one moving frame. The nearly planar body
         # spans the full section. Most axial displacement is allocated to the
         # ends, over two link spacings, to keep the shell envelopes apart.
@@ -44,8 +44,8 @@ class SectionRingCurve(BentHelixCurve):
                     - np.maximum(0., 1. - (1. - fraction) / transition)**3)
         # Use the measured shell diameter for tip clearance. Leave the shallow
         # material advance of one head length on the bearing segment itself.
-        bearing_advance = min(self.pitch, self.bearing_advance_m)
-        separation = max(self.pitch, self.shell_diameter)
+        bearing_advance = min(self.pitch, self.bearing_advance_m if bearing_advance_m is None else bearing_advance_m)
+        separation = max(self.pitch if separation_m is None else separation_m, self.shell_diameter)
         axial = bearing_advance * (.5 - fraction) + .5 * (separation - bearing_advance) * ends
         u = head_u - separation * .5
         center, normal = self.axis(np.array([u]))

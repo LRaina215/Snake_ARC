@@ -96,7 +96,8 @@ def render(folder,sheet=False,speed=4.):
             stage='' if rows is None else rows[i]['stage']
             canvas=Image.new('RGB',(1200,650),'#f4f7fa');draw=ImageDraw.Draw(canvas)
             if straight:
-                title={'variable':'竖直渐扩','square':'竖直方管外侧','round_to_square':'竖直圆管转方管'}.get(scene,'竖直等径')
+                title={'variable':'竖直渐扩','variable_return':'竖直渐扩后渐缩',
+                       'square':'竖直方管外侧','round_to_square':'竖直圆管转方管'}.get(scene,'竖直等径')
                 title+='｜2023 TRO Helix' if folder.name=='tro' else '｜整圈 ARC'
             else:
                 title='急弯 A组·Helix' if acute and folder.name=='helix' else '急弯 B组·整圈ARC' if acute else '竖直Helix→水平ARC'
