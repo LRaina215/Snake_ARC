@@ -64,11 +64,12 @@ class Outlet:
         return float(min(distances))
 
 
-def run(case, output, expansion_turn=None, anticipate=False):
+def run(case, output, expansion_turn=None, anticipate=False, inner_circle_resize=False):
     scene, start, duration = COURSES[case]
     parameters = HalfArcParameters()
     options = SectionOptions(project_open_goal=True)
-    posture = PostureWindowOptions(minimum_loaded_turn_deg=expansion_turn, anticipate_tangent_loss=anticipate)
+    posture = PostureWindowOptions(minimum_loaded_turn_deg=expansion_turn, anticipate_tangent_loss=anticipate,
+                                  use_inner_circle_for_resize=inner_circle_resize)
     sim = PostureSimulation(parameters, references(), scene, start, section_options=options,
                             posture_options=posture)
     outlet = Outlet(sim)
@@ -173,5 +174,6 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--expansion-turn', type=float, help='Use the angle-derived tangent turn to anticipate window growth.')
     parser.add_argument('--anticipate', action='store_true')
+    parser.add_argument('--inner-circle-resize', action='store_true')
     args = parser.parse_args()
-    run(args.case, args.output, args.expansion_turn, args.anticipate)
+    run(args.case, args.output, args.expansion_turn, args.anticipate, args.inner_circle_resize)

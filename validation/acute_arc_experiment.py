@@ -421,6 +421,7 @@ def run(args):
                       vertical_return_advance_m=args.vertical_return_advance,
                       section_bearing_advance_m=args.section_bearing_advance,
                       section_flat_advance_weight=args.section_flat_advance_weight,
+                      vertical_end_clearance=args.vertical_end_clearance,
                       section_feedback_during_release=args.section_feedback_during_release,
                       section_preserve_mean_turn=args.section_preserve_mean_turn,
                       section_local_handoff=args.section_local_handoff,
@@ -642,6 +643,7 @@ if __name__ == '__main__':
     p.add_argument('--vertical-return-advance', type=float)
     p.add_argument('--section-bearing-advance', type=float)
     p.add_argument('--section-flat-advance-weight', type=float, default=0.)
+    p.add_argument('--vertical-end-clearance', action='store_true')
     p.add_argument('--section-feedback-during-release', action='store_true')
     p.add_argument('--section-preserve-mean-turn', action='store_true')
     p.add_argument('--section-local-handoff', action='store_true')

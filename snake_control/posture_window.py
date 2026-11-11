@@ -16,7 +16,7 @@ from .fixed_section_compliance import FixedSectionCompliance
 from .motor_feedback_sliding import MotorFeedbackSliding
 from .motor_shape_observer import MotorObserverOptions, bending_features
 from .rolling_shape_observer import RollingShapeObserver
-from .section_geometry import forward, local_section
+from .section_geometry import forward, local_section, section_circle
 from .phase_balanced_count import PhaseBalancedCount
 
 
@@ -36,6 +36,7 @@ class PostureWindowOptions:
     contract_exit_angle_deg: float = 12.
     minimum_loaded_turn_deg: Optional[float] = None
     anticipate_tangent_loss: bool = False
+    use_inner_circle_for_resize: bool = False
 
     def __post_init__(self):
         turn = self.minimum_loaded_turn_deg
@@ -221,7 +222,7 @@ class PostureWindow(MotorFeedbackSliding):
         try:
             good, geometry, section = self.observer.geometry_observer.geometry(np.radians(angles), window)
             down, quality = self.observer.passive_down(forward(np.radians(angles), self.lengths), window, section)
-            measured = measured_half_circle(section)
+            measured = self._circle_for_resize(section)
             intrinsic = self._position_evidence(window) == 'persistent_intrinsic_bending_and_boundary'
             resizing = window[1]-window[0] != self.window[1]-self.window[0]
             reason = ('candidate_shape_unreliable' if not good else
@@ -233,6 +234,23 @@ class PostureWindow(MotorFeedbackSliding):
                         end_source=quality['source'], position_evidence=self._position_evidence(window), reason=reason)
         except (ValueError, np.linalg.LinAlgError) as exc:
             return dict(window=list(window), eligible=False, reason=str(exc))
+
+    def _circle_for_resize(self, section):
+        measured = measured_half_circle(section)
+        limit = self.posture_options.circle_rms_max_m
+        xy = section['projected'][1:-1]
+        if not self.posture_options.use_inner_circle_for_resize or measured['circle_rms_m'] <= limit or len(xy) < 7:
+            return measured
+        # Fit the centre to the interior, but measure the angular coverage
+        # of all retained material about that centre.
+        radius, residual, center = section_circle(xy[1:-1])
+        if not .045 <= radius <= .22 or residual > limit:
+            return measured
+        x, y = (xy - center).T
+        azimuth = np.unwrap(np.arctan2(y, x))
+        coverage = float(abs(azimuth[-1] - azimuth[0]))
+        return dict(radius_m=radius, circle_rms_m=residual, coverage_deg=math.degrees(coverage),
+                    arc_length_m=radius * coverage, turn_deg=measured['turn_deg'], center_source='inner_section')
 
     def _observe_count(self, angles, time_s):
         """Collect even while a handover, trial or cooldown is in progress."""
@@ -246,7 +264,7 @@ class PostureWindow(MotorFeedbackSliding):
             return
         width = self.window[1]-self.window[0]+1
         q = np.radians(angles)
-        actual = measured_half_circle(local_section(q, self.lengths, *self.window))
+        actual = self._circle_for_resize(local_section(q, self.lengths, *self.window))
         # L_half = pi*R_body. The active arc length is R_body*coverage;
         # using the ratio avoids confusing a body-radius fit with pipe radius.
         estimated_count = width*180./max(actual['coverage_deg'], 1e-8)

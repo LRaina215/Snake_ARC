@@ -63,6 +63,7 @@ class AcuteOptions:
     vertical_return_advance_m: Optional[float] = None
     section_bearing_advance_m: Optional[float] = None
     section_flat_advance_weight: float = 0.
+    vertical_end_clearance: bool = False
     section_feedback_during_release: bool = False
     section_preserve_mean_turn: bool = False
     section_local_handoff: bool = False
@@ -144,6 +145,8 @@ class AcuteArcTransition(HelixArcTransition):
         if not 0. <= options.section_flat_advance_weight < 1. or (options.section_flat_advance_weight and
                 not (options.section_feedback_weight and options.vertical_use_spare_length)):
             raise ValueError('Shape-dependent advance needs a measured section and weight in [0, 1)')
+        if options.vertical_end_clearance and not options.vertical_adaptive_material:
+            raise ValueError('Vertical end clearance requires measured material adjustment')
         if options.vertical_return_advance_m is not None and (not options.vertical_adaptive_material or
                 not 0. < options.vertical_return_advance_m < (options.section_bearing_advance_m or 0.)):
             raise ValueError('Return advance requires an adaptive ring and a smaller bearing advance')
@@ -317,7 +320,7 @@ class AcuteArcTransition(HelixArcTransition):
         w = np.clip(age * self.wrap_radius * abs(self.acute.roll_rate_rad_s) / self.l, 0., 1.)
         return self.ring_spare_length() * w*w*(3. - 2.*w)
 
-    def vertical_section_reference(self, feedback_time=None):
+    def vertical_section_reference(self, feedback_time=None, dt=0.):
         cut, compact = self.vertical_section
         if self.acute.vertical_use_spare_length and self.stage == 'vertical_ring':
             # Extend the end of the curve within the existing torque mask.
@@ -345,6 +348,8 @@ class AcuteArcTransition(HelixArcTransition):
             self.section_weight = 1.
             bounds = np.r_[cut, self.L]
             field = np.vstack([compact, [0., 0.]])
+            if self.acute.vertical_end_clearance:
+                field = self.steer_tip(bounds, field, dt, vertical=True)
             return self.section_targets(bounds, field, feedback_time)
         nominal = self.acute.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
         lead = min(nominal, self.helix_length)
@@ -600,22 +605,23 @@ class AcuteArcTransition(HelixArcTransition):
         b = np.column_stack([np.interp(rear, self.curve.s, axis) for axis in points.T])
         return float(np.linalg.norm(a[:, None] - b, axis=2).min())
 
-    def steer_tip(self, bounds, field, dt):
+    def steer_tip(self, bounds, field, dt, vertical=False):
         limit = math.radians(88.)
-        if not .195 <= self.nominal_head_u <= .33:
+        active = self.ring_overlap_offset >= .022 if vertical else .195 <= self.nominal_head_u <= .33
+        if not active:
             self.tip_demand = 0.
         elif self.tip_sample_time != self.last_feedback_time:
             self.tip_sample_time = self.last_feedback_time
             current = self.tip_field(bounds, field, self.tip_turn)
             base = np.clip(self.curve.sampled_targets(bounds, current, self.phase), -limit, limit)
             self.tip_gap_m = self.tip_clearance(self.measured)
-            choices = (0., -.35, .35, -.70, .70)
+            choices = (0., -.18, .18, -.36, .36) if vertical else (0., -.35, .35, -.70, .70)
             scores = []
             for turn in choices:
                 trial = self.tip_field(bounds, field, turn)
                 q = np.clip(self.curve.sampled_targets(bounds, trial, self.phase), -limit, limit)
                 predicted = np.clip(self.measured + q - base, -limit, limit)
-                scores.append(min(self.tip_clearance(predicted), .073) - .003 * abs(turn))
+                scores.append(min(self.tip_clearance(predicted), .066 if vertical else .073) - .003 * abs(turn))
             self.tip_demand = choices[int(np.argmax(scores))]
         self.tip_turn += float(np.clip(self.tip_demand - self.tip_turn, -1.4 * dt, 1.4 * dt))
         return self.tip_field(bounds, field, self.tip_turn)
@@ -786,7 +792,7 @@ class AcuteArcTransition(HelixArcTransition):
             self.form_ring(dt)
         if ((self.acute.encoder_spacing or self.acute.encoder_compaction or self.acute.encoder_tip_clearance
              or self.acute.encoder_feed_sync or self.acute.section_handoff_from_tilt or
-             self.acute.bend_section_radius_trim_m) and
+             self.acute.bend_section_radius_trim_m or self.acute.vertical_end_clearance) and
                 self.stage in ('vertical_ring', 'bend_shift') and self.mode == 'arc'):
             self.observe_encoders(feedback_time)
         if self.bent is not None:
@@ -796,7 +802,7 @@ class AcuteArcTransition(HelixArcTransition):
         elif self.stage == 'bend_shift':
             desired = self.miter_reference()
         elif self.vertical_section is not None:
-            desired = self.vertical_section_reference(feedback_time)
+            desired = self.vertical_section_reference(feedback_time, dt)
         else:
             desired = self.straight_reference()
         if mask is None:
