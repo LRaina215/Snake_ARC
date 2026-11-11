@@ -30,7 +30,18 @@ def add_vertical_section(assets, pipe, name, first, last, common):
     ET.SubElement(pipe, 'geom', name=name, type='mesh', mesh=name, **common)
 
 
-def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140):
+def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140, outlet_height_m=4.,
+          embed_return_outlet=False):
+    if embed_return_outlet and (scene != 'variable_return' or upper_diameter_m <= 2. * PIPE_RADIUS):
+        raise ValueError('Embedding the outlet requires an expanded section followed by a diameter return')
+    if scene in ('variable', 'variable_return'):
+        feature_exit = 1.9 + taper_length_m
+        if scene == 'variable_return':
+            feature_exit += .30 + taper_length_m
+        if not np.isfinite(outlet_height_m) or outlet_height_m <= feature_exit:
+            raise ValueError('The outlet must extend above the last diameter transition')
+    elif outlet_height_m != 4.:
+        raise ValueError('Only variable-diameter scenes support a custom outlet height')
     root=ET.parse(ROOT/'mujoco_model/Snake_Robot_o18_Tee_straight.xml').getroot()
     root.set('model','vertical-arc18-'+scene)
     world=root.find('worldbody');assets=root.find('asset')
@@ -141,7 +152,7 @@ def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140):
             directions = np.column_stack([np.cos(theta), np.sin(theta)])
             if scene in ('variable', 'variable_return', 'collar'):
                 section = upper_radius * directions
-                plateau_end = end + .060 if scene == 'collar' else end + .30 if scene == 'variable_return' else 4.
+                plateau_end = end + .060 if scene == 'collar' else end + .30 if scene == 'variable_return' else outlet_height_m
                 ET.SubElement(pipe, 'geom', name='pipe_upper', type='cylinder', size=str(upper_radius),
                               fromto=f'0 0 {end} 0 0 {plateau_end}', **common)
             else:
@@ -157,11 +168,15 @@ def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140):
                 end = plateau_end + taper_length_m
                 add_vertical_section(assets, pipe, 'pipe_return', (plateau_end, section),
                                      (end, PIPE_RADIUS * directions), common)
+                # The cylinder's lower cap can sit inside the taper, where the
+                # solid pipe already covers it. This removes the exposed cap at
+                # the join while retaining the same exterior radius profile.
+                outlet_start = plateau_end if embed_return_outlet else end
                 ET.SubElement(pipe, 'geom', name='pipe_exit', type='cylinder', size=str(PIPE_RADIUS),
-                              fromto=f'0 0 {end} 0 0 4', **common)
-                route += [(plateau_end, upper_radius), (end, PIPE_RADIUS), (4., PIPE_RADIUS)]
+                              fromto=f'0 0 {outlet_start} 0 0 {outlet_height_m}', **common)
+                route += [(plateau_end, upper_radius), (end, PIPE_RADIUS), (outlet_height_m, PIPE_RADIUS)]
             else:
-                route += [(4., upper_radius)]
+                route += [(outlet_height_m, upper_radius)]
             route = np.array([[0.,0.,z,r] for z, r in route])
     else:
         pipe.find('geom').set('fromto','0 0 -.2 0 0 4')

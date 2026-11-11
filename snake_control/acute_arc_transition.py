@@ -517,7 +517,15 @@ class AcuteArcTransition(HelixArcTransition):
             # A part of the ring can encounter the smaller diameter before
             # the rest clears the slope. Require narrow evidence across roll
             # phases before returning material to the passive end.
-            requested = self.ring_overlap_offset if travel < self.acute.vertical_material_return_phase_rad else 0.
+            if travel < self.acute.vertical_material_return_phase_rad:
+                requested = self.ring_overlap_offset
+            elif self.ring_material_extended and self.acute.vertical_material_minimum_wrap_deg:
+                # On the smaller section the ring can still have a measured
+                # closing deficit. Keep the small amount of material needed
+                # for closure instead of returning the whole added length.
+                requested = float(np.clip(.25 * radius * gap, 0., .10 * self.l))
+            else:
+                requested = 0.
         budget = max(0., 2. * self.l - 2. * math.pi * self.ring_radius_offset - self.ring_spare_length())
         requested = float(np.clip(requested, 0., min(self.acute.vertical_material_max_extra_m, budget)))
         withdrawal = .002 if wider and self.acute.vertical_material_minimum_wrap_deg else .008

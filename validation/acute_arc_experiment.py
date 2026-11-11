@@ -378,7 +378,8 @@ def run(args):
     root.mkdir(parents=True, exist_ok=False)
     model_copy = root / 'model.xml'
     if args.scene in GENERATED_STRAIGHT_SCENES:
-        build(args.scene, model_copy, taper_length_m=args.taper_length, upper_diameter_m=args.upper_pipe_diameter)
+        build(args.scene, model_copy, taper_length_m=args.taper_length, upper_diameter_m=args.upper_pipe_diameter,
+              outlet_height_m=args.vertical_outlet_height, embed_return_outlet=args.embed_return_outlet)
     sim = VerticalScene(args.scene, recorded_model=model_copy if model_copy.exists() else None)
     model, data = sim.model, sim.data
     review = AcuteReview(sim)
@@ -438,6 +439,8 @@ def run(args):
          square_side_m=None if review.square is None else 2 * model.geom_size[review.square, 0],
          twin_diameters_m=[2. * model.geom_size[i, 0] for i in review.twin], twin_centers_m=review.twin_centers,
          route_radii_m=np.unique(route[:, 3]), feature_exit_z_m=feature_exit,
+         vertical_outlet_height_m=float(route[-1, 2]) if review.straight else None,
+         embed_return_outlet=args.embed_return_outlet,
          vertical_axis=[0, 0, 1], horizontal_axis=[1, 0, 0],
          corner_z_m=review.corner_z, entry_z_m=review.entry_z, exit_x_m=review.exit_x,
          meshes=review.bend_meshes, lengths_m=sim.lengths,
@@ -604,6 +607,10 @@ if __name__ == '__main__':
     p.add_argument('--initial-helix-radius', type=float, default=.094)
     p.add_argument('--taper-length', type=float, default=.15)
     p.add_argument('--upper-pipe-diameter', type=float, default=.140)
+    p.add_argument('--vertical-outlet-height', type=float, default=4.,
+                   help='Top of the straight outlet above a variable-diameter transition, in metres')
+    p.add_argument('--embed-return-outlet', action='store_true',
+                   help='Place the outlet cylinder cap inside the shrinking transition')
     p.add_argument('--ring-pitch', type=float, default=AcuteOptions.ring_pitch_m)
     p.add_argument('--ring-turns', type=float, default=AcuteOptions.ring_turns)
     p.add_argument('--ring-radius-delta', type=float, default=AcuteOptions.ring_radius_delta_m)
@@ -651,7 +658,14 @@ if __name__ == '__main__':
     p.add_argument('--manual-takeover', action='store_true')
     p.add_argument('--modes', nargs='+', choices=['helix', 'arc', 'tro'], default=['helix', 'arc'])
     args = p.parse_args()
-    maximum_taper_length = .90 if args.scene == 'variable_return' else 2.1
+    if args.vertical_outlet_height != 4. and args.scene not in ('variable', 'variable_return'):
+        p.error('--vertical-outlet-height requires --scene variable or variable_return')
+    if not np.isfinite(args.vertical_outlet_height):
+        p.error('--vertical-outlet-height must be finite')
+    if args.embed_return_outlet and args.scene != 'variable_return':
+        p.error('--embed-return-outlet requires --scene variable_return')
+    maximum_taper_length = ((args.vertical_outlet_height - 2.2) / 2. if args.scene == 'variable_return'
+                            else args.vertical_outlet_height - 1.9)
     if not 0. < args.taper_length < maximum_taper_length:
         p.error('--taper-length must fit between the taper start and pipe top')
     if not args.upper_pipe_diameter > .110:
