@@ -11,6 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 class VerticalScene:
     def __init__(self,scene,recorded_model=None):
+        self.scene=scene
         self.model_path=ROOT/f'mujoco_model/Snake_Robot_o18_Vertical_ARC_{scene}.xml'
         if recorded_model is None:
             self.model=mujoco.MjModel.from_xml_path(str(self.model_path))

@@ -162,12 +162,50 @@ def sample_section(segments, step=.005):
                       np.linspace(0,1,max(2,int(math.ceil(s.length/step))+1))[1:]])
 
 
-def local_section(q,lengths,first,last,previous=None, method='plane'):
+def section_curvature_field(curve, link_lengths, active_count, gain=0.):
+    """Length-preserving planar deformation on physical material coordinates."""
+    lengths = np.asarray(link_lengths)
+    modules = np.r_[lengths[0]/2, (lengths[:-1]+lengths[1:])/2, lengths[-1]/2]
+    winding = 1 if sum(s.turn for s in curve if 1 <= s.joint <= active_count) >= 0 else -1
+    totals = np.bincount([s.joint for s in curve], weights=[s.length for s in curve], minlength=len(modules))
+    rows = []
+    cursor = 0.
+    for segment in curve:
+        joint = segment.joint
+        length = segment.length * modules[joint] / totals[joint]
+        taper = .5 if joint in (1, active_count) else 1.
+        factor = 1 + gain * taper if 1 <= joint <= active_count else 1.
+        curvature = segment.turn * winding * factor / length if segment.radius else 0.
+        rows.append((cursor, cursor + length, curvature))
+        cursor += length
+    return rows
+
+
+def section_integral(rows, positions):
+    """Cumulative signed turn at arbitrary material positions."""
+    lo, hi, curvature = np.asarray(rows).T
+    bounds = np.r_[lo[0], hi]
+    return np.interp(positions, bounds, np.r_[0., np.cumsum((hi - lo) * curvature)])
+
+
+def section_circle(points):
+    """Diagnostic circle scale and residual of already projected points."""
+    xy = np.asarray(points)
+    u, v, intercept = np.linalg.lstsq(np.c_[2. * xy, np.ones(len(xy))], (xy*xy).sum(1), rcond=None)[0]
+    radial = np.linalg.norm(xy - [u, v], axis=1)
+    return float(np.sqrt(max(0., intercept + u*u + v*v))), float(np.std(radial)), np.array([u, v])
+
+
+def local_section(q,lengths,first,last,previous=None, method='plane', fit_interval_m=None):
     points=forward(q,lengths)[first-1:last+3]  # one entering/exiting boundary link
+    fitting=points[1:-1]
     if method=='paper': axis=paper_axis(points)
     else:
         # Open near-planar arc extension: directly fit its section plane.
-        fitting=points[1:-1]  # passive boundary links cannot determine the section plane
+        if fit_interval_m is not None:
+            material = np.r_[0., np.cumsum(lengths[first-1:last+2])]
+            positions = np.linspace(*fit_interval_m, 49)
+            fitting = np.column_stack([np.interp(positions, material, p) for p in points.T])
         center=fitting.mean(axis=0); _,_,vh=np.linalg.svd(fitting-center,full_matrices=False)
         direction=vh[-1]
         if previous is not None and direction@previous['direction']<0: direction=-direction
@@ -181,5 +219,6 @@ def local_section(q,lengths,first,last,previous=None, method='plane'):
     projected=(points-axis['point'])@basis[:,:2]
     curve=continuous_section(projected)
     return dict(points=points,projected=projected,curve=curve,axis=axis,
+                fit_projected=(fitting-axis['point'])@basis[:,:2],
                 total_turn=sum(abs(s.turn) for s in curve if 1<=s.joint<=last-first+1),
                 fit_rms=math.sqrt(axis['variance']))

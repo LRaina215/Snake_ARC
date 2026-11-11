@@ -12,6 +12,7 @@ PIPE_RADIUS=.055
 SHARP_SCALE=PIPE_RADIUS/.0565
 SHARP_LEG=.15*SHARP_SCALE
 SHORT_BEND_RADIUS=.105
+SQUARE_HALF_WIDTH=2. * np.pi * PIPE_RADIUS / 8.
 
 
 def axis(u,radius=BEND_RADIUS,entry=BEND_HEIGHT):
@@ -22,7 +23,13 @@ def axis(u,radius=BEND_RADIUS,entry=BEND_HEIGHT):
     return np.array([radius+u-np.pi*radius/2,0.,entry+radius]),np.array([0.,0.,-1.])
 
 
-def build(scene):
+def add_vertical_section(assets, pipe, name, first, last, common):
+    vertices = [(*point, z) for z, section in (first, last) for point in section]
+    ET.SubElement(assets, 'mesh', name=name, vertex=' '.join(f'{v:.10g}' for v in np.ravel(vertices)))
+    ET.SubElement(pipe, 'geom', name=name, type='mesh', mesh=name, **common)
+
+
+def build(scene, output=None, *, taper_length_m=.15):
     root=ET.parse(ROOT/'mujoco_model/Snake_Robot_o18_Tee_straight.xml').getroot()
     root.set('model','vertical-arc18-'+scene)
     world=root.find('worldbody');assets=root.find('asset')
@@ -83,6 +90,39 @@ def build(scene):
         u=np.r_[np.linspace(-entry-.2,0.,41),np.linspace(0,np.pi*radius/2,49)[1:],
                 np.linspace(np.pi*radius/2,np.pi*radius/2+2.,25)[1:]]
         route=np.array([np.r_[axis(x,radius,entry)[0],PIPE_RADIUS] for x in u])
+    elif scene == 'straight_wide':
+        upper_radius = .070
+        cylinder = pipe.find('geom')
+        cylinder.set('size', str(upper_radius))
+        cylinder.set('fromto', '0 0 -.2 0 0 4')
+        route = np.array([[0.,0.,-.2,upper_radius], [0.,0.,4.,upper_radius]])
+    elif scene in ('variable', 'square', 'round_to_square'):
+        start, upper_radius = 1.9, .070
+        end = start + taper_length_m
+        cylinder = pipe.find('geom')
+        if scene == 'square':
+            pipe.remove(cylinder)
+            ET.SubElement(pipe, 'geom', name='pipe_vertical', type='box',
+                          size=f'{SQUARE_HALF_WIDTH} {SQUARE_HALF_WIDTH} 2.1', pos='0 0 1.9', **common)
+            route = np.array([[0.,0.,-.2,PIPE_RADIUS], [0.,0.,4.,PIPE_RADIUS]])
+        else:
+            cylinder.set('fromto', f'0 0 -.2 0 0 {start}')
+            theta = np.arange(64) * 2 * np.pi / 64
+            directions = np.column_stack([np.cos(theta), np.sin(theta)])
+            if scene == 'variable':
+                section = upper_radius * directions
+                ET.SubElement(pipe, 'geom', name='pipe_upper', type='cylinder', size=str(upper_radius),
+                              fromto=f'0 0 {end} 0 0 4', **common)
+            else:
+                end = 2.2
+                upper_radius = PIPE_RADIUS  # perimeter-equivalent, only for route metadata
+                section = SQUARE_HALF_WIDTH * np.array([[-1., -1.], [1., -1.], [1., 1.], [-1., 1.]])
+                ET.SubElement(pipe, 'geom', name='pipe_upper', type='box',
+                              size=f'{SQUARE_HALF_WIDTH} {SQUARE_HALF_WIDTH} {(4.-end)/2.}',
+                              pos=f'0 0 {(4.+end)/2.}', **common)
+            add_vertical_section(assets, pipe, 'pipe_taper', (start, PIPE_RADIUS * directions), (end, section), common)
+            route = np.array([[0.,0.,z,r] for z, r in ((-.2, PIPE_RADIUS), (start, PIPE_RADIUS),
+                                                       (end, upper_radius), (4., upper_radius))])
     else:
         pipe.find('geom').set('fromto','0 0 -.2 0 0 4')
         route=np.array([[0.,0.,z,.055] for z in np.linspace(-.2,4.,85)])
@@ -93,14 +133,18 @@ def build(scene):
         feature=(entry+.2,entry+.2+2*SHARP_LEG)
     elif scene in ('elbow','short'):
         feature=(entry+.2,entry+.2+np.pi*radius/2)
+    elif scene in ('variable', 'round_to_square'):
+        feature=(start+.2,end+.2)
+    elif scene in ('square', 'straight_wide'):
+        feature=(0.,0.)
     else:
         feature=(2,2+np.pi*BEND_RADIUS/2)
     ET.SubElement(custom,'numeric',name='feature_span',data=' '.join(map(str,feature)))
     ET.SubElement(custom,'numeric',name='robot_lengths',data=' '.join(map(str,LENGTHS)))
     root.find('statistic').set('center','0 0 1.6');root.find('statistic').set('extent','2')
-    path=ROOT/f'mujoco_model/Snake_Robot_o18_Vertical_ARC_{scene}.xml'
+    path=output if output is not None else ROOT/f'mujoco_model/Snake_Robot_o18_Vertical_ARC_{scene}.xml'
     ET.ElementTree(root).write(path,encoding='utf-8',xml_declaration=True)
-    return str(path.relative_to(ROOT))
+    return str(path if output is not None else path.relative_to(ROOT))
 
 
 if __name__=='__main__':

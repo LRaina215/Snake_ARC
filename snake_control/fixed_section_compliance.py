@@ -9,7 +9,7 @@ nominal-arc restoring term. Shape checks never substitute a nominal target.
 from dataclasses import dataclass,asdict
 import math
 import numpy as np
-from .section_geometry import local_section, sample_section
+from .section_geometry import local_section, sample_section, section_circle, section_curvature_field, section_integral
 
 
 @dataclass(frozen=True)
@@ -42,21 +42,11 @@ def yamada_section(curve, link_lengths, first, count, phase, gain=0., direction=
     The same-module line/arc lengths are normalized together to physical length.
     """
     lengths=np.asarray(link_lengths)
-    modules=np.r_[lengths[0]/2,(lengths[:-1]+lengths[1:])/2,lengths[-1]/2]
-    winding=1 if sum(s.turn for s in curve if 1<=s.joint<=count)>=0 else -1
-    total=[sum(s.length for s in curve if s.joint==j) for j in range(len(modules))]
-    rows=[]; cursor=0.
-    for s in curve:
-        length=s.length*modules[s.joint]/max(total[s.joint],1e-12)
-        taper=.5 if s.joint in (1,count) else 1.
-        factor=1+gain*taper if 1<=s.joint<=count else 1.
-        turn=s.turn*winding*factor
-        rows.append((cursor,cursor+length,turn/length if s.radius else 0.))
-        cursor+=length
-    joints=np.r_[0,np.cumsum(lengths)]
+    rows=section_curvature_field(curve, lengths, count, gain)
+    turn=section_integral(rows,np.r_[0,np.cumsum(lengths)])
     targets=np.zeros(count)
     for j in range(1,count+1):
-        integral=sum(k*max(0,min(hi,joints[j+1])-max(lo,joints[j-1])) for lo,hi,k in rows)
+        integral=turn[j+1]-turn[j-1]
         number=first+j-1
         targets[j-1]=integral*(math.cos(phase) if number%2 else direction*math.sin(phase))
     return targets,rows
@@ -191,8 +181,7 @@ class FixedSectionCompliance:
         if g is None:return dict(status=self.status)
         curve_points=sample_section(g['curve'])
         xy=g['projected'][1:-1]
-        circle=np.linalg.lstsq(np.column_stack([2*xy,np.ones(len(xy))]),np.sum(xy*xy,axis=1),rcond=None)[0]
-        radius=math.sqrt(max(0,circle[2]+circle[:2]@circle[:2]))
+        radius,_,_=section_circle(xy)
         return dict(status=self.status,window=[self.first,self.last],geometry_updates=self.updates,
                     control_law='direct_measured_section', nominal_restoring=False,
                     inverse_conversion=self.inverse_diagnostic,

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import shutil
 import sys
+from time import perf_counter
 
 import mujoco
 import numpy as np
@@ -18,7 +19,11 @@ from snake_control.curve_gait import CurveGait, helix
 from snake_control.simulation import backbone
 from snake_control.vertical_scene import VerticalScene
 from snake_control.vertical_ring_manual import VerticalRingManual
+from tools.build_vertical_arc_scene import build
 from validation.vertical_arc_experiment import json_default
+from validation.tro_helix_baseline import TroHelixBaseline, REFERENCE
+
+STRAIGHT_SCENES = ('straight', 'straight_wide', 'variable', 'square', 'round_to_square')
 
 
 def dump(path, value):
@@ -29,23 +34,26 @@ class AcuteReview:
     def __init__(self, sim):
         self.sim = sim
         model = sim.model
-        horizontal = model.geom('pipe_horizontal').id
+        self.straight = sim.scene in STRAIGHT_SCENES
+        self.square = next((geom for geom in sim.pipe_geoms
+                            if model.geom_type[geom] == mujoco.mjtGeom.mjGEOM_BOX), None)
+        horizontal = None if self.straight else model.geom('pipe_horizontal').id
         data = sim.data
         mujoco.mj_kinematics(model, data)
-        self.corner_z = float(data.geom_xpos[horizontal, 2])
+        self.corner_z = None if self.straight else float(data.geom_xpos[horizontal, 2])
         self.material = np.r_[0., np.cumsum(sim.lengths)]
         self.route = model.numeric('pipe_centerline').data.reshape(-1, 4)[:, :3]
         self.horizontal = horizontal
         self.vertical = model.geom('pipe_vertical').id
         self.bend_meshes = []
-        for geom in sorted(sim.pipe_geoms - {self.vertical, horizontal}):
+        for geom in ([] if self.straight else sorted(sim.pipe_geoms - {self.vertical, horizontal})):
             idx = model.geom_dataid[geom]
             adr = model.mesh_vertadr[idx]
             vertices = model.mesh_vert[adr:adr + model.mesh_vertnum[idx]]
             points = vertices @ data.geom_xmat[geom].reshape(3, 3).T + data.geom_xpos[geom]
             self.bend_meshes.append(dict(name=model.geom(geom).name, bounds_min_m=points.min(0), bounds_max_m=points.max(0)))
-        self.exit_x = max(float(mesh['bounds_max_m'][0]) for mesh in self.bend_meshes)
-        self.entry_z = min(float(mesh['bounds_min_m'][2]) for mesh in self.bend_meshes)
+        self.exit_x = None if self.straight else max(float(mesh['bounds_max_m'][0]) for mesh in self.bend_meshes)
+        self.entry_z = None if self.straight else min(float(mesh['bounds_min_m'][2]) for mesh in self.bend_meshes)
         self.weight = float(model.body_mass[sim.head:].sum() * abs(model.opt.gravity[2]))
         self.robot = set(np.flatnonzero(model.geom_bodyid >= sim.head))
         self.shells = []
@@ -62,24 +70,25 @@ class AcuteReview:
                 raise ValueError(f'Unexpected robot envelope geometry {model.geom(geom).name}')
             self.shells.append((geom, verts))
 
-    def last_envelope_x(self):
+    def last_envelope(self, coordinate):
         m, d = self.sim.model, self.sim.data
         values = []
         for geom, verts in self.shells:
-            axis = d.geom_xmat[geom].reshape(3, 3)[0]
+            axis = d.geom_xmat[geom].reshape(3, 3)[coordinate]
             if verts is None:
                 r, half, _ = m.geom_size[geom]
                 offset = -abs(axis[2]) * half - r * np.linalg.norm(axis[:2])
             else:
                 offset = (verts @ axis).min()
-            values.append(d.geom_xpos[geom, 0] + offset)
+            values.append(d.geom_xpos[geom, coordinate] + offset)
         return float(min(values))
 
     def support(self):
         m, d = self.sim.model, self.sim.data
         normal = dict(vertical=0., elbow=0., horizontal=0.)
         up = dict(vertical=0., elbow=0., horizontal=0.)
-        links = set()
+        link_normal = {}
+        corners = set()
         for i, c in enumerate(d.contact):
             a, b = int(c.geom1), int(c.geom2)
             if a in self.robot and b in self.sim.pipe_geoms:
@@ -92,11 +101,14 @@ class AcuteReview:
             mujoco.mj_contactForce(m, d, i, force)
             if force[0] <= .05:
                 continue
-            links.add(int(m.geom_bodyid[robot] - self.sim.head))
-            key = 'horizontal' if pipe == self.horizontal else 'vertical' if pipe == self.vertical else 'elbow'
+            link = int(m.geom_bodyid[robot] - self.sim.head)
+            link_normal[link] = link_normal.get(link, 0.) + force[0]
+            if pipe == self.square and min(abs(c.pos[:2])) >= .65 * m.geom_size[pipe, 0]:
+                corners.add((int(c.pos[0] > 0), int(c.pos[1] > 0)))
+            key = 'vertical' if self.straight or pipe == self.vertical else 'horizontal' if pipe == self.horizontal else 'elbow'
             normal[key] += force[0]
             up[key] += float(sign * (c.frame.reshape(3, 3).T @ force[:3])[2])
-        return normal, up, sorted(links)
+        return normal, up, link_normal, sorted(corners)
 
     def wrap_shape(self, points, start, stop, pre_bend, horizontal):
         # Dense samples are points on the *actual* robot's link polyline.
@@ -144,21 +156,24 @@ class AcuteReview:
     def sample(self, core, target, mask):
         m, d = self.sim.model, self.sim.data
         points = backbone(m, d)
-        normal, up, links = self.support()
-        last_x = self.last_envelope_x()
+        normal, up, link_normal, corners = self.support()
+        last_x = self.last_envelope(0)
         row = self.sim.evaluate(target, mask)
-        clear = last_x >= self.exit_x and normal['elbow'] + normal['vertical'] <= .1 and row['floor_force_n'] <= .1
+        clear = (not self.straight and last_x >= self.exit_x and normal['elbow'] + normal['vertical'] <= .1
+                 and row['floor_force_n'] <= .1)
         full_support = clear and up['horizontal'] >= .5 * self.weight
         wrap_end = core.wrap_start + core.helix_length
         end = int(np.searchsorted(self.material, wrap_end))
-        pre_bend = bool(points[:end + 1, 2].max() < self.entry_z and normal['elbow'] < .1)
+        pre_bend = self.straight or bool(points[:end + 1, 2].max() < self.entry_z and normal['elbow'] < .1)
         ring = self.wrap_shape(points, core.wrap_start, wrap_end, pre_bend, clear)
         tangents = np.diff(points, axis=0) / self.sim.lengths[:, None]
         turns = np.arccos(np.clip(np.sum(tangents[:-1] * tangents[1:], axis=1), -1., 1.))
         return dict(time_s=float(d.time), stage=core.stage, last_envelope_x_m=last_x,
+                    last_envelope_z_m=self.last_envelope(2) if self.straight else None,
                     head_xyz_m=points[0].tolist(), tail_xyz_m=points[-1].tolist(),
                     pre_bend=pre_bend,
-                    normal_n=normal, up_n=up, supporting_links=links,
+                    normal_n=normal, up_n=up, supporting_links=sorted(link_normal), link_normal_n=link_normal,
+                    square_corner_contacts=corners,
                     clear_supported=bool(full_support), exit_attached=bool(clear and normal['horizontal'] > 1.),
                     maximum_curvature_per_m=float(np.max(turns / ((self.sim.lengths[:-1] + self.sim.lengths[1:]) * .5))),
                     **row, **ring)
@@ -258,6 +273,8 @@ def review_saved(folder):
         masks = trace['masks']
         enabled_count = np.count_nonzero(masks, axis=1)
     for row, body, status in zip(rows, points, statuses):
+        if evaluator.straight:
+            continue
         start = status.get('wrap_start_m', 0.)
         stop = start + status['wrap_length_m']
         end = np.searchsorted(evaluator.material, stop)
@@ -268,6 +285,10 @@ def review_saved(folder):
                    exit_attached=bool(clear and row['normal_n']['horizontal'] > 1.))
         row.update(evaluator.wrap_shape(body, start, stop, before, clear))
     result = summarize(rows, points, statuses, folder.name, evaluator.weight)
+    if evaluator.straight:
+        result['vertical_continuation'] = summarize_straight(
+            rows, hypothesis['options']['roll_rate_rad_s'], hypothesis['feature_exit_z_m'], folder.name,
+            square=evaluator.square is not None)
     result.update(exit_x_m=evaluator.exit_x, failure=original['summary']['failure'],
                   enabled_count_min_max=[int(enabled_count.min()), int(enabled_count.max())],
                   total_pipe_normal_peak_n=max(sum(r['normal_n'].values()) for r in rows),
@@ -285,18 +306,63 @@ def review_saved(folder):
     return result
 
 
+def summarize_straight(rows, rate, feature_exit, mode, square=False):
+    stage = 'vertical_ring' if mode == 'arc' else 'vertical_helix'
+    ring = [r for r in rows if r['stage'] == stage]
+    if not ring:
+        return dict(ring_reached=False)
+    height = np.array([r['ring_center_m'][2] for r in ring])
+    clear = next((r for r in ring if feature_exit is not None and r['last_envelope_z_m'] >= feature_exit), None)
+    period = 2. * np.pi / abs(rate)
+    times = np.array([r['time_s'] for r in ring])
+    shape = np.array([r['ring_shape'] if mode == 'arc' else
+                      r['fitted_pitch_m'] >= .095 and r['wrap_deg'] >= 365. for r in ring])
+    allowed = np.flatnonzero(shape) if feature_exit is None else [] if clear is None else [ring.index(clear)]
+    continuation = None
+    for begin in allowed:
+        end = int(np.searchsorted(times, times[begin] + period))
+        if end >= len(ring):
+            break
+        window = ring[begin:end + 1]
+        corners = sorted({tuple(corner) for r in window for corner in r.get('square_corner_contacts', [])})
+        candidate = dict(time_s=[float(times[begin]), float(times[end])],
+                            net_up_m=float(height[end] - height[begin]), gait_shape_all=bool(shape[begin:end + 1].all()),
+                            contact_all=all(r['supporting_links'] for r in window),
+                            square_corners=corners if square else None,
+                            collision_free_all=all(not r['self_contacts'] and r['floor_force_n'] <= .1 for r in window),
+                            above_feature_all=feature_exit is None or
+                            all(r['last_envelope_z_m'] >= feature_exit for r in window))
+        if feature_exit is not None or (candidate['gait_shape_all'] and candidate['contact_all'] and
+                                        candidate['collision_free_all'] and candidate['net_up_m'] > 0. and
+                                        (not square or len(corners) == 4)):
+            continuation = candidate
+            break
+    return dict(ring_reached=True, ring_time_s=times[0], ring_net_up_m=float(height[-1] - height[0]),
+                maximum_backslide_m=float(np.max(np.maximum.accumulate(height) - height)),
+                minimum_normal_n=min(r['normal_n']['vertical'] for r in ring),
+                maximum_normal_n=max(r['normal_n']['vertical'] for r in ring),
+                end_envelope_z_m=ring[-1]['last_envelope_z_m'],
+                first_clear_time_s=None if clear is None else clear['time_s'], continuation=continuation)
+
+
 def run(args):
     root = args.output
     root.mkdir(parents=True, exist_ok=False)
-    sim = VerticalScene(args.scene)
+    model_copy = root / 'model.xml'
+    if args.scene in ('straight_wide', 'variable', 'square', 'round_to_square'):
+        build(args.scene, model_copy, taper_length_m=args.taper_length)
+    sim = VerticalScene(args.scene, recorded_model=model_copy if model_copy.exists() else None)
     model, data = sim.model, sim.data
     review = AcuteReview(sim)
     source = root / 'source'
     source.mkdir()
     for name in ('snake_control/acute_arc_transition.py', 'snake_control/bent_helix_curve.py',
                  'snake_control/curve_gait.py', 'snake_control/vertical_ring_manual.py', 'snake_control/section_ring_curve.py',
-                 'tools/build_vertical_arc_scene.py', __file__):
+                 'snake_control/section_geometry.py', 'tools/build_vertical_arc_scene.py', __file__):
         shutil.copyfile(name, source / Path(name).name)
+    if 'tro' in args.modes:
+        shutil.copyfile(REFERENCE, source / 'tro_original_pole_compliance.py')
+        shutil.copyfile(Path(__file__).with_name('tro_helix_baseline.py'), source / 'tro_helix_baseline.py')
     options = replace(AcuteOptions(), ring_pitch_m=args.ring_pitch, ring_turns=args.ring_turns,
                       ring_radius_delta_m=args.ring_radius_delta, ring_feed_m_s=args.ring_feed,
                       reference_bend_radius_m=args.reference_radius, miter_section=args.miter_section,
@@ -314,20 +380,36 @@ def run(args):
                       section_before_bend=args.section_before_bend,
                       section_seam_clearance=args.section_seam_clearance,
                       outlet_end_correction=args.outlet_end_correction or args.outlet_use_spare_length,
-                      outlet_use_spare_length=args.outlet_use_spare_length)
-    shutil.copyfile(sim.model_path, root / 'model.xml')
-    dump(root / 'hypothesis.json', dict(case='acute', scene=args.scene,
-         hypothesis='The selected curve can carry the whole robot through the elbow and keep its gait on the outlet',
-         diameter_m=2 * model.geom_size[review.horizontal, 0], vertical_axis=[0, 0, 1], horizontal_axis=[1, 0, 0],
+                      outlet_use_spare_length=args.outlet_use_spare_length,
+                      section_feedback_weight=args.section_feedback_weight, section_feedback_gain=args.section_feedback_gain,
+                      vertical_use_spare_length=args.vertical_use_spare_length,
+                      vertical_adaptive_material=args.vertical_adaptive_material,
+                      section_bearing_advance_m=args.section_bearing_advance,
+                      section_feedback_during_release=args.section_feedback_during_release,
+                      section_preserve_mean_turn=args.section_preserve_mean_turn)
+    if not model_copy.exists():
+        shutil.copyfile(sim.model_path, model_copy)
+    route = model.numeric('pipe_centerline').data.reshape(-1, 4)
+    feature_exit = float(route[-2, 2]) if args.scene in ('variable', 'round_to_square') else None
+    pipe = review.vertical if review.straight else review.horizontal
+    dump(root / 'hypothesis.json', dict(case='straight' if review.straight else 'acute', scene=args.scene,
+         hypothesis=('The measured section maintains ring shape and vertical grip through the vertical course' if review.straight
+                     else 'The selected curve can carry the whole robot through the elbow and keep its gait on the outlet'),
+         diameter_m=2 * route[0, 3] if review.square != pipe else None,
+         square_side_m=None if review.square is None else 2 * model.geom_size[review.square, 0],
+         route_radii_m=np.unique(route[:, 3]), feature_exit_z_m=feature_exit,
+         vertical_axis=[0, 0, 1], horizontal_axis=[1, 0, 0],
          corner_z_m=review.corner_z, entry_z_m=review.entry_z, exit_x_m=review.exit_x,
          meshes=review.bend_meshes, lengths_m=sim.lengths,
-         friction=model.geom_friction[review.horizontal], mass_kg=model.body_mass[sim.head:].sum(),
-         phase_rad=args.phase, options=options.__dict__,
+         friction=model.geom_friction[pipe], mass_kg=model.body_mass[sim.head:].sum(),
+         phase_rad=args.phase, initial_helix_radius_m=args.initial_helix_radius, options=options.__dict__,
          manual_takeover=args.manual_takeover,
-         acceptance='actual last shell clears and supported by horizontal pipe; 72 mm after exit with correct shape',
+         acceptance=('positive net ascent and a supported intact ring for one rolling period after formation/feature exit'
+                     if review.straight else
+                     'actual last shell clears and supported by horizontal pipe; 72 mm after exit with correct shape'),
          shape_limits=dict(turn_deg=[325,395], axial_span_m=.100, plane_rms_m=.027, max_radius_m=.170)))
     gait = CurveGait(18, lengths=sim.lengths)
-    q = gait.targets([helix(gait.body_length, .094, .13)], args.phase)
+    q = gait.targets([helix(gait.body_length, args.initial_helix_radius, .13)], args.phase)
     initial = sim.place_helix(q, 1., 0.)
     core = AcuteArcTransition(q, sim.lengths, options)
     mask = np.ones(18, bool)
@@ -348,6 +430,7 @@ def run(args):
         points.append(backbone(model, data))
 
     timestep = model.opt.timestep
+    common_work = 0.
     for tick in range(round(10. / timestep)):
         if tick % 200 == 0:
             measured = data.qpos[sim.drive.qadr].copy()
@@ -355,6 +438,7 @@ def run(args):
             q, mask = core.step(.02, measured)
         sim.drive.apply_targets(data, q, mask)
         mujoco.mj_step(model, data)
+        common_work += timestep * float(np.maximum(0., data.actuator_force * data.qvel[sim.drive.vadr]).sum())
         if tick % 50 == 0:
             sample(core, q, mask, common_records)
     mujoco.mj_getState(model, data, saved, state)
@@ -369,6 +453,7 @@ def run(args):
         records = tuple(list(stream) for stream in common_records)
         events = []
         manual = None
+        tro = TroHelixBaseline(sim.lengths) if mode == 'tro' else None
         if args.manual_takeover and mode == 'arc':
             initial_feedback = np.degrees(data.qpos[sim.drive.qadr])
             manual = VerticalRingManual(initial_feedback, sim.lengths, options, helix_targets_deg=np.degrees(q))
@@ -383,14 +468,16 @@ def run(args):
         previous = None
         low_since = None
         feedback_time = float(data.time)
+        branch_work = 0.
+        control_us = []
         for tick in range(round(10. / timestep), round(args.duration / timestep)):
             if tick % 200 == 0:
                 measured = data.qpos[sim.drive.qadr].copy()
                 feedback_time = float(data.time)
             if tick % 20 == 0:
                 try:
-                    nominal_entry = review.corner_z - options.reference_bend_radius_m - .055
-                    if core.stage in ('vertical_helix', 'vertical_ring') and data.site('s_head').xpos[2] >= nominal_entry:
+                    if (not review.straight and tro is None and core.stage in ('vertical_helix', 'vertical_ring') and
+                            data.site('s_head').xpos[2] >= review.corner_z - options.reference_bend_radius_m - .055):
                         if manual is None:
                             core.begin_bend(-.055)
                         else:
@@ -406,11 +493,21 @@ def run(args):
                             if confirmed:
                                 events.append(dict(time_s=float(data.time), command='confirm_outlet',
                                                    source='simulated operator observing ring on horizontal straight'))
-                    if manual is None:
+                    control_start = perf_counter()
+                    if tro is not None:
+                        core.measured = measured
+                        core.phase += core.handedness * options.roll_rate_rad_s * .02
+                        desired = tro.step(measured, core.phase, q, feedback_time, float(data.time))
+                        if desired is not None:
+                            core.target_angle_max = float(np.degrees(max(abs(desired))))
+                            core.apply_reference(desired, .02, mask)
+                            q = core.targets.copy()
+                    elif manual is None:
                         q, mask = core.step(.02, measured, feedback_time)
                     else:
                         manual.advance(.02, float(data.time), feedback_time, np.degrees(measured))
                         q, mask = np.radians(manual.targets), manual.enabled
+                    control_us.append((perf_counter() - control_start) * 1.e6)
                 except (ValueError, FloatingPointError, np.linalg.LinAlgError) as exc:
                     failure = str(exc)
                     break
@@ -419,6 +516,7 @@ def run(args):
                     previous = core.stage
             sim.drive.apply_targets(data, q, mask)
             mujoco.mj_step(model, data)
+            branch_work += timestep * float(np.maximum(0., data.actuator_force * data.qvel[sim.drive.vadr]).sum())
             if tick % 50 == 0:
                 sample(core, q, mask, records)
                 row = records[0][-1]
@@ -436,7 +534,14 @@ def run(args):
         out = root / mode
         out.mkdir()
         summary = summarize(rows, points, statuses, mode, review.weight)
-        summary.update(failure=failure, common_climb_m=common_climb, initial=initial)
+        if review.straight:
+            summary['vertical_continuation'] = summarize_straight(rows, options.roll_rate_rad_s, feature_exit, mode,
+                                                                  square=review.square is not None)
+        if tro is not None:
+            summary['tro_status'] = tro.controller.status
+        summary.update(failure=failure, common_climb_m=common_climb, initial=initial,
+                       positive_mechanical_work_j=common_work + branch_work, branch_positive_work_j=branch_work,
+                       control_tick_us=None if not control_us else np.percentile(control_us, [50, 95, 99]))
         dump(out / 'run.json', dict(summary=summary, samples=rows))
         dump(out / 'controller.json', statuses)
         dump(out / 'operator.json', events)
@@ -453,9 +558,11 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', type=Path)
     p.add_argument('--review', nargs='+', type=Path)
-    p.add_argument('--scene', choices=['acute', 'short'], default='acute')
+    p.add_argument('--scene', choices=('acute', 'short') + STRAIGHT_SCENES, default='acute')
     p.add_argument('--duration', type=float, default=185.)
     p.add_argument('--phase', type=float, default=.4)
+    p.add_argument('--initial-helix-radius', type=float, default=.094)
+    p.add_argument('--taper-length', type=float, default=.15)
     p.add_argument('--ring-pitch', type=float, default=AcuteOptions.ring_pitch_m)
     p.add_argument('--ring-turns', type=float, default=AcuteOptions.ring_turns)
     p.add_argument('--ring-radius-delta', type=float, default=AcuteOptions.ring_radius_delta_m)
@@ -482,9 +589,18 @@ if __name__ == '__main__':
     p.add_argument('--section-seam-clearance', action='store_true')
     p.add_argument('--outlet-end-correction', action='store_true')
     p.add_argument('--outlet-use-spare-length', action='store_true')
+    p.add_argument('--section-feedback-weight', type=float, default=0.)
+    p.add_argument('--section-feedback-gain', type=float, default=.02)
+    p.add_argument('--vertical-use-spare-length', action='store_true')
+    p.add_argument('--vertical-adaptive-material', action='store_true')
+    p.add_argument('--section-bearing-advance', type=float)
+    p.add_argument('--section-feedback-during-release', action='store_true')
+    p.add_argument('--section-preserve-mean-turn', action='store_true')
     p.add_argument('--manual-takeover', action='store_true')
-    p.add_argument('--modes', nargs='+', choices=['helix', 'arc'], default=['helix', 'arc'])
+    p.add_argument('--modes', nargs='+', choices=['helix', 'arc', 'tro'], default=['helix', 'arc'])
     args = p.parse_args()
+    if not 0. < args.taper_length < 2.1:
+        p.error('--taper-length must fit between the taper start and pipe top')
     if args.section_before_bend and not (args.progressive_tail_release and args.section_shell_diameter):
         p.error('--section-before-bend requires --progressive-tail-release and --section-shell-diameter')
     if args.review:

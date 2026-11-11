@@ -1,5 +1,6 @@
 """New reference integrator, near-vertical frames, shared adapter handover."""
 import unittest,math
+from dataclasses import replace
 import numpy as np
 from snake_control.curve_gait import CurveGait,helix
 from snake_control.bent_helix_curve import BentHelixCurve
@@ -98,6 +99,28 @@ class VerticalArcTests(unittest.TestCase):
         np.testing.assert_array_equal(np.flatnonzero(~first), [17])
         np.testing.assert_array_equal(repeat, first)
         np.testing.assert_array_equal(np.flatnonzero(~second), [16, 17])
+
+    def test_section_feedback_updates_once_per_encoder_frame(self):
+        q = self.g.targets([helix(self.g.body_length, .094, .13)], .4)
+        c = AcuteArcTransition(q, self.lengths, replace(vertical_short_options(), section_feedback_weight=.35))
+        c.branch('arc')
+        c.wrap_radius -= .003
+        c.pitch = .075
+        c.section_ring = c.make_section()
+        c.vertical_section = c.section_ring.section_field(-.055)[:2]
+        c.helix_length = c.vertical_section[0][-1]
+        c.enabled = c.ring_mask()
+        c.enter('vertical_ring')
+        _, mask = c.step(.02, q, 1.)
+        positions, correction = c.section_feedback
+        changed = q * .9
+        target, repeated_mask = c.step(.02, changed, 1.)
+        np.testing.assert_array_equal(c.section_feedback[1], correction)
+        np.testing.assert_array_equal(repeated_mask, mask)
+        np.testing.assert_array_equal(target[~mask], changed[~mask])
+        c.step(.02, changed, 1.2)
+        np.testing.assert_array_equal(c.section_feedback[0], positions)
+        self.assertFalse(np.array_equal(c.section_feedback[1], correction))
 
     def test_shared_reference_application_and_horizontal_entry_after_localisation(self):
         q=self.g.targets([helix(self.g.body_length,.094,.13)],.4)

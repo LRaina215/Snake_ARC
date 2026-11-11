@@ -8,23 +8,25 @@ from .bent_helix_curve import BentHelixCurve
 
 class SectionRingCurve(BentHelixCurve):
     def __init__(self, radius, pitch, bend_radius, link_spacing, shell_diameter, *, handedness=1,
-                 endpoint_allowance=False, seam_clearance=False):
+                 endpoint_allowance=False, seam_clearance=False, bearing_advance_m=None):
         super().__init__(radius, pitch, bend_radius, handedness=handedness)
         self.link_spacing = link_spacing
         self.shell_diameter = shell_diameter
         self.endpoint_allowance = endpoint_allowance
         self.seam_clearance = seam_clearance
+        self.bearing_advance_m = shell_diameter * .4 if bearing_advance_m is None else bearing_advance_m
 
-    def section_field(self, head_u, outlet_overlap_m=0.):
+    def section_field(self, head_u, outlet_overlap_m=0., radius_m=None):
         # The lead and return share one moving frame. The nearly planar body
         # spans the full section. Most axial displacement is allocated to the
         # ends, over two link spacings, to keep the shell envelopes apart.
         # A half link covers the joint-centred discretisation at the two ends.
         # The resulting angular overlap is separated by the two axial ramps.
+        radius = self.r if radius_m is None else radius_m
         overlap = self.link_spacing / 2. if self.endpoint_allowance else outlet_overlap_m
-        extent = 2. * math.pi * self.r + overlap
+        extent = 2. * math.pi * radius + overlap
         fraction = np.linspace(0., 1., 481)
-        theta = math.pi - self.handedness * (extent / self.r) * fraction
+        theta = math.pi - self.handedness * (extent / radius) * fraction
         if self.seam_clearance:
             transition = 2. * self.link_spacing
             plateau = overlap + self.link_spacing / 2.
@@ -42,7 +44,7 @@ class SectionRingCurve(BentHelixCurve):
                     - np.maximum(0., 1. - (1. - fraction) / transition)**3)
         # Use the measured shell diameter for tip clearance. Leave the shallow
         # material advance of one head length on the bearing segment itself.
-        bearing_advance = min(self.pitch, self.shell_diameter * .4)
+        bearing_advance = min(self.pitch, self.bearing_advance_m)
         separation = max(self.pitch, self.shell_diameter)
         axial = bearing_advance * (.5 - fraction) + .5 * (separation - bearing_advance) * ends
         u = head_u - separation * .5
@@ -50,7 +52,7 @@ class SectionRingCurve(BentHelixCurve):
         normal = normal[0]
         tangent = np.array([-normal[2], 0., normal[0]])
         radial = np.cos(theta)[:, None] * normal + np.sin(theta)[:, None] * [0., 1., 0.]
-        points = center[0] + self.r * radial + axial[:, None] * tangent
+        points = center[0] + radius * radial + axial[:, None] * tangent
         material = np.r_[0., np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))]
         samples = np.linspace(0., material[-1], 481)
         points = np.column_stack([np.interp(samples, material, axis) for axis in points.T])
