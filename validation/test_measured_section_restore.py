@@ -19,6 +19,7 @@ import numpy as np
 from codes import Rolling_Arc_Real as real
 from codes import Rolling_Arc_Debug_Mujoco as debug
 from snake_control import fixed_section_compliance as research
+from snake_control.adaptive_arc_length import HalfArcParameters
 from snake_control.motor_feedback_sliding import MotorFeedbackSliding
 from snake_control.motor_shape_observer import PhaseShapeReference
 from validation.test_repeated_motor_port import AngleBus, RecordingSerial
@@ -63,6 +64,25 @@ def reference_angles(reference, geometry, first, last, phase, gain):
 
 
 class MeasuredSectionRestoreTests(unittest.TestCase):
+    def test_open_projection_retains_measured_target_direction_without_shape_hold(self):
+        parameters = HalfArcParameters()
+        phase = .48
+        measured = 1.08 * parameters.targets(phase)
+        mask = parameters.enabled
+        original = research.FixedSectionCompliance(parameters, parameters.mechanical_lengths_m)
+        projected = research.FixedSectionCompliance(parameters, parameters.mechanical_lengths_m,
+            research.SectionOptions(project_open_goal=True))
+        for core in (original, projected):
+            core.update(measured, phase, 0., .02)
+        self.assertEqual(original.status, 'measured-section target outside opening')
+        self.assertEqual(projected.status, 'running')
+        turn = projected.snapshot()['target_section_turn_deg']
+        self.assertGreater(turn, 189.)
+        self.assertLessEqual(turn, 190.)
+        scale = np.linalg.norm(projected.last_goal[mask]) / np.linalg.norm(original.last_goal[mask])
+        np.testing.assert_allclose(projected.last_goal[mask], scale * original.last_goal[mask])
+        np.testing.assert_array_equal(projected.last_goal[~mask], measured[~mask])
+
     def test_matches_original_reference_and_ignores_nominal_amplitude(self):
         reference = reference_module()
         for first, last in ((8, 13), (5, 9)):

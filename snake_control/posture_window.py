@@ -7,6 +7,7 @@ not a measurement of gravity or evidence of support.
 import copy
 from dataclasses import asdict, dataclass, replace
 import math
+from typing import Optional
 import numpy as np
 
 from .adaptive_arc_length import circle_shape
@@ -33,6 +34,15 @@ class PostureWindowOptions:
     shorter_trial_count_margin_joints: float = .25
     shorter_trial_turn_error_deg: float = -2.
     contract_exit_angle_deg: float = 12.
+    minimum_loaded_turn_deg: Optional[float] = None
+    anticipate_tangent_loss: bool = False
+
+    def __post_init__(self):
+        turn = self.minimum_loaded_turn_deg
+        if turn is not None and not 0. < turn < 180.:
+            raise ValueError('Expansion tangent threshold must lie between 0 and 180 degrees')
+        if self.anticipate_tangent_loss and turn is None:
+            raise ValueError('Anticipating tangent loss requires a tangent threshold')
 
 
 def nominal_angles(lengths, window, phase):
@@ -181,6 +191,7 @@ class PostureWindow(MotorFeedbackSliding):
         self.observation = None
         self.filtered_count = None
         self.count_history = PhaseBalancedCount(maximum_feedback_gap_s=2.5*self.feedback_period_s)
+        self.tangent_history = PhaseBalancedCount(maximum_feedback_gap_s=2.5*self.feedback_period_s)
         self.count_observation = None
         self.intent = self.intent_since = None
 
@@ -230,6 +241,7 @@ class PostureWindow(MotorFeedbackSliding):
             return
         if not o['valid']:
             self.count_history.reset()
+            self.tangent_history.reset()
             self.count_observation = dict(valid=False, reason='current shape not reliable')
             return
         width = self.window[1]-self.window[0]+1
@@ -240,6 +252,7 @@ class PostureWindow(MotorFeedbackSliding):
         estimated_count = width*180./max(actual['coverage_deg'], 1e-8)
         if actual['circle_rms_m'] > self.posture_options.circle_rms_max_m:
             self.count_history.reset()
+            self.tangent_history.reset()
             self.count_observation = dict(valid=False, reason='body circle fit not reliable', actual_body_circle=actual)
             return
         phase_statistics = self.count_history.update(estimated_count, actual['coverage_deg'], self.feedback_phase,
@@ -249,6 +262,14 @@ class PostureWindow(MotorFeedbackSliding):
             raw_count_joints=estimated_count, actual_body_circle=actual, nominal_body_circle=None,
             target_coverage_deg=180., required_arc_length_m=math.pi*actual['radius_m'],
             phase_statistics=phase_statistics, observes_support=False, observes_pipe_radius=False)
+        if self.posture_options.minimum_loaded_turn_deg is not None:
+            self.count_observation['tangent_statistics'] = self.tangent_history.update(
+                estimated_count, actual['turn_deg'], self.feedback_phase, self.last_time)
+            if self.posture_options.anticipate_tangent_loss:
+                recent = self.tangent_history.samples
+                lag = self.tangent_history.travel - recent[0]['travel_rad']
+                if lag >= math.pi - .25:
+                    self.count_observation['recent_tangent_loss_deg'] = recent[0]['turn_deg'] - actual['turn_deg']
 
     def _select(self, angles, time_s):
         o, count = self.observation, self.count_observation
@@ -300,6 +321,14 @@ class PostureWindow(MotorFeedbackSliding):
         elif ready and self.filtered_count <= width-option.count_hysteresis_joints and stats['balanced_turn_error_deg'] >= option.contraction_turn_error_deg:
             delta_width = -1
             length_reason = 'measured_coverage_above_half_circle'
+        if option.minimum_loaded_turn_deg is not None and count:
+            tangent = count.get('tangent_statistics', {})
+            early = (option.anticipate_tangent_loss and count.get('recent_tangent_loss_deg', 0.) >= 10. and
+                     actual is not None and actual['turn_deg'] <= option.minimum_loaded_turn_deg + 20.)
+            if early or (tangent.get('ready') and sum(turn < option.minimum_loaded_turn_deg
+                                                      for turn in tangent['group_turn_medians_deg']) >= 2):
+                delta_width = 1
+                length_reason = 'measured_tangent_turn_declining' if early else 'measured_tangent_turn_low_across_phases'
         if evidence == 'persistent_intrinsic_bending_and_boundary':
             delta_width = 0
             length_reason = 'intrinsic_slide_only_resize_waits_for_down'
@@ -333,6 +362,9 @@ class PostureWindow(MotorFeedbackSliding):
             c['score'] = abs(coverage-180.)/30.+.25*c['center_error_joints']
             if operation == 'contract' and actual is not None:
                 c['eligible'] &= abs(coverage-180.)+1. < abs(actual['coverage_deg']-180.)
+                if option.minimum_loaded_turn_deg is not None and not mechanically_feasible(
+                        self.lengths, w, option.nominal_joint_margin_rad):
+                    c.update(eligible=False, reason='candidate_cannot_form_half_circle_across_phase')
         usable = [c for c in candidates if c['eligible']]
         best = min(usable, key=lambda c: c['score']) if usable else None
         self.selection = dict(state=operation if best else 'retain' if not windows else 'blocked_candidates',

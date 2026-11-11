@@ -58,14 +58,21 @@ def main():
     parser.add_argument('path', type=Path)
     parser.add_argument('--manual-panel-only', action='store_true')
     args = parser.parse_args()
-    rows = load(args.path/'actual_trace.jsonl.gz')
+    shared_section = (args.path/'records.jsonl.gz').is_file()
+    rows = load(args.path/('records.jsonl.gz' if shared_section else 'actual_trace.jsonl.gz'))
     if args.manual_panel_only:
         manual_panel(args.path, rows)
         return
-    evaluation = load(args.path/'evaluation.jsonl.gz')
-    status = json.loads((args.path/'status.json').read_text(encoding='utf8'))
+    evaluation = ([dict(row, body_geometry=row['body_shape']) for row in rows] if shared_section else
+                  load(args.path/'evaluation.jsonl.gz'))
+    status = json.loads((args.path/('run.json' if shared_section else 'status.json')).read_text(encoding='utf8'))
     scene_name = status.get('scene', 'straight')
-    model = mujoco.MjModel.from_xml_path(str(ROOT/'mujoco_model'/f'Snake_Robot_o20_Rolling_Arc_{scene_name}.xml'))
+    if shared_section:
+        assets = (ROOT/'mujoco_model'/'asset').as_posix() + '/'
+        xml = (args.path/'model.xml').read_text(encoding='utf-8').replace('./asset/', assets)
+        model = mujoco.MjModel.from_xml_string(xml)
+    else:
+        model = mujoco.MjModel.from_xml_path(str(ROOT/'mujoco_model'/f'Snake_Robot_o20_Rolling_Arc_{scene_name}.xml'))
     data = mujoco.MjData(model)
     if not glfw.init():
         raise RuntimeError('Cannot initialize archived-state renderer')
@@ -78,12 +85,14 @@ def main():
     scene = mujoco.MjvScene(model, maxgeom=5000)
     context = mujoco.MjrContext(model, mujoco.mjtFontScale.mjFONTSCALE_150)
     option, camera = mujoco.MjvOption(), mujoco.MjvCamera()
-    camera.distance, camera.azimuth, camera.elevation = 1.8, 125., -12.
+    camera.distance, camera.azimuth, camera.elevation = (1.65, -55., 23.) if shared_section else (1.8, 125., -12.)
     viewport = mujoco.MjrRect(0, 0, 960, 600)
     rgb = np.empty((600, 960, 3), np.uint8)
-    movie = ROOT/'validation/results'/args.path.parent.name/(args.path.name+'.mp4')
+    movie = (args.path/'process_4x.mp4' if shared_section else
+             ROOT/'validation/results'/args.path.parent.name/(args.path.name+'.mp4'))
     movie.parent.mkdir(parents=True, exist_ok=True)
-    writer = cv2.VideoWriter(str(movie), cv2.VideoWriter_fourcc(*'mp4v'), 10, (960, 600))
+    fps = 15 if shared_section else 10
+    writer = cv2.VideoWriter(str(movie), cv2.VideoWriter_fourcc(*'mp4v'), fps, (960, 600))
     if not writer.isOpened():
         raise RuntimeError('Cannot create movie writer')
     frames = 0
@@ -91,7 +100,7 @@ def main():
         data.qpos[:], data.qvel[:], data.time = row['actual_qpos'], row['actual_qvel'], row['time_s']
         mujoco.mj_forward(model, data)
         center = backbone(model, data).mean(axis=0)
-        camera.lookat[:] = [center[0], center[1], .95]
+        camera.lookat[:] = [center[0], center[1], 1.04 if shared_section else .95]
         model.geom_rgba[model.geom_bodyid >= model.body('head').id] = [.50, .26, .70, 1]
         active = np.flatnonzero(row['enabled'])+1
         for j in active:
@@ -107,7 +116,13 @@ def main():
             text += f"\nphase={c['phase_rad']:.3f}rad | fault={c.get('fault') or c.get('resize_fault') or 'none'}"
             force = np.asarray(row.get('external_force_world', []))
             magnitude = float(np.linalg.norm(force[:, :3], axis=1).sum()) if force.size else 0.
-            text += f"\nApplied force sum={magnitude:.1f}N | feedback={status.get('motor_feedback_period_s', .02):g}s"
+            feedback_period = status.get('motor_feedback_period_s', status.get('angle_period_s', .02))
+            text += f"\nApplied force sum={magnitude:.1f}N | feedback={feedback_period:g}s"
+            if shared_section:
+                text += (f"\nBody turn {row['body_shape']['turn_deg']:.1f} deg"
+                         f" | last shell to exit {1000*row['last_shell_outlet_m']:+.1f} mm")
+                if row['outlet_advance_m'] is not None:
+                    text += f"\nAfter full exit: {1000*row['outlet_advance_m']:+.1f} mm"
             mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPLEFT,
                                viewport, 'Saved actual motion\nBlue: enabled  Purple: disabled', text, context)
             glfw.swap_buffers(surface)
@@ -115,7 +130,13 @@ def main():
         return np.flipud(rgb).copy()
     panels = []
     try:
-        for row in rows[::5]:
+        if shared_section:
+            times = [row['time_s'] for row in rows]
+            frame_indices = np.unique(np.r_[np.searchsorted(times, np.arange(0., times[-1], 4./fps)), len(rows)-1])
+        else:
+            frame_indices = range(0, len(rows), 5)
+        for index in frame_indices:
+            row = rows[index]
             writer.write(cv2.cvtColor(render(row), cv2.COLOR_RGB2BGR)); frames += 1
         wanted = [0., 2.]
         complete = [e for e in status['events'] if e['kind'] in ('complete', 'resize_step', 'resize_complete')]
@@ -144,7 +165,7 @@ def main():
     for i, panel in enumerate(panels):
         montage.paste(panel, ((i % 2)*640, (i//2)*426))
     montage.save(args.path/'actual_montage.png')
-    (args.path/'render.json').write_text(json.dumps(dict(movie=str(movie), frames=frames, fps=10,
+    (args.path/'render.json').write_text(json.dumps(dict(movie=str(movie), frames=frames, fps=fps,
         full_time_range_s=[rows[0]['time_s'], rows[-1]['time_s']], snapshot_times_s=wanted,
         method='mj_forward saved actual qpos/qvel; no mj_step'), indent=2), encoding='utf8')
     print(movie)

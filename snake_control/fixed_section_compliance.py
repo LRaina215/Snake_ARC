@@ -22,6 +22,7 @@ class SectionOptions:
     maximum_section_turn_deg: float = 190.
     minimum_gap_fraction: float = .4
     correct_discrete_turn: bool = True
+    project_open_goal: bool = False
 
     def __post_init__(self):
         if not all(math.isfinite(v) for v in asdict(self).values()):
@@ -131,6 +132,22 @@ class FixedSectionCompliance:
             valid = True  # DIY只记录形态，不按研究阈值拒绝目标。
         return valid, geometry
 
+    def _limit_measured_goal(self, goal):
+        # Keep the measured deformation's relative curvature and phase.
+        # Find the largest admissible scale against the actual linkage.
+        lower, upper = 0., 1.
+        candidate = goal.copy()
+        for _ in range(12):
+            scale = .5 * (lower + upper)
+            candidate[self.enabled] = scale * goal[self.enabled]
+            valid, _ = self._check_goal(candidate)
+            if valid:
+                lower = scale
+            else:
+                upper = scale
+        candidate[self.enabled] = lower * goal[self.enabled]
+        return candidate
+
     def update(self, measured, phase, time_s, dt, reference_targets=None):
         """Read actual shape and return one full-size angle command.
 
@@ -164,6 +181,9 @@ class FixedSectionCompliance:
             valid, goal_geometry = self._check_goal(goal)
             if not valid:
                 self.clipped += 1
+                if self.options.project_open_goal:
+                    goal = self._limit_measured_goal(goal)
+                    valid, goal_geometry = self._check_goal(goal)
             self.last_goal, self.target_geometry = goal, goal_geometry
             self.status = 'running' if valid else 'measured-section target outside opening'
         # Hold the candidate between geometry updates; filter it at every
