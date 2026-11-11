@@ -19,11 +19,12 @@ from snake_control.curve_gait import CurveGait, helix
 from snake_control.simulation import backbone
 from snake_control.vertical_scene import VerticalScene
 from snake_control.vertical_ring_manual import VerticalRingManual
-from tools.build_vertical_arc_scene import build
+from tools.build_vertical_arc_scene import GENERATED_STRAIGHT_SCENES, build
 from validation.vertical_arc_experiment import json_default
 from validation.tro_helix_baseline import TroHelixBaseline, REFERENCE
 
-STRAIGHT_SCENES = ('straight', 'straight_wide', 'variable', 'variable_return', 'square', 'round_to_square')
+STRAIGHT_SCENES = ('straight',) + GENERATED_STRAIGHT_SCENES
+VERTICAL_FEATURES = ('variable', 'variable_return', 'round_to_square', 'collar', 'twin')
 
 
 def dump(path, value):
@@ -40,6 +41,8 @@ class AcuteReview:
         horizontal = None if self.straight else model.geom('pipe_horizontal').id
         data = sim.data
         mujoco.mj_kinematics(model, data)
+        self.twin = tuple(model.geom(name).id for name in ('pipe_twin_small', 'pipe_twin_large')) if sim.scene == 'twin' else ()
+        self.twin_centers = data.geom_xpos[list(self.twin), :2].copy()
         self.corner_z = None if self.straight else float(data.geom_xpos[horizontal, 2])
         self.material = np.r_[0., np.cumsum(sim.lengths)]
         self.route = model.numeric('pipe_centerline').data.reshape(-1, 4)[:, :3]
@@ -87,8 +90,10 @@ class AcuteReview:
         m, d = self.sim.model, self.sim.data
         normal = dict(vertical=0., elbow=0., horizontal=0.)
         up = dict(vertical=0., elbow=0., horizontal=0.)
+        normal_up = dict.fromkeys(normal, 0.)
         link_normal = {}
         corners = set()
+        twin_normals = dict.fromkeys(self.twin, 0.)
         for i, c in enumerate(d.contact):
             a, b = int(c.geom1), int(c.geom2)
             if a in self.robot and b in self.sim.pipe_geoms:
@@ -106,9 +111,13 @@ class AcuteReview:
             if pipe == self.square and min(abs(c.pos[:2])) >= .65 * m.geom_size[pipe, 0]:
                 corners.add((int(c.pos[0] > 0), int(c.pos[1] > 0)))
             key = 'vertical' if self.straight or pipe == self.vertical else 'horizontal' if pipe == self.horizontal else 'elbow'
+            frame = c.frame.reshape(3, 3)
             normal[key] += force[0]
-            up[key] += float(sign * (c.frame.reshape(3, 3).T @ force[:3])[2])
-        return normal, up, link_normal, sorted(corners)
+            up[key] += float(sign * frame[:, 2] @ force[:3])
+            normal_up[key] += float(sign * frame[0, 2] * force[0])
+            if pipe in twin_normals:
+                twin_normals[pipe] += force[0]
+        return normal, up, normal_up, link_normal, sorted(corners), list(twin_normals.values())
 
     def wrap_shape(self, points, start, stop, pre_bend, horizontal):
         # Dense samples are points on the *actual* robot's link polyline.
@@ -148,7 +157,13 @@ class AcuteReview:
         rms = float(np.std((ring - mean) @ tilt))
         gap = float(np.linalg.norm(ring[0] - ring[-1]))
         straight_pitch = float(abs(np.linalg.lstsq(np.c_[angle, np.ones(len(angle))], axial, rcond=None)[0][0]) * 2 * np.pi)
-        return dict(wrap_deg=turn, span_m=span, plane_rms_m=rms, end_gap_m=gap,
+        twin_turns = []
+        if self.twin:
+            for xy in self.twin_centers:
+                x, y = (ring[:, :2] - xy).T
+                winding = np.unwrap(np.arctan2(y, x))
+                twin_turns.append(abs(float(np.degrees(winding[-1] - winding[0]))))
+        return dict(wrap_deg=turn, span_m=span, plane_rms_m=rms, end_gap_m=gap, twin_turn_deg=twin_turns,
                     minimum_radius_m=float(radius.min()), maximum_radius_m=float(radius.max()),
                     fitted_normal=tilt.tolist(), ring_center_m=mean.tolist(), fitted_pitch_m=straight_pitch,
                     ring_shape=bool(325. <= turn <= 395. and span <= .100 and rms <= .027 and radius.max() < .170))
@@ -156,7 +171,7 @@ class AcuteReview:
     def sample(self, core, target, mask):
         m, d = self.sim.model, self.sim.data
         points = backbone(m, d)
-        normal, up, link_normal, corners = self.support()
+        normal, up, normal_up, link_normal, corners, twin_normals = self.support()
         last_x = self.last_envelope(0)
         row = self.sim.evaluate(target, mask)
         clear = (not self.straight and last_x >= self.exit_x and normal['elbow'] + normal['vertical'] <= .1
@@ -172,8 +187,9 @@ class AcuteReview:
                     last_envelope_z_m=self.last_envelope(2) if self.straight else None,
                     head_xyz_m=points[0].tolist(), tail_xyz_m=points[-1].tolist(),
                     pre_bend=pre_bend,
-                    normal_n=normal, up_n=up, supporting_links=sorted(link_normal), link_normal_n=link_normal,
-                    square_corner_contacts=corners,
+                    normal_n=normal, up_n=up, normal_up_n=normal_up,
+                    supporting_links=sorted(link_normal), link_normal_n=link_normal,
+                    square_corner_contacts=corners, twin_normal_n=twin_normals,
                     clear_supported=bool(full_support), exit_attached=bool(clear and normal['horizontal'] > 1.),
                     maximum_curvature_per_m=float(np.max(turns / ((self.sim.lengths[:-1] + self.sim.lengths[1:]) * .5))),
                     **row, **ring)
@@ -288,7 +304,7 @@ def review_saved(folder):
     if evaluator.straight:
         result['vertical_continuation'] = summarize_straight(
             rows, hypothesis['options']['roll_rate_rad_s'], hypothesis['feature_exit_z_m'], folder.name,
-            square=evaluator.square is not None)
+            square=evaluator.square is not None, twin=bool(evaluator.twin))
     result.update(exit_x_m=evaluator.exit_x, failure=original['summary']['failure'],
                   enabled_count_min_max=[int(enabled_count.min()), int(enabled_count.max())],
                   total_pipe_normal_peak_n=max(sum(r['normal_n'].values()) for r in rows),
@@ -306,7 +322,7 @@ def review_saved(folder):
     return result
 
 
-def summarize_straight(rows, rate, feature_exit, mode, square=False):
+def summarize_straight(rows, rate, feature_exit, mode, square=False, twin=False):
     stage = 'vertical_ring' if mode == 'arc' else 'vertical_helix'
     ring = [r for r in rows if r['stage'] == stage]
     if not ring:
@@ -317,6 +333,8 @@ def summarize_straight(rows, rate, feature_exit, mode, square=False):
     times = np.array([r['time_s'] for r in ring])
     shape = np.array([r['ring_shape'] if mode == 'arc' else
                       r['fitted_pitch_m'] >= .095 and r['wrap_deg'] >= 365. for r in ring])
+    if twin:
+        shape &= np.array([min(r['twin_turn_deg']) >= 325. for r in ring])
     above = np.array([feature_exit is None or r['last_envelope_z_m'] >= feature_exit for r in ring])
     contact = np.array([bool(r['supporting_links']) for r in ring])
     collision_free = np.array([not r['self_contacts'] and r['floor_force_n'] <= .1 for r in ring])
@@ -329,14 +347,16 @@ def summarize_straight(rows, rate, feature_exit, mode, square=False):
             break
         window = ring[begin:end + 1]
         corners = sorted({tuple(corner) for r in window for corner in r.get('square_corner_contacts', [])})
+        twin_contact = bool(np.all(np.max([r['twin_normal_n'] for r in window], axis=0) >= 1.)) if twin else None
         candidate = dict(time_s=[float(times[begin]), float(times[end])],
                             net_up_m=float(height[end] - height[begin]), gait_shape_all=bool(shape[begin:end + 1].all()),
                             contact_all=bool(contact[begin:end + 1].all()),
-                            square_corners=corners if square else None,
+                            square_corners=corners if square else None, twin_contact_both=twin_contact,
                             collision_free_all=bool(collision_free[begin:end + 1].all()),
                             above_feature_all=bool(above[begin:end + 1].all()))
         valid = (candidate['gait_shape_all'] and candidate['contact_all'] and candidate['collision_free_all'] and
-                 candidate['above_feature_all'] and candidate['net_up_m'] > 0. and (not square or len(corners) == 4))
+                 candidate['above_feature_all'] and candidate['net_up_m'] > 0. and
+                 (not square or len(corners) == 4) and (not twin or twin_contact))
         if feature_exit is not None and continuation is None:
             continuation = candidate
         if valid:
@@ -357,7 +377,7 @@ def run(args):
     root = args.output
     root.mkdir(parents=True, exist_ok=False)
     model_copy = root / 'model.xml'
-    if args.scene in ('straight_wide', 'variable', 'variable_return', 'square', 'round_to_square'):
+    if args.scene in GENERATED_STRAIGHT_SCENES:
         build(args.scene, model_copy, taper_length_m=args.taper_length, upper_diameter_m=args.upper_pipe_diameter)
     sim = VerticalScene(args.scene, recorded_model=model_copy if model_copy.exists() else None)
     model, data = sim.model, sim.data
@@ -400,6 +420,7 @@ def run(args):
                       vertical_material_return_phase_rad=args.vertical_material_return_phase,
                       vertical_return_advance_m=args.vertical_return_advance,
                       section_bearing_advance_m=args.section_bearing_advance,
+                      section_flat_advance_weight=args.section_flat_advance_weight,
                       section_feedback_during_release=args.section_feedback_during_release,
                       section_preserve_mean_turn=args.section_preserve_mean_turn,
                       section_local_handoff=args.section_local_handoff,
@@ -407,13 +428,14 @@ def run(args):
     if not model_copy.exists():
         shutil.copyfile(sim.model_path, model_copy)
     route = model.numeric('pipe_centerline').data.reshape(-1, 4)
-    feature_exit = float(route[-2, 2]) if args.scene in ('variable', 'variable_return', 'round_to_square') else None
+    feature_exit = float(route[-2, 2]) if args.scene in VERTICAL_FEATURES else None
     pipe = review.vertical if review.straight else review.horizontal
     dump(root / 'hypothesis.json', dict(case='straight' if review.straight else 'acute', scene=args.scene,
          hypothesis=('The measured section maintains ring shape and vertical grip through the vertical course' if review.straight
                      else 'The selected curve can carry the whole robot through the elbow and keep its gait on the outlet'),
          diameter_m=2 * route[0, 3] if review.square != pipe else None,
          square_side_m=None if review.square is None else 2 * model.geom_size[review.square, 0],
+         twin_diameters_m=[2. * model.geom_size[i, 0] for i in review.twin], twin_centers_m=review.twin_centers,
          route_radii_m=np.unique(route[:, 3]), feature_exit_z_m=feature_exit,
          vertical_axis=[0, 0, 1], horizontal_axis=[1, 0, 0],
          corner_z_m=review.corner_z, entry_z_m=review.entry_z, exit_x_m=review.exit_x,
@@ -553,7 +575,7 @@ def run(args):
         summary = summarize(rows, points, statuses, mode, review.weight)
         if review.straight:
             summary['vertical_continuation'] = summarize_straight(rows, options.roll_rate_rad_s, feature_exit, mode,
-                                                                  square=review.square is not None)
+                                                                  square=review.square is not None, twin=bool(review.twin))
         if tro is not None:
             summary['tro_status'] = tro.controller.status
         summary.update(failure=failure, common_climb_m=common_climb, initial=initial,
@@ -619,6 +641,7 @@ if __name__ == '__main__':
     p.add_argument('--vertical-material-return-phase', type=float, default=0.)
     p.add_argument('--vertical-return-advance', type=float)
     p.add_argument('--section-bearing-advance', type=float)
+    p.add_argument('--section-flat-advance-weight', type=float, default=0.)
     p.add_argument('--section-feedback-during-release', action='store_true')
     p.add_argument('--section-preserve-mean-turn', action='store_true')
     p.add_argument('--section-local-handoff', action='store_true')

@@ -16,7 +16,8 @@ class SectionRingCurve(BentHelixCurve):
         self.seam_clearance = seam_clearance
         self.bearing_advance_m = shell_diameter * .4 if bearing_advance_m is None else bearing_advance_m
 
-    def section_field(self, head_u, outlet_overlap_m=0., radius_m=None, separation_m=None, bearing_advance_m=None):
+    def section_field(self, head_u, outlet_overlap_m=0., radius_m=None, separation_m=None,
+                      bearing_advance_m=None, bearing_profile=None):
         # The lead and return share one moving frame. The nearly planar body
         # spans the full section. Most axial displacement is allocated to the
         # ends, over two link spacings, to keep the shell envelopes apart.
@@ -46,7 +47,14 @@ class SectionRingCurve(BentHelixCurve):
         # material advance of one head length on the bearing segment itself.
         bearing_advance = min(self.pitch, self.bearing_advance_m if bearing_advance_m is None else bearing_advance_m)
         separation = max(self.pitch if separation_m is None else separation_m, self.shell_diameter)
-        axial = bearing_advance * (.5 - fraction) + .5 * (separation - bearing_advance) * ends
+        advance_fraction = fraction
+        if bearing_profile is not None:
+            positions, density = bearing_profile
+            mid_fraction = .5 * (fraction[:-1] + fraction[1:])
+            steps = np.interp(mid_fraction * extent, positions, density, left=1., right=1.)
+            advance_fraction = np.r_[0., np.cumsum(steps)]
+            advance_fraction /= advance_fraction[-1]
+        axial = bearing_advance * (.5 - advance_fraction) + .5 * (separation - bearing_advance) * ends
         u = head_u - separation * .5
         center, normal = self.axis(np.array([u]))
         normal = normal[0]

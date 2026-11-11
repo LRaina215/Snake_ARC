@@ -62,6 +62,7 @@ class AcuteOptions:
     vertical_material_return_phase_rad: float = 0.
     vertical_return_advance_m: Optional[float] = None
     section_bearing_advance_m: Optional[float] = None
+    section_flat_advance_weight: float = 0.
     section_feedback_during_release: bool = False
     section_preserve_mean_turn: bool = False
     section_local_handoff: bool = False
@@ -140,6 +141,9 @@ class AcuteArcTransition(HelixArcTransition):
             raise ValueError('Bend reshaping requires a fixed material interval with spare arc length')
         if options.section_bearing_advance_m is not None and not 0. <= options.section_bearing_advance_m <= options.ring_pitch_m:
             raise ValueError('Bearing advance must fit inside the available axial offset')
+        if not 0. <= options.section_flat_advance_weight < 1. or (options.section_flat_advance_weight and
+                not (options.section_feedback_weight and options.vertical_use_spare_length)):
+            raise ValueError('Shape-dependent advance needs a measured section and weight in [0, 1)')
         if options.vertical_return_advance_m is not None and (not options.vertical_adaptive_material or
                 not 0. < options.vertical_return_advance_m < (options.section_bearing_advance_m or 0.)):
             raise ValueError('Return advance requires an adaptive ring and a smaller bearing advance')
@@ -321,9 +325,27 @@ class AcuteArcTransition(HelixArcTransition):
             overlap = self.ring_spare_overlap() + self.ring_overlap_offset
             if overlap > 0.:
                 bearing = self.section_ring.bearing_advance_m - self.vertical_advance_trim
+                profile = None
+                if self.acute.section_flat_advance_weight and self.section_feedback is not None:
+                    # Preserve the net advance and the shoulder clearance.
+                    # Give the flat spans more of the advance so that the
+                    # actual corners can round the pipe with less axial twist.
+                    positions, correction = self.section_feedback
+                    edge = np.minimum(positions, self.helix_length - positions)
+                    taper = np.clip(edge / (2. * self.l), 0., 1.)
+                    normalized = np.clip(correction * self.wrap_radius, -1., 1.)
+                    density = 1. - self.acute.section_flat_advance_weight * normalized * taper
+                    profile = positions, density
                 cut, compact, _ = self.section_ring.section_field(
-                    -.055, overlap, self.wrap_radius + self.ring_radius_offset, bearing_advance_m=bearing)
-                self.helix_length = cut[-1]
+                    -.055, overlap, self.wrap_radius + self.ring_radius_offset,
+                    bearing_advance_m=bearing, bearing_profile=profile)
+            # The carrier has already taken the load. Subsequent material
+            # growth changes its circumference, not its takeover stage.
+            self.helix_length = cut[-1]
+            self.section_weight = 1.
+            bounds = np.r_[cut, self.L]
+            field = np.vstack([compact, [0., 0.]])
+            return self.section_targets(bounds, field, feedback_time)
         nominal = self.acute.ring_turns * helix_turn_length(self.wrap_radius, self.pitch)
         lead = min(nominal, self.helix_length)
         blend = float(np.clip((nominal + 2.*self.l - self.helix_length) / (2.*self.l), 0., 1.))
@@ -464,6 +486,12 @@ class AcuteArcTransition(HelixArcTransition):
         self.ring_turn_error_filtered += weight * (target - turn - self.ring_turn_error_filtered)
         desired = np.clip(self.acute.vertical_material_radius_gain * (self.ring_radius_filtered - .001),
                           0., 2. * self.l / (2. * math.pi))
+        if self.acute.vertical_material_minimum_wrap_deg:
+            # Accumulate material before opening the target radius. Keep a
+            # half-spacing reserve for an end whose contact is still on the
+            # smaller section of the taper.
+            available = max(0., self.ring_overlap_offset - .5 * self.l)
+            desired = min(desired, available / (2. * math.pi))
         self.ring_radius_offset += float(np.clip(desired - self.ring_radius_offset, -.003*dt, .003*dt))
         # Widening the reference is only part of the handover. If measured
         # coverage has shortened, extend material without forcing a further

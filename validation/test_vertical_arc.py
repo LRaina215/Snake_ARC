@@ -134,6 +134,34 @@ class VerticalArcTests(unittest.TestCase):
         self.assertAlmostEqual(result['sustained_continuation']['time_s'][0], .5)
         self.assertTrue(result['sustained_continuation']['above_feature_all'])
 
+    def test_twin_review_requires_enclosure_and_contact_on_both_pipes(self):
+        rows = [dict(stage='vertical_ring', time_s=i*.1, ring_center_m=[0.,0.,1.+i*.01],
+                     last_envelope_z_m=1.01, ring_shape=True, supporting_links=[2, 5],
+                     floor_force_n=0., self_contacts=[], normal_n={'vertical': 20.},
+                     twin_turn_deg=[350., 25.], twin_normal_n=[20., 0.]) for i in range(15)]
+        self.assertIsNone(summarize_straight(rows, 2.*math.pi, 1., 'arc', twin=True)['sustained_continuation'])
+        for row in rows:
+            row['twin_turn_deg'][1] = 350.
+        self.assertIsNone(summarize_straight(rows, 2.*math.pi, 1., 'arc', twin=True)['sustained_continuation'])
+        rows[4]['twin_normal_n'][1] = 4.
+        self.assertIsNotNone(summarize_straight(rows, 2.*math.pi, 1., 'arc', twin=True)['sustained_continuation'])
+
+    def test_extending_an_established_ring_does_not_restore_takeover_helix(self):
+        q = self.g.targets([helix(self.g.body_length, .094, .13)], .4)
+        options = replace(vertical_short_options(), vertical_use_spare_length=True, section_feedback_weight=.35)
+        core = AcuteArcTransition(q, self.lengths, options)
+        core.branch('arc')
+        core.pitch = options.ring_pitch_m
+        core.section_ring = core.make_section()
+        core.vertical_section = core.section_ring.section_field(-.055)[:2]
+        core.helix_length = core.vertical_section[0][-1]
+        core.enter('vertical_ring')
+        core.ring_overlap_offset = .090
+        bounds, field, _ = core.section_ring.section_field(-.055, .090)
+        expected = core.curve.sampled_targets(np.r_[bounds, core.L], np.vstack([field, [0., 0.]]), core.phase)
+        np.testing.assert_allclose(core.vertical_section_reference(), expected)
+        self.assertEqual(core.section_weight, 1.)
+
     def test_shared_reference_application_and_horizontal_entry_after_localisation(self):
         q=self.g.targets([helix(self.g.body_length,.094,.13)],.4)
         c=VerticalArcTransition(q,self.lengths,VerticalArcOptions(phase_rate_rad_s=-.5,retained_turns=1.5,finish_after_pilot=False))

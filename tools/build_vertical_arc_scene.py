@@ -13,6 +13,7 @@ SHARP_SCALE=PIPE_RADIUS/.0565
 SHARP_LEG=.15*SHARP_SCALE
 SHORT_BEND_RADIUS=.105
 SQUARE_HALF_WIDTH=2. * np.pi * PIPE_RADIUS / 8.
+GENERATED_STRAIGHT_SCENES = ('straight_wide', 'variable', 'variable_return', 'square', 'round_to_square', 'collar', 'twin')
 
 
 def axis(u,radius=BEND_RADIUS,entry=BEND_HEIGHT):
@@ -96,8 +97,37 @@ def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140):
         cylinder.set('size', str(upper_radius))
         cylinder.set('fromto', '0 0 -.2 0 0 4')
         route = np.array([[0.,0.,-.2,upper_radius], [0.,0.,4.,upper_radius]])
-    elif scene in ('variable', 'variable_return', 'square', 'round_to_square'):
+    elif scene == 'twin':
+        # A scaled analogue of the published 200 -> 100/150 mm specimen.
+        # The spacing and transition length are declared simulation geometry.
+        start, end = 1.9, 2.2
+        pipe.find('geom').set('fromto', f'0 0 -.2 0 0 {start}')
+        radii = np.array([.0275, .04125])
+        separation = radii.sum() + .008
+        small_center = -.5 * (separation + radii[1] - radii[0])
+        centers = (small_center, small_center + separation)
+        theta = np.arange(64) * 2 * np.pi / 64
+        directions = np.column_stack([np.cos(theta), np.sin(theta)])
+        planes = np.linspace(start, end, 5)
+        blend = (planes - start) / (end - start)
+        blend = (blend**2 * (3. - 2. * blend))[:, None]
+        plane_centers = blend * centers
+        plane_radii = PIPE_RADIUS + blend * (radii - PIPE_RADIUS)
+        for branch, label in enumerate(('small', 'large')):
+            sections = [radius * directions + [x, 0.] for x, radius in zip(plane_centers[:, branch], plane_radii[:, branch])]
+            for index, (z0, z1) in enumerate(zip(planes[:-1], planes[1:])):
+                add_vertical_section(assets, pipe, f'pipe_twin_{label}_{index}',
+                                     (z0, sections[index]), (z1, sections[index + 1]), common)
+            final_x, final_r = centers[branch], radii[branch]
+            ET.SubElement(pipe, 'geom', name=f'pipe_twin_{label}', type='cylinder', size=str(final_r),
+                          fromto=f'{final_x} 0 {end} {final_x} 0 4', **common)
+        outer_radius = centers[1] + radii[1]
+        route = np.array([[0., 0., -.2, PIPE_RADIUS], [0., 0., start, PIPE_RADIUS],
+                          [0., 0., end, outer_radius], [0., 0., 4., outer_radius]])
+    elif scene in ('variable', 'variable_return', 'square', 'round_to_square', 'collar'):
         start, upper_radius = 1.9, upper_diameter_m * .5
+        if scene == 'collar':
+            taper_length_m, upper_radius = .015, .065
         end = start + taper_length_m
         cylinder = pipe.find('geom')
         if scene == 'square':
@@ -109,9 +139,9 @@ def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140):
             cylinder.set('fromto', f'0 0 -.2 0 0 {start}')
             theta = np.arange(64) * 2 * np.pi / 64
             directions = np.column_stack([np.cos(theta), np.sin(theta)])
-            if scene in ('variable', 'variable_return'):
+            if scene in ('variable', 'variable_return', 'collar'):
                 section = upper_radius * directions
-                plateau_end = end + .30 if scene == 'variable_return' else 4.
+                plateau_end = end + .060 if scene == 'collar' else end + .30 if scene == 'variable_return' else 4.
                 ET.SubElement(pipe, 'geom', name='pipe_upper', type='cylinder', size=str(upper_radius),
                               fromto=f'0 0 {end} 0 0 {plateau_end}', **common)
             else:
@@ -123,7 +153,7 @@ def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140):
                               pos=f'0 0 {(4.+end)/2.}', **common)
             add_vertical_section(assets, pipe, 'pipe_taper', (start, PIPE_RADIUS * directions), (end, section), common)
             route = [(-.2, PIPE_RADIUS), (start, PIPE_RADIUS), (end, upper_radius)]
-            if scene == 'variable_return':
+            if scene in ('variable_return', 'collar'):
                 end = plateau_end + taper_length_m
                 add_vertical_section(assets, pipe, 'pipe_return', (plateau_end, section),
                                      (end, PIPE_RADIUS * directions), common)
@@ -139,11 +169,14 @@ def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140):
     custom=root.find('custom')
     for c in list(custom):custom.remove(c)
     ET.SubElement(custom,'numeric',name='pipe_centerline',data=' '.join(map(str,route.ravel())))
+    if scene == 'twin':
+        sections = np.column_stack((planes, plane_centers, plane_radii))
+        ET.SubElement(custom, 'numeric', name='pipe_twin_cross_sections', data=' '.join(map(str, sections.ravel())))
     if scene=='acute':
         feature=(entry+.2,entry+.2+2*SHARP_LEG)
     elif scene in ('elbow','short'):
         feature=(entry+.2,entry+.2+np.pi*radius/2)
-    elif scene in ('variable', 'variable_return', 'round_to_square'):
+    elif scene in ('variable', 'variable_return', 'round_to_square', 'collar', 'twin'):
         feature=(start+.2,end+.2)
     elif scene in ('square', 'straight_wide'):
         feature=(0.,0.)

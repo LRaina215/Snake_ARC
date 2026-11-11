@@ -28,6 +28,8 @@ def render(folder,sheet=False,speed=4.):
     font=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',20);small=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',16)
     width,height=600,430
     pipe_ids=sorted(sim.pipe_geoms);pipe_pos=m.geom_pos.copy();pipe_size=m.geom_size.copy();pipe_quat=m.geom_quat.copy();pipe_rgba=m.geom_rgba.copy()
+    twin_numeric=mujoco.mj_name2id(m,mujoco.mjtObj.mjOBJ_NUMERIC,'pipe_twin_cross_sections')
+    twin_sections=m.numeric(twin_numeric).data.reshape(-1,5) if twin_numeric>=0 else None
     ids=np.linspace(0,len(trace['time'])-1,12).astype(int) if sheet else np.unique(np.r_[np.searchsorted(trace['time'],np.arange(trace['time'][0],trace['time'][-1],speed/15.)),len(trace['time'])-1])
     board=Image.new('RGB',(600,6*325),'white') if sheet else None
     path=folder/('inspection.jpg' if sheet else f'process_{speed:g}x.mp4')
@@ -76,12 +78,24 @@ def render(folder,sheet=False,speed=4.):
                     gid=m.geom('pipe_vertical').id
                     if scene=='round_to_square' and c[2]>=hyp['feature_exit_z_m']:
                         gid=m.geom('pipe_upper').id
-                    m.geom_rgba[gid]=pipe_rgba[gid];m.geom_pos[gid]=c
-                    if m.geom_type[gid]==mujoco.mjtGeom.mjGEOM_BOX:
-                        m.geom_size[gid,2]=.14
+                    if scene=='twin' and (c[2]>=hyp['feature_exit_z_m'] or
+                                          (twin_sections is not None and c[2]>=twin_sections[0,0])):
+                        for branch,name in enumerate(('pipe_twin_small','pipe_twin_large')):
+                            gid=m.geom(name).id
+                            if twin_sections is None:
+                                x,r=pipe_pos[gid,0],pipe_size[gid,0]
+                            else:
+                                x,r=(float(np.interp(c[2],twin_sections[:,0],twin_sections[:,col]))
+                                     for col in (1+branch,3+branch))
+                            m.geom_rgba[gid]=pipe_rgba[gid];m.geom_pos[gid]=[x,0.,c[2]]
+                            m.geom_size[gid,:2]=[r,.14]
                     else:
-                        m.geom_size[gid,:2]=[radius,.14]
-                    q=Rotation.from_matrix(np.column_stack([normal,[0.,1.,0.],tangent])).as_quat();m.geom_quat[gid]=q[[3,0,1,2]]
+                        m.geom_rgba[gid]=pipe_rgba[gid];m.geom_pos[gid]=c
+                        if m.geom_type[gid]==mujoco.mjtGeom.mjGEOM_BOX:
+                            m.geom_size[gid,2]=.14
+                        else:
+                            m.geom_size[gid,:2]=[radius,.14]
+                        q=Rotation.from_matrix(np.column_stack([normal,[0.,1.,0.],tangent])).as_quat();m.geom_quat[gid]=q[[3,0,1,2]]
                     cam.elevation=min(80.,90.-np.degrees(tilt))
                 mujoco.mj_forward(m,d)
                 rr.update_scene(d,camera=cam)
@@ -97,7 +111,8 @@ def render(folder,sheet=False,speed=4.):
             canvas=Image.new('RGB',(1200,650),'#f4f7fa');draw=ImageDraw.Draw(canvas)
             if straight:
                 title={'variable':'竖直渐扩','variable_return':'竖直渐扩后渐缩',
-                       'square':'竖直方管外侧','round_to_square':'竖直圆管转方管'}.get(scene,'竖直等径')
+                       'square':'竖直方管外侧','round_to_square':'竖直圆管转方管',
+                       'collar':'竖直局部凸环','twin':'竖直单管转并列双管'}.get(scene,'竖直等径')
                 title+='｜2023 TRO Helix' if folder.name=='tro' else '｜整圈 ARC'
             else:
                 title='急弯 A组·Helix' if acute and folder.name=='helix' else '急弯 B组·整圈ARC' if acute else '竖直Helix→水平ARC'
@@ -137,7 +152,7 @@ def render(folder,sheet=False,speed=4.):
                 text+=f'｜包角 {row["wrap_deg"]:.0f}°｜轴向跨度 {1000*row["span_m"]:.0f} mm'
                 exit_z=hyp.get('feature_exit_z_m')
                 if exit_z is not None:
-                    draw.text((12,491),f'最后一个外壳距变径段上缘 {1000*(row["last_envelope_z_m"]-exit_z):+.0f} mm',
+                    draw.text((12,491),f'最后一个外壳距障碍上缘 {1000*(row["last_envelope_z_m"]-exit_z):+.0f} mm',
                               font=small,fill='#385264')
             draw.text((12,511),text,font=small,fill='#17354b')
             draw.text((2,565),'目标',font=small,fill='#385264');draw.text((2,595),'实测',font=small,fill='#385264')
