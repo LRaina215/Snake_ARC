@@ -19,7 +19,7 @@ def install_in_debug_process():
         def snapshot(self):
             row = super().snapshot()
             core = self.controller.feeding
-            row['experimental_trajectory_backend'] = 'stitched_curve_integral'
+            row['experimental_trajectory_backend'] = CurveContinuousFeeding.trajectory_backend
             if core is not None and getattr(core, 'last_curve', None) is not None:
                 row['experimental_curve'] = core.last_curve.as_dict()
             return row

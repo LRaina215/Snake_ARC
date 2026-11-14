@@ -15,7 +15,7 @@ import mujoco
 import numpy as np
 
 from codes import Rolling_Arc_Real as real
-from codes.Rolling_Arc_Debug_Mujoco import MujocoMotorBus
+from codes.Rolling_Arc_Debug_Mujoco import MujocoMotorBus, configure_sim_geometry
 from snake_control.rolling_arc import ArcParameters
 from snake_control.simulation import backbone
 from snake_control.tee_simulation import TeeSimulation
@@ -64,6 +64,7 @@ def run(case, backend, output, parameters):
     p = parameters
     sim = TeeSimulation('straight', p, friction=.5)
     m, d = sim.model, sim.data
+    configure_sim_geometry(sim)
     initial = np.load(output/(case+'_initial.npz'))
     d.qpos[:], d.qvel[:], d.qacc_warmstart[:] = initial['qpos'], initial['qvel'], initial['warmstart']
     mujoco.mj_forward(m, d)

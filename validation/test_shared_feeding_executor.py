@@ -49,7 +49,8 @@ class SharedFeedingExecutorTests(unittest.TestCase):
                 for k,v in overrides.items():
                     if k!='automatic_return':self.assertEqual(getattr(f.options,k),v)
                 self.assertEqual(f.length_observer.options.stability_s,.2)
-                self.assertEqual(f.trajectory_backend,'stitched_curve_integral')
+                self.assertEqual(f.trajectory_backend,'continuous_curve_shift')
+                self.assertEqual(len(f.curve_builder.reference_curve),3)
             self.assertEqual(five.goal_kind,'position');self.assertEqual(feeders[2].goal_kind,'balance')
             self.assertTrue(four.options.automatic_return)
             self.assertFalse(five.options.automatic_return)

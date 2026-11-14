@@ -17,6 +17,7 @@ import mujoco
 import numpy as np
 from scipy.optimize import brentq
 
+from codes.Rolling_Arc_Debug_Mujoco import configure_sim_geometry
 from snake_control.rolling_arc import ArcParameters
 from snake_control.section_geometry import forward
 from snake_control.simulation import backbone
@@ -38,13 +39,15 @@ def run(output):
         raise FileExistsError('Use a new output directory; keep previous evidence')
     real.ContinuousFeeding = CURVE
     p = ArcParameters(joints=18, first_joint=7, last_joint=12)
+    sim = TeeSimulation('straight', p, friction=.5)
+    configure_sim_geometry(sim)
     options = real.ContinuousFeedingOptions(first_joint=7, last_joint=12,
         amplitude_deg=60., requested_transfer_m=-.0645, automatic_return=False,
         tracking_tolerance_deg=8.)
     core = CURVE(real.LINK_LENGTHS_M, options)
 
     def seed_at(position):
-        return core.profile(position, -.12*np.sin(np.pi*position))
+        return core.profile(position, 0.)
 
     # Define a balanced initial material shape using angles/known lengths.
     # The two straight hanging ends have equal height when their Xs match.
@@ -56,7 +59,7 @@ def run(output):
         def targets(self, phase):
             return seed.copy()
 
-    sim = TeeSimulation('straight', SeedParameters(**asdict(p)), friction=.5)
+    sim.p = sim.drive.p = SeedParameters(**asdict(p))
     m, d = sim.model, sim.data
     place_arc_for_adjustment(SimpleNamespace(model=m, data=d, sim=sim), sim.p, .1)
     for _ in range(2500):
@@ -72,7 +75,7 @@ def run(output):
     c.phase = c.command_phase = 0.
     c.mode, c.touched_hardware = 'hold', True
     c.targets, c.enabled = np.degrees(seed).tolist(), seed_mask.tolist()
-    core.position, core.bias = centre, -.12*np.sin(np.pi*centre)
+    core.position = centre
     core.targets, core.enabled, core.window = seed.copy(), seed_mask.copy(), focus
     core.stage, core.stage_since = 'acquire', 0.
     c.feeding, c.feeding_selected, c.feeding_paused = core, True, True

@@ -78,9 +78,9 @@ def render(folder, output, speed=4.):
                 canvas.paste(Image.fromarray(views[k]), (k*W, 70))
             draw = ImageDraw.Draw(canvas)
             stage = row['stage'] if not report['failure'] or index < len(rows)-1 else '未完成：'+report['failure']
-            draw.text((12, 5), f'18关节 | 曲线积分：中间→左极限→右极限→中间    t={time:.1f}s    {stage}',
+            draw.text((12, 5), f'18关节 | 连续曲线移位：中间→两侧边界→初始曲线位置    t={time:.1f}s    {stage}',
                       font=FONT, fill=(23, 53, 74))
-            draw.text((12, 38), f'实际动力学连续记录，{speed:g}倍速 | 仅J/H，无强制L、无复位 | 蓝=使能 紫=失能 | 使能{mask.sum()}关节',
+            draw.text((12, 38), f'实际动力学连续记录，{speed:g}倍速 | Ctrl+J/H调长，Ctrl+G保持 | 蓝=使能 紫=失能 | 使能{mask.sum()}关节',
                       font=SMALL, fill=(62, 86, 102))
             draw.text((12, 76), '斜视', font=SMALL, fill=(70, 70, 70))
             draw.text((W+12, 76), '尾→头端视：左=尾侧(+Y)，右=头侧(-Y)', font=SMALL, fill=(230, 230, 230))

@@ -24,7 +24,7 @@ def embed(source):
     block = (BEGIN+'\n'
         '# 模式4、5/6调长准备、7归中共用：曲线积分、参数工厂与同一个调长执行器。\n'
         '# 相对调长、准备位置、归中只改变目标；角反馈、预置使能与退出逻辑统一。\n'
-        '# 改形状分配看FeedingCurveBuilder；改速度/步长仍看顶部FEED_*。\n'
+        '# 目标由按弧长平移的连续曲线积分生成；速度和步长由顶部FEED参数设置。\n'
         +shape+'\n\n\n'+adapter+'\n\n'
         '# 保存旧类仅用于离线对照；实机所有调长实例默认用曲线积分。\n'
         'LegacyContinuousFeeding = ContinuousFeeding\n'
@@ -46,9 +46,10 @@ def embed(source):
     source = source.replace(
         'Ctrl+4 主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，Ctrl+Y 提前返回，Ctrl+L沿任务方向强制推进一步。',
         'Ctrl+4 曲线积分主动送链；Ctrl+J/H 各执行一段头侧增长/缩短，Ctrl+Y 提前返回，Ctrl+L沿任务方向强制推进一步。')
+    source = source.replace('目标生成=拼接曲线积分', '目标生成=连续曲线移位')
     anchor = '            core = self.feeding\n            o = {} if core is None else core.observation or {}'
     replacement = ('            core = self.feeding\n'
-        "            print('目标生成=拼接曲线积分 | J/H手动相对调长，G暂停/继续，L强制一帧', flush=True)\n"
+        "            print('目标生成=连续曲线移位 | J/H手动相对调长，G暂停/继续，L强制一帧', flush=True)\n"
         '            o = {} if core is None else core.observation or {}')
     if anchor in source:
         source = source.replace(anchor, replacement, 1)

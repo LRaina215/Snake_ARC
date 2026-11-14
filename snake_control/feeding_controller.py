@@ -1,4 +1,4 @@
-"""Trajectory-only adapter; state machine and observation stay inherited."""
+"""Continuous curve targets and their handoff through the shared feeder."""
 from dataclasses import dataclass, replace
 import numpy as np
 from .continuous_feeding import ContinuousFeeding, ContinuousFeedingOptions
@@ -7,45 +7,75 @@ from .feeding_curve import FeedingCurveBuilder
 
 
 class _CurveTemplateHelper:
-    def __init__(self, original, owner):
-        self.original, self.owner = original, owner
+    def __init__(self, owner):
+        self.owner = owner
 
-    def __getattr__(self, name):
-        return getattr(object.__getattribute__(self, 'original'), name)
+    def mask(self, window):
+        joints = np.arange(1, self.owner.curve_builder.n+1)
+        return (joints >= window[0]) & (joints <= window[1])
 
     def template(self, window, phase, amplitude, bias=0.):
-        plan = self.owner.curve_builder.template(window, phase, amplitude, bias)
+        plan = self.owner.curve_builder.plan(0., phase, amplitude)
         self.owner.last_curve = plan
         return plan.targets(self.owner.lengths)
 
 
 def curve_feeding_class(base):
-    """Works with library or single-file embedded controller, unchanged above.
-
-    Super initializes the old bookkeeping; its unused seed is immediately
-    replaced before the object is exposed. Every returned motion reference,
-    including preparation, comes through the curve integral thereafter.
-    """
-    if getattr(base, 'trajectory_backend', None) == 'stitched_curve_integral':
+    """Use the shared motion state machine with a continuous curve reference."""
+    if getattr(base, 'trajectory_backend', None) == 'continuous_curve_shift':
         return base
 
     class CurveContinuousFeeding(base):
-        trajectory_backend = 'stitched_curve_integral'
-        def __init__(self, *args, seed_curve=None,phase_rad=0., **kwargs):
-            super().__init__(*args, **kwargs)
-            self.curve_builder = FeedingCurveBuilder(self.lengths)
-            self.phase=phase_rad
-            if seed_curve is not None:
-                self.curve_builder.seed(seed_curve,self.options.amplitude_deg)
+        trajectory_backend = 'continuous_curve_shift'
+
+        def __init__(self, lengths, options=ContinuousFeedingOptions(), *, seed_curve=None, phase_rad=0.):
+            window = (options.first_joint, options.last_joint)
+            self.curve_builder = FeedingCurveBuilder(
+                lengths, window, options.amplitude_deg, phase_rad, seed_curve)
             self.last_curve = None
-            self.helper = _CurveTemplateHelper(self.helper, self)
-            self.targets = self.helper.template(self.origin, self.phase, self.options.amplitude_deg)
+            super().__init__(lengths, options, geometry=_CurveTemplateHelper(self))
+            self.phase = phase_rad
+            self.position_bounds = self.curve_builder.position_bounds
+            self.targets, focus, _, _ = self.profile(0., 0.)
+            self.enabled = self.helper.mask(focus)
+            self.window = focus
 
         def profile(self, position, bias):
-            plan = self.curve_builder.travelling(self.origin, position, self.phase, bias,
-                self.options, self.minimum_bin, self.maximum_bin)
+            plan = self.curve_builder.plan(position, self.phase, self.options.amplitude_deg)
             self.last_curve = plan
             return plan.targets(self.lengths), plan.focus, plan.cell, plan.fraction
+
+        def required_mask(self, focus, angles, position):
+            required = super().required_mask(focus, angles, position)
+            if self.goal_kind == 'relative_length':
+                # Keep both distal references free wherever the curve permits.
+                # A short arm can then disappear without taking away the
+                # longer arm's existing observation history.
+                reserve = self.options.minimum_passive_reference_links
+                if reserve:
+                    required[:reserve] = False
+                    required[-reserve:] = False
+                measured_arc = self.observation.get('actual_arc_window')
+                if measured_arc is not None:
+                    required |= self.helper.mask(measured_arc)
+            # The passive reference reserve can remove only buffer joints.
+            return required | self.helper.mask(focus)
+
+        def include_fold_joints(self, required, active, folds):
+            if self.goal_kind != 'relative_length':
+                return super().include_fold_joints(required, active, folds)
+            # Neither tip is driven by the travelling curve. A bent free
+            # tip must not keep the intervening straight links energized.
+            joints = np.arange(1, self.n+1)
+            return required | ((joints > 1) & (joints < self.n) & np.isin(joints, folds))
+
+        def release_candidates(self, angles, required):
+            if self.goal_kind != 'relative_length':
+                return super().release_candidates(angles, required)
+            # The trailing buffer and any measured upper arc are already in
+            # required. Once the whole two-link interval is on a straight arm,
+            # a confirmed near-zero angle is enough to let that arm hang.
+            return ~self.helper.mask(self.last_curve.focus)
 
         def snapshot(self):
             row = super().snapshot()

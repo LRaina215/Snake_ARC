@@ -51,9 +51,10 @@ class GravityFrontTransition(ArcHelixTransition):
             self._prepare_shift()
 
     def _prepare_transfer(self, direction):
-        """自动调长复用模式4的曲线分配、相邻折弯接管与目标限速。"""
-        first, last = self.window
-        goal = self.desired_start-first
+        """Use the same arc-length shift as manual feeding."""
+        first = self.window[0]
+        coordinates = np.r_[0., np.cumsum(self.lengths)]
+        goal = (coordinates[self.desired_start]-coordinates[first])/self.l
         self.transfer=create_feeding_controller(self.lengths,self.window,self.feeding_settings,
             amplitude_deg=math.degrees(self.amplitude),phase_rad=self.phase,
             measured_deg=np.degrees(self.measured),enabled=self._enabled,speed_scale=self.speed_scale)
@@ -64,7 +65,7 @@ class GravityFrontTransition(ArcHelixTransition):
         self.transfer_ready_since = None
         self.stage = 'adjust'
         self.events.append(dict(stage='adjust', before=list(self.window),
-                                desired_start=self.desired_start, generator='mode4_profile'))
+                                desired_start=self.desired_start, generator=self.transfer.trajectory_backend))
 
     def _advance_transfer(self, dt):
         helper = self.transfer

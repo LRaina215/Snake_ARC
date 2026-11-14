@@ -3080,12 +3080,14 @@ class ContinuousFeedingOptions:
 
 
 class ContinuousFeeding:
-    def __init__(self, lengths, options=ContinuousFeedingOptions()):
+    def __init__(self, lengths, options=ContinuousFeedingOptions(), *, geometry=None):
         self.lengths = np.asarray(lengths, float)
         self.n = len(self.lengths)-1
         self.options = options
         self.reference_direction = 1 if options.requested_transfer_m > 0 else -1
-        self.helper = FeedingArcGeometry(self.lengths)
+        if geometry is None:
+            geometry = FeedingArcGeometry(self.lengths)
+        self.helper = geometry
         self.length_observer = ManualFeedingObserver(self.lengths, (options.first_joint, options.last_joint))
         self.origin = (options.first_joint, options.last_joint)
         # Each transition advances two alternating hinges. The last valid
@@ -3343,9 +3345,7 @@ class ContinuousFeeding:
             (abs(position-self.fold_capture_position)<self.options.fold_retention_distance_joints)]
         folds = np.union1d(folds, retained)
         if len(folds):
-            first=max(2,min(int(active[0]),int(folds.min())))
-            last=min(self.n-1,max(int(active[-1]),int(folds.max())))
-            required |= self.helper.mask((first,last))
+            required = self.include_fold_joints(required, active, folds)
         # Keep one distal torque-off reference observable. The end
         # being lengthened on the outbound leg has the larger reserve;
         # use the same end through return to avoid switching the
@@ -3358,11 +3358,15 @@ class ContinuousFeeding:
             required[self.n-reserve:] = False
         return required
 
-    def release_ready(self, angles, required, feedback_time, fresh):
-        """Encoder geometry below the bearing arc; not a contact-force gate."""
-        leaving = self.enabled & ~required
+    def include_fold_joints(self, required, active, folds):
+        """Keep the contiguous guard span used by the historical controller."""
+        first = max(2, min(int(active[0]), int(folds.min())))
+        last = min(self.n-1, max(int(active[-1]), int(folds.max())))
+        return required | self.helper.mask((first, last))
+
+    def release_candidates(self, angles, required):
+        """Find straightening buffers that lie below the reconstructed bearing arc."""
         if not self.observation['valid'] or self.release_below_peak_m is None:
-            self.release_since[:] = np.nan
             return np.zeros(self.n, bool)
         points = forward(np.radians(angles), self.lengths)
         heights = -points @ np.array(self.observation['down_head'])
@@ -3375,7 +3379,12 @@ class ContinuousFeeding:
         towards_tip = directions[1:].copy()
         towards_tip[indices<active[0]] *= -1
         aligned = towards_tip @ np.array(self.observation['down_head']) >= self.options.release_down_alignment
-        eligible = leaving & (abs(angles)<=self.options.exit_angle_deg) & below & aligned
+        return below & aligned
+
+    def release_ready(self, angles, required, feedback_time, fresh):
+        """Confirm a leaving joint is straight across distinct feedback samples."""
+        eligible = self.enabled & ~required & (abs(angles)<=self.options.exit_angle_deg)
+        eligible &= self.release_candidates(angles, required)
         if fresh:
             self.release_since[~eligible] = np.nan
             starting = eligible & np.isnan(self.release_since)
@@ -4606,9 +4615,10 @@ class GravityFrontTransition(ArcHelixTransition):
             self._prepare_shift()
 
     def _prepare_transfer(self, direction):
-        """自动调长复用模式4的曲线分配、相邻折弯接管与目标限速。"""
-        first, last = self.window
-        goal = self.desired_start-first
+        """Use the same arc-length shift as manual feeding."""
+        first = self.window[0]
+        coordinates = np.r_[0., np.cumsum(self.lengths)]
+        goal = (coordinates[self.desired_start]-coordinates[first])/self.l
         self.transfer=create_feeding_controller(self.lengths,self.window,self.feeding_settings,
             amplitude_deg=math.degrees(self.amplitude),phase_rad=self.phase,
             measured_deg=np.degrees(self.measured),enabled=self._enabled,speed_scale=self.speed_scale)
@@ -4619,7 +4629,7 @@ class GravityFrontTransition(ArcHelixTransition):
         self.transfer_ready_since = None
         self.stage = 'adjust'
         self.events.append(dict(stage='adjust', before=list(self.window),
-                                desired_start=self.desired_start, generator='mode4_profile'))
+                                desired_start=self.desired_start, generator=self.transfer.trajectory_backend))
 
     def _advance_transfer(self, dt):
         helper = self.transfer
@@ -6315,7 +6325,7 @@ class VerticalRingManual:
 # BEGIN CURVE_FEEDING_CORE
 # 模式4、5/6调长准备、7归中共用：曲线积分、参数工厂与同一个调长执行器。
 # 相对调长、准备位置、归中只改变目标；角反馈、预置使能与退出逻辑统一。
-# 改形状分配看FeedingCurveBuilder；改速度/步长仍看顶部FEED_*。
+# 目标由按弧长平移的连续曲线积分生成；速度和步长由顶部FEED参数设置。
 @dataclass(frozen=True)
 class CurvePlan:
     segments: tuple
@@ -6325,16 +6335,11 @@ class CurvePlan:
     roll_rad: float = 0.
 
     def targets(self, lengths):
-        """Exact integral of k*cos(psi), k*sin(psi) over adjacent-link spans.
-
-        Uses individual link lengths, with the production parity convention.
-        Constant torsion is supported so the same integral accepts helix
-        segments later; this feeding backend currently uses tau=0 subarcs.
-        """
+        """Integrate each segment over its overlap with the two links at a joint."""
         s = np.r_[0., np.cumsum(lengths)]
         lo, hi = s[:-2], s[2:]
         out = np.zeros(len(lengths)-1)
-        boundary,phase=0.,self.roll_rad
+        boundary, phase = 0., self.roll_rad
         pitch = np.arange(len(out)) % 2 == 0
         for segment in self.segments:
             phase += segment.psi
@@ -6349,7 +6354,7 @@ class CurvePlan:
         return out
 
     def as_dict(self):
-        boundary,phase=0.,self.roll_rad
+        boundary, phase = 0., self.roll_rad
         rows = []
         for segment in self.segments:
             phase += segment.psi
@@ -6359,156 +6364,138 @@ class CurvePlan:
                              torsion_per_m=segment.tau))
             boundary += segment.length
             phase += segment.tau*segment.length
-        return dict(focus=list(self.focus), cell=self.cell,roll_rad=self.roll_rad,
+        return dict(focus=list(self.focus), cell=self.cell, roll_rad=self.roll_rad,
                     fraction=self.fraction, segments=rows)
 
 
 class FeedingCurveBuilder:
-    def __init__(self, lengths):
+    def __init__(self, lengths, window, amplitude_deg, phase, seed_curve=None):
         self.lengths = np.asarray(lengths, float)
         if self.lengths.ndim != 1 or len(self.lengths) < 4 or not np.isfinite(self.lengths).all() or np.any(self.lengths <= 0):
             raise ValueError('Positive finite individual link lengths required')
         self.n = len(self.lengths)-1
         self.s = np.r_[0., np.cumsum(self.lengths)]
-        self.reference_curve=None
+        self.spacing = float(np.median(self.lengths[1:-1]))
+        self.reference_amplitude = amplitude_deg
+        self.reference_curve = (self.initial_arc(window, phase, amplitude_deg)
+                                if seed_curve is None else tuple(seed_curve))
+        first, *interior, last = self.reference_curve
+        if first.kappa != 0. or last.kappa != 0. or not any(s.kappa > 0. for s in interior):
+            raise ValueError('Feeding curve requires a curved span between straight arms')
+        if not math.isclose(sum(s.length for s in self.reference_curve), self.s[-1], abs_tol=1e-9):
+            raise ValueError('Feeding curve must span the robot body')
+        # Keep the first and last hinges outside the curved span during motion.
+        # Retain the initial position even for a seed already at an end.
+        lower = min(first.length, self.s[2])-first.length
+        upper = last.length-min(last.length, self.s[-1]-self.s[-3])
+        self.position_bounds = (lower/self.spacing, upper/self.spacing)
 
-    def seed(self,segments,amplitude_deg):
-        """Accept the existing backbone curve as data, retaining its radius and shape."""
-        self.reference_curve=tuple(segments)
-        self.reference_amplitude=amplitude_deg
-
-    def _translated_reference(self,position,phase,amplitude_deg):
-        scale=amplitude_deg/self.reference_amplitude if self.reference_amplitude else 1.
-        segments=[HelixCurveSegment(s.length,s.kappa*scale,s.tau,s.psi) for s in self.reference_curve]
-        shift=position*float(np.median(self.lengths[1:-1]))
-        first,last=segments[0],segments[-1]
-        segments[0]=HelixCurveSegment(first.length+shift,first.kappa,first.tau,first.psi)
-        segments[-1]=HelixCurveSegment(last.length-shift,last.kappa,last.tau,last.psi)
-        bounds=np.r_[0.,np.cumsum([s.length for s in segments])]
-        active=np.zeros(self.n,bool)
-        for i,s in enumerate(segments):
-            if s.kappa>1e-9:
-                active|=(self.s[2:]>bounds[i]+1e-6)&(self.s[:-2]<bounds[i+1]-1e-6)
-        indices=np.flatnonzero(active)+1
-        return CurvePlan(tuple(segments),(int(indices[0]),int(indices[-1])),
-                         int(math.floor(position/2)),float(position/2%1),phase)
-
-    def _basis(self, window, phase, amplitude_deg, bias):
-        """Curvature densities keyed by axis and adjacent-link interval.
-
-        Amplitude is the integrated turn budget of each nominal subarc, not
-        an already generated motor vector. Bias redistributes the budget of
-        the two shoulder subarcs within each bending-axis family.
-        """
+    def initial_arc(self, window, phase, amplitude_deg):
         first, last = window
-        if not 2 <= first <= last < self.n:
+        if not 2 <= first < last < self.n:
             raise ValueError('Active arc needs passive boundary joints')
-        basis = {}
-        for parity, projection in enumerate((math.cos(phase), math.sin(phase))):
-            family = [j for j in range(first, last+1) if (j-1) % 2 == parity]
-            for j in family:
-                shoulder = 1.
-                if len(family) >= 2:
-                    if j == family[0]:
-                        shoulder *= 1.-bias
-                    if j == family[-1]:
-                        shoulder *= 1.+bias
-                width = self.s[j+1]-self.s[j-1]
-                basis[j] = math.radians(amplitude_deg)*projection*shoulder/width
-        return basis
+        # Place one continuous curve from the active interval and the entry
+        # bending plane. This accounts for the staggered pitch/yaw axes only
+        # at entry. During feeding every boundary moves by the same distance.
+        first_axis = math.cos(phase) if first % 2 else math.sin(phase)
+        last_axis = math.cos(phase) if last % 2 else math.sin(phase)
+        head = max(self.s[2], self.s[first]-self.lengths[first-1]*first_axis**2)
+        end = min(self.s[-3], self.s[last]+self.lengths[last]*last_axis**2)
+        length = end-head
+        turn = math.radians(amplitude_deg)*(last-first+1)/2
+        return (HelixCurveSegment(head), HelixCurveSegment(length, turn/length), HelixCurveSegment(self.s[-1]-end))
 
-    def _stitch(self, densities, focus, cell=0, fraction=0.):
-        # Every link boundary is a possible endpoint of a staggered basis.
-        # Assemble the two projected components over their common partition.
-        components = np.zeros((len(self.lengths), 2))
-        for j, density in densities.items():
-            components[j-1:j+1, (j-1) % 2] += density
-        segments, phase = [], 0.
-        for length, (kp, ky) in zip(self.lengths, components):
-            curvature = math.hypot(kp, ky)
-            direction = math.atan2(ky, kp) if curvature else phase
-            segment = HelixCurveSegment(float(length), curvature, 0., direction-phase)
-            # Merge identical neighboring subarcs. A zero-curvature extension
-            # carries the frame onward; it does not enable any passive hinge.
-            if segments and abs(segment.psi) < 1e-15 and segments[-1].kappa == curvature:
-                old = segments[-1]
-                segments[-1] = HelixCurveSegment(old.length+length, curvature, 0., old.psi)
-            else:
-                segments.append(segment)
-            phase = direction
-        return CurvePlan(tuple(segments), tuple(focus), cell, fraction)
-
-    def template(self, window, phase, amplitude_deg, bias=0.):
-        if self.reference_curve is not None:return self._translated_reference(0.,phase,amplitude_deg)
-        return self._stitch(self._basis(window, phase, amplitude_deg, bias), window)
-
-    def travelling(self, origin, position, phase, bias, options, minimum_bin, maximum_bin):
-        if self.reference_curve is not None:return self._translated_reference(position,phase,options.amplitude_deg)
-        cell = int(np.clip(math.floor(position/2), minimum_bin, maximum_bin))
-        fraction = float(np.clip(position/2-cell, 0., 1.))
-        old = tuple(j+2*cell for j in origin)
-        new = tuple(j+2 for j in old)
-        left = self._basis(old, phase, options.amplitude_deg, bias)
-        right = self._basis(new, phase, options.amplitude_deg, bias)
-        densities, support = {}, []
-        for j in sorted(left.keys() | right.keys()):
-            a, b = left.get(j, 0.), right.get(j, 0.)
-            width = self.s[j+1]-self.s[j-1]
-            if (abs(a)+abs(b))*width > 1e-10:
-                support.append(j)
-            densities[j] = (1-fraction)*a+fraction*b
-        if not support:
-            raise ValueError('Zero bending budget has no feeding arc')
-        allocation = float(np.clip((abs(position)-options.middle_boost_activation_joints)/
-                                  options.middle_boost_ramp_joints, 0., 1.))
-        allocation = allocation**2*(3.-2.*allocation)
-        extra_turn = math.radians(options.fractional_middle_boost_deg)*allocation*math.sin(math.pi*fraction)**2
-        if len(support) == 4:
-            for j, sign in zip(support, (-1., 1., 1., -1.)):
-                densities[j] += sign*extra_turn/(self.s[j+1]-self.s[j-1])
-        return self._stitch(densities, (support[0], support[-1]), cell, fraction)
+    def plan(self, position, phase, amplitude_deg):
+        """Change the straight lengths by +/- displacement, keeping the inner curve."""
+        position = float(np.clip(position, *self.position_bounds))
+        shift = position*self.spacing
+        first, *interior, last = self.reference_curve
+        # Amplitude is an explicit operating parameter, independent of shift.
+        scale = amplitude_deg/self.reference_amplitude if self.reference_amplitude else 1.
+        if scale != 1.:
+            interior = [HelixCurveSegment(s.length, s.kappa*scale, s.tau, s.psi) for s in interior]
+        segments = (HelixCurveSegment(max(0., first.length+shift), psi=first.psi), *interior,
+                    HelixCurveSegment(max(0., last.length-shift), psi=last.psi))
+        bounds = np.r_[0., np.cumsum([s.length for s in segments])]
+        active = np.zeros(self.n, bool)
+        for i, segment in enumerate(segments):
+            if segment.kappa > 0.:
+                active |= (self.s[2:] > bounds[i]+1e-9) & (self.s[:-2] < bounds[i+1]-1e-9)
+        indices = np.flatnonzero(active)+1
+        cell = math.floor(position)
+        return CurvePlan(segments, (int(indices[0]), int(indices[-1])), cell, position-cell, phase)
 
 
 class _CurveTemplateHelper:
-    def __init__(self, original, owner):
-        self.original, self.owner = original, owner
+    def __init__(self, owner):
+        self.owner = owner
 
-    def __getattr__(self, name):
-        return getattr(object.__getattribute__(self, 'original'), name)
+    def mask(self, window):
+        joints = np.arange(1, self.owner.curve_builder.n+1)
+        return (joints >= window[0]) & (joints <= window[1])
 
     def template(self, window, phase, amplitude, bias=0.):
-        plan = self.owner.curve_builder.template(window, phase, amplitude, bias)
+        plan = self.owner.curve_builder.plan(0., phase, amplitude)
         self.owner.last_curve = plan
         return plan.targets(self.owner.lengths)
 
 
 def curve_feeding_class(base):
-    """Works with library or single-file embedded controller, unchanged above.
-
-    Super initializes the old bookkeeping; its unused seed is immediately
-    replaced before the object is exposed. Every returned motion reference,
-    including preparation, comes through the curve integral thereafter.
-    """
-    if getattr(base, 'trajectory_backend', None) == 'stitched_curve_integral':
+    """Use the shared motion state machine with a continuous curve reference."""
+    if getattr(base, 'trajectory_backend', None) == 'continuous_curve_shift':
         return base
 
     class CurveContinuousFeeding(base):
-        trajectory_backend = 'stitched_curve_integral'
-        def __init__(self, *args, seed_curve=None,phase_rad=0., **kwargs):
-            super().__init__(*args, **kwargs)
-            self.curve_builder = FeedingCurveBuilder(self.lengths)
-            self.phase=phase_rad
-            if seed_curve is not None:
-                self.curve_builder.seed(seed_curve,self.options.amplitude_deg)
+        trajectory_backend = 'continuous_curve_shift'
+
+        def __init__(self, lengths, options=ContinuousFeedingOptions(), *, seed_curve=None, phase_rad=0.):
+            window = (options.first_joint, options.last_joint)
+            self.curve_builder = FeedingCurveBuilder(
+                lengths, window, options.amplitude_deg, phase_rad, seed_curve)
             self.last_curve = None
-            self.helper = _CurveTemplateHelper(self.helper, self)
-            self.targets = self.helper.template(self.origin, self.phase, self.options.amplitude_deg)
+            super().__init__(lengths, options, geometry=_CurveTemplateHelper(self))
+            self.phase = phase_rad
+            self.position_bounds = self.curve_builder.position_bounds
+            self.targets, focus, _, _ = self.profile(0., 0.)
+            self.enabled = self.helper.mask(focus)
+            self.window = focus
 
         def profile(self, position, bias):
-            plan = self.curve_builder.travelling(self.origin, position, self.phase, bias,
-                self.options, self.minimum_bin, self.maximum_bin)
+            plan = self.curve_builder.plan(position, self.phase, self.options.amplitude_deg)
             self.last_curve = plan
             return plan.targets(self.lengths), plan.focus, plan.cell, plan.fraction
+
+        def required_mask(self, focus, angles, position):
+            required = super().required_mask(focus, angles, position)
+            if self.goal_kind == 'relative_length':
+                # Keep both distal references free wherever the curve permits.
+                # A short arm can then disappear without taking away the
+                # longer arm's existing observation history.
+                reserve = self.options.minimum_passive_reference_links
+                if reserve:
+                    required[:reserve] = False
+                    required[-reserve:] = False
+                measured_arc = self.observation.get('actual_arc_window')
+                if measured_arc is not None:
+                    required |= self.helper.mask(measured_arc)
+            # The passive reference reserve can remove only buffer joints.
+            return required | self.helper.mask(focus)
+
+        def include_fold_joints(self, required, active, folds):
+            if self.goal_kind != 'relative_length':
+                return super().include_fold_joints(required, active, folds)
+            # Neither tip is driven by the travelling curve. A bent free
+            # tip must not keep the intervening straight links energized.
+            joints = np.arange(1, self.n+1)
+            return required | ((joints > 1) & (joints < self.n) & np.isin(joints, folds))
+
+        def release_candidates(self, angles, required):
+            if self.goal_kind != 'relative_length':
+                return super().release_candidates(angles, required)
+            # The trailing buffer and any measured upper arc are already in
+            # required. Once the whole two-link interval is on a straight arm,
+            # a confirmed near-zero angle is enough to let that arm hang.
+            return ~self.helper.mask(self.last_curve.focus)
 
         def snapshot(self):
             row = super().snapshot()
@@ -7172,7 +7159,8 @@ class RollingArcController:
             requested_transfer_m=self.feed_direction*self.feed_distance_m,
             maximum_feed_s=FEED_OPTIONS_OVERRIDE.get('maximum_feed_s',
                 60. if self.feed_distance_m<=float(np.median(LINK_LENGTHS_M[1:-1]))+1e-9 else 100.))
-        core = create_feeding_controller(LINK_LENGTHS_M,self.feeding_origin,replace(settings,options=options))
+        core = create_feeding_controller(LINK_LENGTHS_M, self.feeding_origin,
+            replace(settings, options=options), phase_rad=self.phase)
         measured = np.asarray(self.measured_angles())
         mask = core.enabled | np.asarray(self.enabled)
         entering = mask & ~np.asarray(self.enabled)
@@ -7193,7 +7181,8 @@ class RollingArcController:
         self.feeding_last_stage = None
         self.feeding_last_diagnostic_s = None
         self.feeding_inputs = None
-        self.phase = self.command_phase = self.pending_phase = 0.
+        self.phase = self.command_phase = core.phase
+        self.pending_phase = 0.
         self.forming, self.settle_remaining = False, 0.
         self.freeze_targets, self.feeding_paused = False, not running
         self.feeding_pause_clock = None if running else now
@@ -8202,7 +8191,7 @@ class RollingArcController:
                 print(f"停在当前目标：{h['events'][-1]['reason']}", flush=True)
         if self.feeding_selected:
             core = self.feeding
-            print('目标生成=拼接曲线积分 | J/H手动相对调长，G暂停/继续，L强制一帧', flush=True)
+            print('目标生成=连续曲线移位 | J/H手动相对调长，G暂停/继续，L强制一帧', flush=True)
             o = {} if core is None else core.observation or {}
             if core is not None and core.forced_step is not None:
                 print('强制步正在下发目标：绕过跟踪误差/稳定采样等待，发完后保持。', flush=True)

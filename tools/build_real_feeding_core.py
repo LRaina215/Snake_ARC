@@ -30,12 +30,12 @@ def main():
         '        self.n = len(lengths)-1\n\n'+
         '\n\n'.join('\n'.join(lines[n.lineno-1:n.end_lineno]) for n in methods))
     controller = declaration(ROOT/'snake_control/continuous_feeding.py')
-    old = ("self.helper = ActiveArcTransfer(self.lengths, 'transfer', TransferOptions(\n"
-        '            first_joint=options.first_joint, last_joint=options.last_joint,\n'
-        '            amplitude_deg=options.amplitude_deg, hold_phase_rad=0.))')
+    old = ("geometry = ActiveArcTransfer(self.lengths, 'transfer', TransferOptions(\n"
+        '                first_joint=options.first_joint, last_joint=options.last_joint,\n'
+        '                amplitude_deg=options.amplitude_deg, hold_phase_rad=0.))')
     if controller.count(old)!=1:
         raise ValueError('Research helper changed; inspect this explicit sync before updating')
-    controller = controller.replace(old, 'self.helper = FeedingArcGeometry(self.lengths)')
+    controller = controller.replace(old, 'geometry = FeedingArcGeometry(self.lengths)')
     body = geometry+'\n\n\n'+declaration(ROOT/'snake_control/whole_feeding_observer.py')
     # Mode 3 retains its current observer; mode 4 uses the requested manual version.
     body += '\n\n\n'+declaration(ROOT/'snake_control/manual_feeding_observer.py')+'\n\n\n'+controller

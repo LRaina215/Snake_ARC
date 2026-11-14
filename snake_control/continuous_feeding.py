@@ -58,14 +58,16 @@ class ContinuousFeedingOptions:
 
 
 class ContinuousFeeding:
-    def __init__(self, lengths, options=ContinuousFeedingOptions()):
+    def __init__(self, lengths, options=ContinuousFeedingOptions(), *, geometry=None):
         self.lengths = np.asarray(lengths, float)
         self.n = len(self.lengths)-1
         self.options = options
         self.reference_direction = 1 if options.requested_transfer_m > 0 else -1
-        self.helper = ActiveArcTransfer(self.lengths, 'transfer', TransferOptions(
-            first_joint=options.first_joint, last_joint=options.last_joint,
-            amplitude_deg=options.amplitude_deg, hold_phase_rad=0.))
+        if geometry is None:
+            geometry = ActiveArcTransfer(self.lengths, 'transfer', TransferOptions(
+                first_joint=options.first_joint, last_joint=options.last_joint,
+                amplitude_deg=options.amplitude_deg, hold_phase_rad=0.))
+        self.helper = geometry
         self.length_observer = ManualFeedingObserver(self.lengths, (options.first_joint, options.last_joint))
         self.origin = (options.first_joint, options.last_joint)
         # Each transition advances two alternating hinges. The last valid
@@ -323,9 +325,7 @@ class ContinuousFeeding:
             (abs(position-self.fold_capture_position)<self.options.fold_retention_distance_joints)]
         folds = np.union1d(folds, retained)
         if len(folds):
-            first=max(2,min(int(active[0]),int(folds.min())))
-            last=min(self.n-1,max(int(active[-1]),int(folds.max())))
-            required |= self.helper.mask((first,last))
+            required = self.include_fold_joints(required, active, folds)
         # Keep one distal torque-off reference observable. The end
         # being lengthened on the outbound leg has the larger reserve;
         # use the same end through return to avoid switching the
@@ -338,11 +338,15 @@ class ContinuousFeeding:
             required[self.n-reserve:] = False
         return required
 
-    def release_ready(self, angles, required, feedback_time, fresh):
-        """Encoder geometry below the bearing arc; not a contact-force gate."""
-        leaving = self.enabled & ~required
+    def include_fold_joints(self, required, active, folds):
+        """Keep the contiguous guard span used by the historical controller."""
+        first = max(2, min(int(active[0]), int(folds.min())))
+        last = min(self.n-1, max(int(active[-1]), int(folds.max())))
+        return required | self.helper.mask((first, last))
+
+    def release_candidates(self, angles, required):
+        """Find straightening buffers that lie below the reconstructed bearing arc."""
         if not self.observation['valid'] or self.release_below_peak_m is None:
-            self.release_since[:] = np.nan
             return np.zeros(self.n, bool)
         points = forward(np.radians(angles), self.lengths)
         heights = -points @ np.array(self.observation['down_head'])
@@ -355,7 +359,12 @@ class ContinuousFeeding:
         towards_tip = directions[1:].copy()
         towards_tip[indices<active[0]] *= -1
         aligned = towards_tip @ np.array(self.observation['down_head']) >= self.options.release_down_alignment
-        eligible = leaving & (abs(angles)<=self.options.exit_angle_deg) & below & aligned
+        return below & aligned
+
+    def release_ready(self, angles, required, feedback_time, fresh):
+        """Confirm a leaving joint is straight across distinct feedback samples."""
+        eligible = self.enabled & ~required & (abs(angles)<=self.options.exit_angle_deg)
+        eligible &= self.release_candidates(angles, required)
         if fresh:
             self.release_since[~eligible] = np.nan
             starting = eligible & np.isnan(self.release_since)

@@ -1,6 +1,6 @@
 # 曲线积分调长实验（独立入口）
 
-本目录只替换模式4的目标形状生成器。主仿真、主实机文件不改动。
+当前主入口与实验入口使用连续曲线移位。新版结果和复现方式见[11月14日复盘](../../validation/reports/continuous_curve_shift_20261114/README.md)。
 
 启动手动仿真：
 
@@ -11,19 +11,20 @@ python .\experiments\curve_feeding\manual_mujoco.py
 
 仍使用 Ctrl+U 形成、Ctrl+4 选择调长、Ctrl+J/H 启动正/反向相对调长、Ctrl+G 暂停/继续、Ctrl+L 强制推进一帧、Ctrl+Y 返回、Ctrl+X 失能。方向含义、单步任务量与主入口相同。实验后端也用于本进程内模式5/6调用的调长部分，但本轮不据此宣称越障重新验证通过。
 
-执行比较与验证：
+检查当前实现并复跑全行程：
 
 ```powershell
-python -m experiments.curve_feeding.check_equivalence
-python -m experiments.curve_feeding.validate_mujoco --output validation/results/curve_feeding_rerun
-python -m experiments.curve_feeding.review --input validation/results/curve_feeding_rerun
+python -m unittest validation.test_real_curve_feeding
+python -m experiments.curve_feeding.full_stroke --output artifacts/continuous_curve_shift_rerun
 ```
 
 物理验证会保留原始证据；再次复现时换一个输出目录，避免覆盖上次运行。
 
 场景、起始窗口和基础幅值可在 `manual_mujoco.py` 顶部修改。运行日志另存到 `logs/curve_feeding_experiment/`，包含曲线各子段的长度、曲率和弯曲方向。
 
-本轮结论和视频见 [验证报告](../../validation/reports/curve_feeding_20261108/README.md)。曲线迁移复现了原行为；原长度代理在短端姿态仍存在明显偏差，不能把兼容性通过说成毫米精度通过。
+## 11月8日历史兼容性试验
+
+历史试验使用独立目标生成器和逐连杆曲率重分配，对应源码为 `a9d4486`。当时结论和视频见[验证报告](../../validation/reports/curve_feeding_20261108/README.md)。曲线迁移复现了原行为，原长度代理在短端姿态仍存在明显偏差。
 
 另有一次 [中间→左端→右端→中间的连续全行程记录](../../validation/reports/curve_feeding_full_stroke_20261108/README.md)，附完整视频。动作路径完成，但回中实际长度及部分过渡形态仍有偏差。
 

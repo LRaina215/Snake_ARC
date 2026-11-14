@@ -1,10 +1,8 @@
 """Standalone real-port checks. Memory serial only; NEVER opens a COM port."""
 from contextlib import redirect_stdout
-from dataclasses import asdict
 import gzip
 import io
 import json
-import math
 from pathlib import Path
 import subprocess
 import sys
@@ -33,40 +31,45 @@ class RealCurveFeedingTests(unittest.TestCase):
         self.assertEqual(real.NUM_JOINTS, 18)
         self.assertEqual(len(real.SERVO_IDS), 18)
         self.assertEqual(len(real.LINK_LENGTHS_M), 19)
-        self.assertEqual(real.ContinuousFeeding.trajectory_backend, 'stitched_curve_integral')
+        self.assertEqual(real.ContinuousFeeding.trajectory_backend, 'continuous_curve_shift')
         for name in ('advance', 'request_step', 'start_forced_step', 'acquire_start',
-                     'required_mask', 'required_with_buffer', 'release_ready'):
+                     'required_with_buffer', 'release_ready'):
             self.assertIs(getattr(real.ContinuousFeeding, name), getattr(real.LegacyContinuousFeeding, name))
         for key, expected in [('J', 'step'), ('H', 'back'), ('G', 'toggle'),
                               ('L', 'feed_tick'), ('Y', 'feed_return'), ('X', 'release')]:
             self.assertEqual(real.decode_hotkey(ord(key), True), expected)
 
-    def test_embedded_curve_and_old_reference_match(self):
-        maximum = 0.
-        count = 0
-        for n in (18, 20):
-            lengths = np.full(n+1, .0645)
-            for window in ((2, 7), (7, 12), (11, 16)):
-                for amplitude in (60., 70.):
-                    values = dict(first_joint=window[0], last_joint=window[1], amplitude_deg=amplitude)
-                    old = real.LegacyContinuousFeeding(lengths, real.ContinuousFeedingOptions(**values))
-                    new = real.ContinuousFeeding(lengths, real.ContinuousFeedingOptions(**values))
-                    source = CurveContinuousFeeding(lengths, ContinuousFeedingOptions(**values))
-                    for phase in (0., .4, -1.2, math.pi/2):
-                        old.phase = new.phase = source.phase = phase
-                        for position in np.linspace(*old.position_bounds, 25):
-                            bias = -.12*math.sin(math.pi*position)
-                            a, b, c = [core.profile(position, bias) for core in (old, new, source)]
-                            maximum = max(maximum, float(np.max(abs(a[0]-b[0]))), float(np.max(abs(b[0]-c[0]))))
-                            self.assertLess(float(np.max(abs(a[0]-b[0]))), 2e-12)
-                            np.testing.assert_allclose(b[0], c[0], atol=2e-12, rtol=0)
-                            self.assertEqual(a[1:], b[1:])
-                            count += 1
-                    with patch.object(new.helper.original, 'template', side_effect=AssertionError('legacy path')):
-                        new.profile(.4, .1)
-                        new.helper.template(window, .2, amplitude)
-                    json.dumps(new.snapshot())
-        EVIDENCE.update(parameter_profiles=count, max_target_difference_rad=maximum)
+    def test_curve_moves_by_arc_length_and_integrates_exact_joint_overlap(self):
+        # Unequal spacings detect accidental integer-window interpolation.
+        lengths = np.array([.025] + [.070, .074]*8 + [.072, .091])
+        coordinates = np.r_[0., np.cumsum(lengths)]
+        values = dict(first_joint=7, last_joint=12, amplitude_deg=60.)
+        phase = .43
+        for cls, options in ((real.ContinuousFeeding, real.ContinuousFeedingOptions(**values)),
+                             (CurveContinuousFeeding, ContinuousFeedingOptions(**values))):
+            feeder = cls(lengths, options, phase_rad=phase)
+            segments = feeder.curve_builder.reference_curve
+            initial_head, arc, initial_tail = segments
+            for shift_m in (-.049, .017, .112):
+                with self.subTest(controller=cls.__module__, shift_m=shift_m):
+                    position = shift_m/feeder.curve_builder.spacing
+                    target, focus, _, _ = feeder.profile(position, .15)
+                    head, moved_arc, tail = feeder.last_curve.segments
+                    self.assertAlmostEqual(head.length, initial_head.length+shift_m)
+                    self.assertAlmostEqual(tail.length, initial_tail.length-shift_m)
+                    self.assertEqual(moved_arc, arc)
+                    self.assertAlmostEqual(moved_arc.kappa*moved_arc.length, np.pi)
+                    overlap = np.maximum(0., np.minimum(coordinates[2:], head.length+arc.length)
+                                         - np.maximum(coordinates[:-2], head.length))
+                    expected = arc.kappa*overlap*np.tile([np.cos(phase), np.sin(phase)], 9)
+                    np.testing.assert_allclose(target, expected, atol=1e-12, rtol=0)
+                    active = np.flatnonzero(overlap > 1e-9)+1
+                    self.assertEqual(focus, (active[0], active[-1]))
+                    np.testing.assert_array_equal(feeder.profile(position, -.3)[0], target)
+            for position in feeder.position_bounds:
+                feeder.profile(position, 0.)
+                self.assertGreaterEqual(feeder.last_curve.segments[0].length, coordinates[2]-1e-12)
+                self.assertGreaterEqual(feeder.last_curve.segments[-1].length, coordinates[-1]-coordinates[-3]-1e-12)
 
     def test_complete_saved_stroke_target_replay(self):
         path = ROOT/'validation/reports/curve_feeding_full_stroke_20261108/normal/full_stroke_curve_control.jsonl.gz'
@@ -104,7 +107,7 @@ class RealCurveFeedingTests(unittest.TestCase):
                     break
             self.assertIsNotNone(c.feeding.baseline)
             self.assertIsNone(c.feeding.fault)
-            self.assertEqual(c.feeding.trajectory_backend, 'stitched_curve_integral')
+            self.assertEqual(c.feeding.trajectory_backend, 'continuous_curve_shift')
             press('G')
             p, targets, mask = c.feeding.position, c.targets.copy(), c.enabled.copy()
             for _ in range(30):
@@ -134,7 +137,7 @@ class RealCurveFeedingTests(unittest.TestCase):
             self.assertEqual(core.stage, 'feed_return')
             self.assertEqual(core.goal_m, core.baseline)
             json.dumps(c.snapshot())
-            self.assertEqual(core.snapshot()['trajectory_backend'], 'stitched_curve_integral')
+            self.assertEqual(core.snapshot()['trajectory_backend'], 'continuous_curve_shift')
             press('X')
             self.assertFalse(any(c.enabled))
             self.assertTrue(all(c.port.registers[sid][0x28] == 0 for sid in memory_real.SERVO_IDS))
@@ -152,7 +155,7 @@ class RealCurveFeedingTests(unittest.TestCase):
                 "builtins.__import__=isolated\n"
                 "m=runpy.run_path('Rolling_Arc_Real.py',run_name='offline_import'); m['validate_setup'](); "
                 "c=m['ContinuousFeeding'](m['LINK_LENGTHS_M']); "
-                "assert c.trajectory_backend=='stitched_curve_integral'; "
+                "assert c.trajectory_backend=='continuous_curve_shift'; "
                 "assert m['DRY_RUN'] is False; print('standalone_real_ready')"
             )
             result = subprocess.run([sys.executable, '-I', '-c', code], cwd=directory,
