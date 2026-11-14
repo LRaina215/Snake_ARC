@@ -615,7 +615,7 @@ class AcuteArcTransition(HelixArcTransition):
 
     def steer_tip(self, bounds, field, dt, vertical=False):
         limit = math.radians(88.)
-        active = self.ring_overlap_offset >= .022 if vertical else .195 <= self.nominal_head_u <= .33
+        active = self.ring_overlap_offset >= .012 if vertical else .195 <= self.nominal_head_u <= .33
         if not active:
             self.tip_demand = 0.
         elif self.tip_sample_time != self.last_feedback_time:
@@ -624,6 +624,10 @@ class AcuteArcTransition(HelixArcTransition):
             base = np.clip(self.curve.sampled_targets(bounds, current, self.phase), -limit, limit)
             self.tip_gap_m = self.tip_clearance(self.measured)
             choices = (0., -.18, .18, -.36, .36) if vertical else (0., -.35, .35, -.70, .70)
+            if vertical and self.ring_radius_offset < .001 and self.tip_gap_m < self.section_ring.shell_diameter:
+                # An existing contact can consume the whole small correction.
+                # Also consider a larger change in the out-of-plane tangent.
+                choices += (-.54, .54, -.72, .72)
             scores = []
             for turn in choices:
                 trial = self.tip_field(bounds, field, turn)

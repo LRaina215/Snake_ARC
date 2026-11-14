@@ -19,7 +19,7 @@ from snake_control.curve_gait import CurveGait, helix
 from snake_control.simulation import backbone
 from snake_control.vertical_scene import VerticalScene
 from snake_control.vertical_ring_manual import VerticalRingManual
-from tools.build_vertical_arc_scene import GENERATED_STRAIGHT_SCENES, build
+from tools.build_vertical_arc_scene import GENERATED_STRAIGHT_SCENES, SHORT_BEND_RADIUS, build
 from validation.vertical_arc_experiment import json_default
 from validation.tro_helix_baseline import TroHelixBaseline, REFERENCE
 
@@ -380,6 +380,8 @@ def run(args):
     if args.scene in GENERATED_STRAIGHT_SCENES:
         build(args.scene, model_copy, taper_length_m=args.taper_length, upper_diameter_m=args.upper_pipe_diameter,
               outlet_height_m=args.vertical_outlet_height, embed_return_outlet=args.embed_return_outlet)
+    elif args.short_bend_radius is not None:
+        build(args.scene, model_copy, short_bend_radius_m=args.short_bend_radius)
     sim = VerticalScene(args.scene, recorded_model=model_copy if model_copy.exists() else None)
     model, data = sim.model, sim.data
     review = AcuteReview(sim)
@@ -441,6 +443,7 @@ def run(args):
          route_radii_m=np.unique(route[:, 3]), feature_exit_z_m=feature_exit,
          vertical_outlet_height_m=float(route[-1, 2]) if review.straight else None,
          embed_return_outlet=args.embed_return_outlet,
+         short_bend_radius_m=(args.short_bend_radius or SHORT_BEND_RADIUS) if args.scene == 'short' else None,
          vertical_axis=[0, 0, 1], horizontal_axis=[1, 0, 0],
          corner_z_m=review.corner_z, entry_z_m=review.entry_z, exit_x_m=review.exit_x,
          meshes=review.bend_meshes, lengths_m=sim.lengths,
@@ -607,6 +610,8 @@ if __name__ == '__main__':
     p.add_argument('--initial-helix-radius', type=float, default=.094)
     p.add_argument('--taper-length', type=float, default=.15)
     p.add_argument('--upper-pipe-diameter', type=float, default=.140)
+    p.add_argument('--short-bend-radius', type=float,
+                   help='Generate a 90-degree short elbow with this centreline radius in metres')
     p.add_argument('--vertical-outlet-height', type=float, default=4.,
                    help='Top of the straight outlet above a variable-diameter transition, in metres')
     p.add_argument('--embed-return-outlet', action='store_true',
@@ -658,6 +663,8 @@ if __name__ == '__main__':
     p.add_argument('--manual-takeover', action='store_true')
     p.add_argument('--modes', nargs='+', choices=['helix', 'arc', 'tro'], default=['helix', 'arc'])
     args = p.parse_args()
+    if args.short_bend_radius is not None and args.scene != 'short':
+        p.error('--short-bend-radius requires --scene short')
     if args.vertical_outlet_height != 4. and args.scene not in ('variable', 'variable_return'):
         p.error('--vertical-outlet-height requires --scene variable or variable_return')
     if not np.isfinite(args.vertical_outlet_height):

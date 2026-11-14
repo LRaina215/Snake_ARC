@@ -27,6 +27,14 @@ ARC 退回 9 关节后，同相位包角低点重复出现。控制重建的环�
 
 全过程仍有改进空间。0.40 和 1.15 rad 起态分别在缩径期间记录到 6 和 3 帧头端外壳与连杆 9 自接触，当时仍有约 20–31 mm 的追加材料，半径修正已归零。成环到整身清空前也出现包角和跨度短暂超限。两组几乎每个采样帧都至少有一个关节达到模型力矩上限。当前结果验证的是这个缓坡场景的整身通过及出口续行。下一项最小验证是在同一模型中根据实测端部净空协调缩径曲率和材料退回，减少已观测到的自碰，然后再考虑更陡的变径。
 
+### 缩径净空复测
+
+用相同模型、两个起始相位和同一滚动速度，试验在实测包角足够、端部净空不足时，提前退回少量曲线材料。两个起态仍在全身清空后合格滚动，净上升均约 139.6 mm。自接触由 6／3 帧变为 6／5 帧，主要集中在剩余附加弧长约 16–19 mm 的后段。此改动推迟或缩短了部分早期接触，随后仍会复发，因此从控制代码撤出。原始配对数据保留在 `variable_140_return450_gap_return_040` 和 `variable_140_return450_gap_return_115`。
+
+第二次试验保持回收弧长的逻辑。缩径时若编码器重建的端部净空不足，则让已有的局部末端曲线多比较几个切向候选，并覆盖到更短的重叠段。两个起态的自接触由 6／3 帧降为 2／0 帧。0.40 rad 的剩余自碰在 189.50–189.60 s，首次碰撞时局部切向还在过渡，追加弧长仍为 31.3 mm。两组始终未触地，最大回滑为 3.9／4.2 mm。分别于 260.10／255.50 s 整身清空，并在首个合格周期净上升 139.6／139.6 mm。最低包角 326.21／326.22°，最大跨度 95.70／95.72 mm。两组持续保持合格构型至记录结束。
+
+同一改动回归 0.40 rad 的 110→140 mm 单向渐扩。190.65 s 整身清空，合格周期净上升 126.6 mm，全记录无自碰或触地。该回归保留了此前验证过的渐扩能力。
+
 ## 复现
 
 ```powershell
@@ -45,4 +53,5 @@ python validation/acute_arc_experiment.py @ring --scene variable_return --taper-
 ```
 
 - [ARC 0.40 rad 完整回放](../../../artifacts/unified_section_followup/variable_140_return450_reserve_040/arc/process_4x.mp4) · [ARC 1.15 rad 完整回放](../../../artifacts/unified_section_followup/variable_140_return450_reserve_115/arc/process_4x.mp4)
+- [末端切向净空修正，1.15 rad 完整回放](../../../artifacts/unified_section_followup/variable_140_return450_clear_tangent_115/arc/process_4x.mp4)
 - [直接对接记录](../../../artifacts/unified_section_followup/variable_140_return450_outlet_040/) · [埋入端盖及 TRO 对照记录](../../../artifacts/unified_section_followup/variable_140_return450_embedded_040/)

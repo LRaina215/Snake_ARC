@@ -31,7 +31,9 @@ def add_vertical_section(assets, pipe, name, first, last, common):
 
 
 def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140, outlet_height_m=4.,
-          embed_return_outlet=False):
+          embed_return_outlet=False, short_bend_radius_m=SHORT_BEND_RADIUS):
+    if scene == 'short' and not PIPE_RADIUS < short_bend_radius_m < BEND_HEIGHT:
+        raise ValueError('The bend centreline radius must exceed the pipe radius and fit above the inlet')
     if embed_return_outlet and (scene != 'variable_return' or upper_diameter_m <= 2. * PIPE_RADIUS):
         raise ValueError('Embedding the outlet requires an expanded section followed by a diameter return')
     if scene in ('variable', 'variable_return'):
@@ -85,7 +87,7 @@ def build(scene, output=None, *, taper_length_m=.15, upper_diameter_m=.140, outl
         route=np.array([[0,0,-.2,.055],[0,0,entry,.055],
                         [0,0,height,.055],[SHARP_LEG,0,height,.055],[2.3,0,height,.055]])
     elif scene in ('elbow','short'):
-        radius=SHORT_BEND_RADIUS if scene=='short' else BEND_RADIUS
+        radius=short_bend_radius_m if scene=='short' else BEND_RADIUS
         entry=BEND_HEIGHT+SHARP_LEG/2-radius if scene=='short' else BEND_HEIGHT
         pipe.find('geom').set('fromto',f'0 0 -.2 0 0 {entry}')
         angles=np.linspace(0,np.pi/2,25);theta=np.arange(48)*2*np.pi/48

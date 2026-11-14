@@ -27,6 +27,7 @@ COURSES = {
     'taper_elbow': ('elbow90_taper110_210', -.25, 100.),
     'taper_straight': ('length_taper_return', -.50, 130.),
 }
+MAX_OPEN_TURN_DEG = 218.
 
 
 class Outlet:
@@ -90,6 +91,8 @@ def run(case, output, expansion_turn=None, anticipate=False, inner_circle_resize
     first_clear = clear_phase = clear_time = origin = None
     reason = 'duration_limit'
     exit_checks = None
+    exit_pipe_wraps = []
+    exit_pipe_unobservable = 0
     with gzip.open(output / 'records.jsonl.gz', 'wt', encoding='utf-8') as stream:
         for sample in range(round(duration / .05) + 1):
             if sample:
@@ -108,7 +111,8 @@ def run(case, output, expansion_turn=None, anticipate=False, inner_circle_resize
                 ground |= (a == floor and b in sim.robot_geoms) or (b == floor and a in sim.robot_geoms)
                 if a in sim.robot_geoms and b in sim.robot_geoms and contact.dist < 0.:
                     self_collision |= abs(model.geom_bodyid[a] - model.geom_bodyid[b]) > 2
-            open_arc = 150. <= shape['turn_deg'] <= 218. and shape['gap_fraction'] >= .4 and shape['fit_rms_m'] <= .015
+            open_arc = (150. <= shape['turn_deg'] <= MAX_OPEN_TURN_DEG and shape['gap_fraction'] >= .4
+                        and shape['fit_rms_m'] <= .015)
             support = sum(row['support_up_n']) >= .5 * weight
             clear = outlet.distance()
             phase = sim.controller.phase
@@ -121,8 +125,14 @@ def run(case, output, expansion_turn=None, anticipate=False, inner_circle_resize
                     exit_checks = True
                 advance = float(points[markers].mean(0) @ outlet.axis - origin)
                 exit_checks &= open_arc and not self_collision
+                if pipe_shape['wrap_valid']:
+                    exit_pipe_wraps.append(pipe_shape['wrap_deg'])
+                else:
+                    exit_pipe_unobservable += 1
             else:
                 clear_phase = clear_time = origin = advance = exit_checks = None
+                exit_pipe_wraps.clear()
+                exit_pipe_unobservable = 0
             row.update(body_shape=shape, pipe_shape=pipe_shape, open_arc=open_arc, support=support, ground=ground,
                        self_collision=self_collision, last_shell_outlet_m=clear, outlet_advance_m=advance,
                        route_progress_m=float(sim.route_coordinates(points.mean(0))[0][0]))
@@ -139,6 +149,7 @@ def run(case, output, expansion_turn=None, anticipate=False, inner_circle_resize
     audited = [row for row in rows if row['time_s'] >= parameters.settle_s + 1.]
     valid_pipe = [row['pipe_shape']['wrap_deg'] for row in audited if row['pipe_shape']['wrap_valid']]
     last = rows[-1]
+    sustained_exit_open = bool(reason == 'sustained_whole_body_exit' and exit_checks)
     report = dict(case=case, scene=scene, parameters=asdict(parameters), section_options=asdict(options),
                   posture_options=asdict(posture),
                   start_x_m=start, maximum_time_s=duration,
@@ -146,7 +157,11 @@ def run(case, output, expansion_turn=None, anticipate=False, inner_circle_resize
                   outlet_axis=outlet.axis.tolist(), route=model.numeric('pipe_centerline').data.reshape(-1, 4).tolist(),
                   termination=reason, last_time_s=last['time_s'], first_clear_s=first_clear,
                   sustained_clear_s=clear_time, continued_advance_m=last['outlet_advance_m'],
-                  sustained_exit_open=bool(reason == 'sustained_whole_body_exit' and exit_checks),
+                  sustained_exit_open=sustained_exit_open,
+                  sustained_exit_pipe_open=bool(sustained_exit_open and exit_pipe_wraps and not exit_pipe_unobservable
+                                                and max(exit_pipe_wraps) <= MAX_OPEN_TURN_DEG),
+                  exit_pipe_wrap_deg=[min(exit_pipe_wraps), max(exit_pipe_wraps)] if exit_pipe_wraps else None,
+                  exit_pipe_wrap_unobservable=exit_pipe_unobservable,
                   route_progress_m=last['route_progress_m'] - rows[0]['route_progress_m'],
                   furthest_shell_outlet_m=max(row['last_shell_outlet_m'] for row in rows),
                   minimum_upward_contact_n=min((sum(row['support_up_n']) for row in audited), default=None),
