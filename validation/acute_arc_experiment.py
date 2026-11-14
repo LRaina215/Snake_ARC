@@ -205,6 +205,7 @@ def summarize(rows, points, statuses, mode, weight):
             last_stable = seq[-1]
     physical_reference = None
     first_clear = None
+    physical_72mm = None
     first_exit_72mm = None
     progress = 0.
     passed = None
@@ -235,6 +236,8 @@ def summarize(rows, points, statuses, mode, weight):
         if attached and physical_reference is not None:
             advance = float(np.mean(points[i][physical_markers, 0] - points[physical_reference][physical_markers, 0]))
             row['physical_progress_m'] = advance
+            if physical_72mm is None and advance >= .072:
+                physical_72mm = i
             episode_correct_continuation &= frame_ok
             if episode_correct_continuation:
                 progress = max(progress, advance)
@@ -255,8 +258,13 @@ def summarize(rows, points, statuses, mode, weight):
                             span_m=[min(r['span_m'] for r in frames), max(r['span_m'] for r in frames)],
                             ring_frames=sum(r['ring_shape'] for r in frames),
                             maximum_curvature_per_m=max(r['maximum_curvature_per_m'] for r in frames))
+    bend_start = next((i for i, r in enumerate(rows) if r['stage'] == 'bend_shift'), None)
+    crossing_collisions = (None if bend_start is None or physical_72mm is None else
+                           sum(bool(r['self_contacts']) for r in rows[bend_start:physical_72mm + 1]))
     return dict(physically_cleared=first_clear is not None,
                 clear_time_s=None if first_clear is None else rows[first_clear]['time_s'],
+                physical_72mm_time_s=None if physical_72mm is None else rows[physical_72mm]['time_s'],
+                crossing_self_contact_frames_to_physical_72mm=crossing_collisions,
                 physical_progress_m=max((r['physical_progress_m'] for r in rows if r['physical_progress_m'] is not None), default=0.),
                 correct_gait_cleared=gait_clear is not None,
                 advance_m=progress, continued_72mm=passed is not None,
@@ -444,6 +452,7 @@ def run(args):
          vertical_outlet_height_m=float(route[-1, 2]) if review.straight else None,
          embed_return_outlet=args.embed_return_outlet,
          short_bend_radius_m=(args.short_bend_radius or SHORT_BEND_RADIUS) if args.scene == 'short' else None,
+         start_head_height_m=args.start_head_height,
          vertical_axis=[0, 0, 1], horizontal_axis=[1, 0, 0],
          corner_z_m=review.corner_z, entry_z_m=review.entry_z, exit_x_m=review.exit_x,
          meshes=review.bend_meshes, lengths_m=sim.lengths,
@@ -456,7 +465,7 @@ def run(args):
          shape_limits=dict(turn_deg=[325,395], axial_span_m=.100, plane_rms_m=.027, max_radius_m=.170)))
     gait = CurveGait(18, lengths=sim.lengths)
     q = gait.targets([helix(gait.body_length, args.initial_helix_radius, .13)], args.phase)
-    initial = sim.place_helix(q, 1., 0.)
+    initial = sim.place_helix(q, args.start_head_height, 0.)
     core = AcuteArcTransition(q, sim.lengths, options)
     mask = np.ones(18, bool)
     measured = q.copy()
@@ -608,6 +617,8 @@ if __name__ == '__main__':
     p.add_argument('--duration', type=float, default=185.)
     p.add_argument('--phase', type=float, default=.4)
     p.add_argument('--initial-helix-radius', type=float, default=.094)
+    p.add_argument('--start-head-height', type=float, default=1.,
+                   help='Starting height of the placed vertical Helix head, in metres')
     p.add_argument('--taper-length', type=float, default=.15)
     p.add_argument('--upper-pipe-diameter', type=float, default=.140)
     p.add_argument('--short-bend-radius', type=float,
@@ -663,6 +674,8 @@ if __name__ == '__main__':
     p.add_argument('--manual-takeover', action='store_true')
     p.add_argument('--modes', nargs='+', choices=['helix', 'arc', 'tro'], default=['helix', 'arc'])
     args = p.parse_args()
+    if not np.isfinite(args.start_head_height) or args.start_head_height <= 0.:
+        p.error('--start-head-height must be finite and positive')
     if args.short_bend_radius is not None and args.scene != 'short':
         p.error('--short-bend-radius requires --scene short')
     if args.vertical_outlet_height != 4. and args.scene not in ('variable', 'variable_return'):

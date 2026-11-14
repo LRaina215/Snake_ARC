@@ -19,3 +19,11 @@
 复现实验使用 `validation/acute_arc_experiment.py --scene short --short-bend-radius .065 --modes helix arc`。其余选项与已有 105 mm 短弯复现一致。全身 Helix 与原 ARC 的配对记录含碰撞模型、起始状态、完整指令和真实位姿。两组达到门槛时的实际净位移分别为 72.68 和 72.41 mm。
 
 [全身 Helix 回放](../../../artifacts/unified_section_followup/acute_radius65_pair/helix/process_4x.mp4) · [单圈 ARC 回放](../../../artifacts/unified_section_followup/acute_radius65_pair/arc/process_4x.mp4)
+
+## 加长成环后的直管行程
+
+在同一个 65 mm 弯头上，将两组机器人起始头高从 1.00 m 降至 0.90 m，保留相同曲线参数、滚动速度、入口触发位置和验收口径。ARC 从成环到发出入弯指令的间隔变为 12.24／11.38 s。全身 Helix 两起态均完整出弯，并在 92.95／93.00 s 达到 72 mm，弯内分别记录 109／121 帧自接触。ARC 的 0.40 rad 起态在 95.85 s 整身出弯，随后净前进 72.70 mm，全程无自碰或触地。弯内最低包角降至 319.29°，45 帧形态不合格。1.15 rad 起态一直停留在弯头附近，至 123.95 s 仍未完整出弯。延长成环后直段运动未改善两起态的完整通过。
+
+复算保存的关节角、根位姿和控制目标。在 1.15 rad 的 72.0 s 样本，连杆 4 同时与入口及出口圆柱碰撞，穿入深度约 25–29 mm，两个圆柱分别产生约 1.37／1.62 kN 法向力。0.40 rad 的已越弯记录中，所检样本的最大单接触法向力为 43 N，穿入深度不足 1 mm。长直段下的 1.15 rad 失效同时包含构型打开和明显碰撞穿入。后续需先排查弯内侧多个碰撞实体的接合，再判断曲线修改是否能解决该起态。用 `--start-head-height .90` 可复现两组起态。
+
+[0.40 rad 完整回放](../../../artifacts/unified_section_followup/acute_radius65_long_inlet_040/arc/process_4x.mp4) · [1.15 rad 卡滞及完整回放](../../../artifacts/unified_section_followup/acute_radius65_long_inlet_115/arc/process_4x.mp4)

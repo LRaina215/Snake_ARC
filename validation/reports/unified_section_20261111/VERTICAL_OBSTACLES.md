@@ -31,3 +31,5 @@
 - [双管 Helix](../../../artifacts/unified_section_followup/twin_pair/tro/process_4x.mp4)
 
 各工况的目录保存配对初态、碰撞模型、源码快照、输入参数、完整轨迹和评价结果。新场景通过 `validation/acute_arc_experiment.py --scene collar` 或 `--scene twin` 选取，使用已有 `mujoco` 环境。圆转方、凸环和双管的复现选项见各自的 `hypothesis.json`。
+
+按机身实际状态在 MuJoCo 中重新计算已有凸环停滞末段 25 s 的接触，向下法向分量主要来自凸环的渐扩斜面（平均 −11.14 N），粗管圆柱下缘贡献约 −0.89 N。仅修改出口接缝难以解释此例的停滞。圆转方末段的向下法向分量则集中在方管下缘（约 −0.81 N），该处仍需检查接触交接和单圈形态。两项属于原始失败轨迹的诊断，未新增通过结果。
