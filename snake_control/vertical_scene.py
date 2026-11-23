@@ -17,8 +17,11 @@ class VerticalScene:
             self.model=mujoco.MjModel.from_xml_path(str(self.model_path))
         else:
             asset_dir=self.model_path.parent/'asset'
-            xml=Path(recorded_model).read_text(encoding='utf-8').replace('./asset/',asset_dir.as_posix()+'/')
-            self.model=mujoco.MjModel.from_xml_string(xml)
+            recorded_model=Path(recorded_model)
+            xml=recorded_model.read_text(encoding='utf-8').replace('./asset/',asset_dir.as_posix()+'/')
+            mesh = recorded_model.with_suffix('.obj')
+            assets = {mesh.name: mesh.read_bytes()} if mesh.exists() else None
+            self.model = mujoco.MjModel.from_xml_string(xml, assets)
         self.data=mujoco.MjData(self.model)
         self.p=ArcParameters(joints=18,first_joint=1,last_joint=18)
         self.drive=LocalMotorDrive(self.model,self.p)

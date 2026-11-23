@@ -23,6 +23,8 @@ python .\codes\Rolling_Arc_Real.py
 
 按同一份程序连续做完整个往返：**上电搭管 → 启动一次程序 → Ctrl+U形成ARC并等归零结束 → Ctrl+5、Ctrl+G自动准备前部 → 前部搭稳后Ctrl+L确认、Ctrl+G送尾 → Helix完成后直接Ctrl+7、Ctrl+G解缠并归中 → 最终归零结束，Ctrl+J／Ctrl+H正反ARC运动。**完整的逐步按键、观察现象和调速位置见上方操作说明。
 
+竖直管上，从已搭稳且全身使能的 Helix 按 **Ctrl+8 → Ctrl+H**，逐节退尾成环后按 **Ctrl+1** 普通上滚，或按 **Ctrl+3** 启用圆形参考顺应。竖直模式用 **Ctrl+J** 单步、**Ctrl+H** 连续／暂停。[竖直单圈实测操作](docs/实机调试代码说明.md#竖直单圈-arc)
+
 **Ctrl+空格**暂停，**Ctrl+K**查看阶段与下一步，**Ctrl+X**全部失能，**Ctrl+Q**退出。启动时自动打开预览，关闭预览窗口不会停止控制。操作时只运行一个控制入口。
 
 ## 仿真手动测试
@@ -39,10 +41,11 @@ python .\codes\Rolling_Arc_Debug_Mujoco.py
 | 110→210→110 mm变径直管 | `SCENE='length_taper_return'`，`START_X_M=-.35` |
 | 110→210 mm连续90°急弯变径 | `SCENE='elbow90_taper110_210'`，`START_X_M=-.25` |
 | T管，主管/支管110/60 mm | `SCENE='tee_up60'`，`START_X_M=.2` |
-| 18 关节竖直 Helix 转整圈 ARC，110 mm 短弯 | `SCENE='vertical_short'`，启动后直接按 `Ctrl+8`、`Ctrl+G` |
+| 18 关节竖直 Helix 转整圈 ARC，110 mm 短弯 | `SCENE='vertical_short'`，启动后直接按 `Ctrl+8`、`Ctrl+H` |
+| 18 关节竖直单圈 ARC 上滚 | `SCENE='vertical_straight'`（Ø110 mm）或 `SCENE='vertical_taper_return'`（Ø110→140→110 mm） |
 
 仿真中按住**Ctrl+A或Ctrl+D**侧拉悬垂端，松开停止；**Ctrl+[或Ctrl+]**调拉力，**Ctrl+R**重建初始预览。
 
-竖直短弯在实机和仿真共用 **Ctrl+8**。实机从已搭稳且全身使能的竖直 Helix 接入。按 **Ctrl+G** 连续执行，尾部退完且到入弯标记时按 **Ctrl+L**，看到承载圈搭上水平直管时再按一次 **Ctrl+L**。**Ctrl+J** 可单步。[竖直短弯操作与验证](validation/reports/vertical_ring_20261110/README.md#出弯续行和手调入口)
+仿真的竖直场景沿用实机按键。短弯操作在成环后仍用 **Ctrl+L** 确认入弯，承载圈搭上水平直管后再按一次 **Ctrl+L**。
 
 更详细的专题操作：[两侧长度调整](docs/曲线积分调长实机验收.md)、[ARC→Helix与T管](docs/ARC_Helix与重力矩越障操作说明.md)、[Helix→ARC](docs/Helix_ARC实机与热键调试说明.md)、[仿真实机统一调试](docs/仿真实机统一调试说明.md)。

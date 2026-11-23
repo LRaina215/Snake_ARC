@@ -24,12 +24,18 @@ def render(folder,sheet=False,speed=4.):
         run['summary']=review['summary'];hyp['exit_x_m']=review['summary']['exit_x_m']
         for row, evaluated in zip(rows,review['evaluation']):row.update(evaluated)
     statuses=json.loads((folder/'controller.json').read_text()) if (folder/'controller.json').exists() else None
-    commands=json.loads((folder/'operator.json').read_text()) if (folder/'operator.json').exists() else []
+    pitch_phase = next((row['phase_rad'] for row in statuses or () if 'pitch_release_age_s' in row), None)
+    commands=json.loads((folder/'operator.json').read_text(encoding='utf-8')) if (folder/'operator.json').exists() else []
     font=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',20);small=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',16)
     width,height=600,430
     pipe_ids=sorted(sim.pipe_geoms);pipe_pos=m.geom_pos.copy();pipe_size=m.geom_size.copy();pipe_quat=m.geom_quat.copy();pipe_rgba=m.geom_rgba.copy()
     twin_numeric=mujoco.mj_name2id(m,mujoco.mjtObj.mjOBJ_NUMERIC,'pipe_twin_cross_sections')
     twin_sections=m.numeric(twin_numeric).data.reshape(-1,5) if twin_numeric>=0 else None
+    ellipse_axes = hyp.get('ellipse_diameters_m')
+    if ellipse_axes is not None:
+        ellipse_axes = np.asarray(ellipse_axes) / 2.
+        ellipse_start = float(m.numeric('pipe_centerline').data.reshape(-1, 4)[1, 2])
+        ellipse_exit = hyp['feature_exit_z_m']
     ids=np.linspace(0,len(trace['time'])-1,12).astype(int) if sheet else np.unique(np.r_[np.searchsorted(trace['time'],np.arange(trace['time'][0],trace['time'][-1],speed/15.)),len(trace['time'])-1])
     board=Image.new('RGB',(600,6*325),'white') if sheet else None
     path=folder/('inspection.jpg' if sheet else f'process_{speed:g}x.mp4')
@@ -42,6 +48,7 @@ def render(folder,sheet=False,speed=4.):
             if (acute or straight) and mask[0]:m.geom_rgba[m.geom_bodyid==sim.head]=[.02,.55,.85,1]
             mujoco.mj_forward(m,d);pts=backbone(m,d);images=[]
             for view in range(2 if not sheet else 1):
+                section_marker = None
                 m.geom_pos[pipe_ids]=pipe_pos[pipe_ids];m.geom_size[pipe_ids]=pipe_size[pipe_ids]
                 m.geom_quat[pipe_ids]=pipe_quat[pipe_ids];m.geom_rgba[pipe_ids]=pipe_rgba[pipe_ids]
                 cam=mujoco.MjvCamera();cam.lookat[:]=pts.mean(0)
@@ -78,7 +85,11 @@ def render(folder,sheet=False,speed=4.):
                     gid=m.geom('pipe_vertical').id
                     if scene=='round_to_square' and c[2]>=hyp['feature_exit_z_m']:
                         gid=m.geom('pipe_upper').id
-                    if scene=='twin' and (c[2]>=hyp['feature_exit_z_m'] or
+                    if ellipse_axes is not None:
+                        fraction = float(np.clip((c[2] - ellipse_start) / (ellipse_exit - ellipse_start), 0., 1.))
+                        axes = (1. - fraction) * radius + fraction * ellipse_axes
+                        section_marker = (c, np.r_[axes, .002])
+                    elif scene=='twin' and (c[2]>=hyp['feature_exit_z_m'] or
                                           (twin_sections is not None and c[2]>=twin_sections[0,0])):
                         for branch,name in enumerate(('pipe_twin_small','pipe_twin_large')):
                             gid=m.geom(name).id
@@ -99,6 +110,12 @@ def render(folder,sheet=False,speed=4.):
                     cam.elevation=min(80.,90.-np.degrees(tilt))
                 mujoco.mj_forward(m,d)
                 rr.update_scene(d,camera=cam)
+                if section_marker is not None:
+                    center, sizes = section_marker
+                    geom = rr.scene.geoms[rr.scene.ngeom]
+                    mujoco.mjv_initGeom(geom, mujoco.mjtGeom.mjGEOM_ELLIPSOID, sizes, center,
+                                        np.eye(3).ravel(), pipe_rgba[sim.model.geom('pipe_vertical').id])
+                    rr.scene.ngeom += 1
                 if acute and view==0:
                     # Transparent plane at the actual transition-to-straight seam.
                     geom=rr.scene.geoms[rr.scene.ngeom]
@@ -108,21 +125,43 @@ def render(folder,sheet=False,speed=4.):
                     rr.scene.ngeom+=1
                 images.append(Image.fromarray(rr.render()))
             stage='' if rows is None else rows[i]['stage']
+            if hyp.get('debug_hotkeys'):
+                status = statuses[i]
+                stage = {'form_ring': '成环', 'release_tail': '逐节退尾'}.get(stage, stage)
+                if status['vertical_roll_mode']:
+                    stage = '普通上滚' if status['vertical_roll_mode'] == 'basic' else '圆形参考顺应'
+            if straight and stage == 'vertical_ring' and statuses is not None:
+                detail = statuses[i]
+                if 'pitch_release_age_s' in detail:
+                    stage = '恢复滚动' if detail['phase_rad'] != pitch_phase else '实测曲线改形、逐节退尾'
+                elif 'held_upper_material_m' in detail:
+                    stage = '上环承载、逐节退尾'
+                elif detail.get('receiving_length_m', 0.) > 0.:
+                    stage = '上方接收弧'
             canvas=Image.new('RGB',(1200,650),'#f4f7fa');draw=ImageDraw.Draw(canvas)
             if straight:
                 title={'variable':'竖直渐扩','variable_return':'竖直渐扩后渐缩',
                        'square':'竖直方管外侧','round_to_square':'竖直圆管转方管',
+                       'round_to_ellipse':'竖直圆管转椭圆管',
                        'collar':'竖直局部凸环','twin':'竖直单管转并列双管'}.get(scene,'竖直等径')
+                if hyp.get('direct_ring'):
+                    if scene == 'square':
+                        title = f'{1000 * hyp["square_side_m"]:.1f} mm 方管预贴合'
+                    else:
+                        radius = np.asarray(hyp['route_radii_m'])[-1]
+                        title = f'{2000 * radius:.0f} mm 粗管直接贴合'
                 title+='｜2023 TRO Helix' if folder.name=='tro' else '｜整圈 ARC'
             else:
                 title='急弯 A组·Helix' if acute and folder.name=='helix' else '急弯 B组·整圈ARC' if acute else '竖直Helix→水平ARC'
             draw.text((12,6),f'18关节｜{title}｜t={trace["time"][i]:.1f}s｜{stage}',font=font,fill='#17354b')
             recent=[c for c in commands if c['time_s']<=trace['time'][i]]
             cmd='自动上行/逐段退尾'
+            if hyp.get('direct_ring'):
+                cmd = '初始保持' if trace['time'][i] < hyp['options']['initial_hold_s'] else '单圈滚动'
             if recent:
                 cmd={'begin_bend':'模拟操作：进入弯头','confirm_outlet':'模拟操作：确认水平管接管',
                      'takeover_and_continuous':'仿真接管：连续执行'}.get(
-                    recent[-1]['command'],'人工事件：水平已搭稳，接原逆向解缠/成弧/归中')
+                    recent[-1]['command'],recent[-1].get('description','人工事件：水平已搭稳，接原逆向解缠/成弧/归中'))
             phase='' if statuses is None else f'｜相位{statuses[i]["phase_rad"]:.2f}rad'
             if acute and statuses is not None and statuses[i].get('options',{}).get('section_shell_diameter_m') is not None:
                 phase+=f'｜单截面交接{100*statuses[i].get("section_weight",0.):.0f}%'
@@ -130,8 +169,15 @@ def render(folder,sheet=False,speed=4.):
                 phase+=f'｜尾端已逐节释放{statuses[i]["released_tail_count"]}关节'
             if acute and statuses is not None and statuses[i].get('outlet_weight',0.)>0.:
                 phase+=f'｜水平端部拼接{100*statuses[i]["outlet_weight"]:.0f}%'
-            if straight and statuses is not None and statuses[i].get('section_feedback'):
+            if hyp.get('debug_hotkeys'):
+                radius = statuses[i]['reference_radius_m']
+                phase = f'｜参考半径 {1000*radius:.1f} mm｜相位 {statuses[i]["phase_rad"]:.2f} rad'
+            elif straight and statuses is not None and statuses[i].get('section_feedback'):
                 phase+=f'｜实测截面顺应｜承载弧长 {1000*statuses[i]["wrap_length_m"]:.0f} mm'
+            effort_mode = hyp.get('options', {}).get('section_effort_mode')
+            if effort_mode:
+                effort_label = {'local': '局部', 'global': '全环', 'fused': '融合'}[effort_mode]
+                phase += f'｜负载代理·{effort_label}'
             draw.text((12,33),f'回放{speed:g}倍｜蓝=使能 紫=失能｜{cmd}{phase}',font=small,fill='#385264')
             for v,im in enumerate(images):canvas.paste(im,(v*600,60))
             draw.text((610,70),'沿局部管轴观察（管道仅作显示切片）',font=small,fill='white')
@@ -139,20 +185,34 @@ def render(folder,sheet=False,speed=4.):
             if rows is not None:text+=f'｜管道支撑Fz={rows[i]["pipe_force_n"][2]:.1f} N（评价）'
             if acute:
                 row=rows[i];clear_time=run['summary']['clear_time_s']
-                state='已完整出弯' if row.get('exit_attached',row['clear_supported']) else '尚未完整出弯'
                 last=1000*(row['last_envelope_x_m']-hyp['exit_x_m'])
-                text=(f'使能 {mask.sum()}/18｜实际包角 {row["wrap_deg"]:.0f}°｜轴向跨度 {1000*row["span_m"]:.0f} mm'
-                      f'｜尾侧离出口 {last:+.0f} mm｜{state}')
+                if last < 0:
+                    state='尚未完整出弯'
+                else:
+                    state='已完整出弯' if row.get('exit_attached',row['clear_supported']) else '已出弯｜支撑未达标'
+                text=f'使能 {mask.sum()}/18｜尾侧离出口 {last:+.0f} mm｜{state}'
+                if row['wrap_deg'] is not None:
+                    text+=f'｜实际包角 {row["wrap_deg"]:.0f}°｜轴向跨度 {1000*row["span_m"]:.0f} mm'
                 if clear_time is None or row['time_s']<clear_time:text+='｜续行未开始计程'
                 if row.get('physical_progress_m') is not None:text+=f'｜出弯净位移 {1000*row["physical_progress_m"]:+.0f} mm'
                 shape=('整圈形态合格' if row['ring_shape'] else '整圈形态超限') if folder.name=='arc' else 'Helix 对照'
+                if stage.startswith('horizontal_'):
+                    shape='整圈转开放半圆｜自动归中'
+                elif stage=='open_arc_roll':
+                    shape='开放半圆合格' if row['open_shape'] else '开放半圆超限'
+                    text+=f'｜半圆续行 {row["open_advance_m"]*1000:+.0f} mm'
+                    if row['balance_m'] is not None:text+=f'｜两侧长度差 {row["balance_m"]*1000:+.0f} mm'
                 draw.text((12,491),f'青色截面 = 弯头实体出口｜右图为局部观察｜{shape}',font=small,fill='#385264')
             if straight:
                 row=rows[i]
                 text+=f'｜包角 {row["wrap_deg"]:.0f}°｜轴向跨度 {1000*row["span_m"]:.0f} mm'
+                if hyp.get('direct_ring'):
+                    shape = '形态合格' if row['ring_shape'] else '形态超限'
+                    text += f'｜最大半径 {1000 * row["maximum_radius_m"]:.1f} mm｜{shape}'
                 exit_z=hyp.get('feature_exit_z_m')
                 if exit_z is not None:
-                    draw.text((12,491),f'最后一个外壳距障碍上缘 {1000*(row["last_envelope_z_m"]-exit_z):+.0f} mm',
+                    contact = '｜自碰' if row['self_contacts'] else ''
+                    draw.text((12,491),f'最后一个外壳距障碍上缘 {1000*(row["last_envelope_z_m"]-exit_z):+.0f} mm{contact}',
                               font=small,fill='#385264')
             draw.text((12,511),text,font=small,fill='#17354b')
             draw.text((2,565),'目标',font=small,fill='#385264');draw.text((2,595),'实测',font=small,fill='#385264')

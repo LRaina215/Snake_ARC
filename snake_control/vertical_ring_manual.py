@@ -20,6 +20,11 @@ def vertical_short_options():
                         outlet_end_correction=True, outlet_use_spare_length=True)
 
 
+def vertical_roll_options():
+    """Carrier geometry used in the manual 110→140→110 mm validation."""
+    return replace(vertical_short_options(), vertical_use_spare_length=True, section_bearing_advance_m=.014)
+
+
 class VerticalRingManual:
     def __init__(self, measured_deg, lengths, options=AcuteOptions(), *, helix_targets_deg=None,
                  step_s=1., max_feedback_age_s=.8):
@@ -73,7 +78,7 @@ class VerticalRingManual:
     def confirm_outlet(self):
         return self.core.confirm_outlet()
 
-    def advance(self, dt, now, feedback_time, measured_deg):
+    def advance(self, dt, now, feedback_time, measured_deg, *, motor_effort=None):
         if not math.isfinite(dt) or dt <= 0.:
             raise ValueError('Expected a positive control step')
         if not self.running and self.step_remaining_s <= 0.:
@@ -90,7 +95,7 @@ class VerticalRingManual:
         self.feedback_wait = False
         self.latest_sample_s = feedback_time
         used = dt if self.running else min(dt, self.step_remaining_s)
-        self.core.step(used, np.radians(measured), feedback_time)
+        self.core.step(used, np.radians(measured), feedback_time, motor_effort=motor_effort)
         self.step_remaining_s = max(0., self.step_remaining_s - used)
         if self.step_remaining_s < 1e-9:
             self.step_remaining_s = 0.
@@ -99,3 +104,43 @@ class VerticalRingManual:
     def status(self):
         return dict(self.core.status(), running=self.running, step_remaining_s=self.step_remaining_s,
                     feedback_wait=self.feedback_wait, enabled_joints=(np.flatnonzero(self.enabled) + 1).tolist())
+
+
+class VerticalRollManual(VerticalRingManual):
+    """Select either vertical roll on the same carrier and command clock."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.compliant = False
+        self.basic_options = self.core.acute
+        self.compliant_options = replace(
+            self.basic_options,
+            section_feedback_weight=.35, vertical_use_spare_length=True, vertical_adaptive_material=True,
+            vertical_material_radius_gain=.85, vertical_material_minimum_wrap_deg=350.,
+            vertical_material_max_extra_m=.105, vertical_material_handoff_m=.036,
+            vertical_end_clearance=True, vertical_material_return_phase_rad=2.*math.pi,
+            vertical_return_advance_m=.012,
+        )
+
+    def select_roll(self, compliant):
+        if self.stage != 'vertical_ring':
+            raise ValueError('请在竖直成环并完成退尾后、入弯前使用 Ctrl+1/3')
+        if self.compliant == compliant:
+            return
+        self.compliant = compliant
+        if compliant:
+            # Retain the current carrier dimensions when returning to ordinary rolling.
+            self.basic_options = replace(self.basic_options, vertical_use_spare_length=True)
+            self.core.section_feedback = self.core.section_feedback_time = None
+            self.core.section_feedback_diagnostic = None
+            if self.core.ring_base_radius is None:
+                self.core.ring_radius_samples.clear()
+                self.core.ring_radius_capture_phase = None
+        self.core.acute = self.compliant_options if compliant else self.basic_options
+
+    def status(self):
+        status = super().status()
+        mode = 'compliant' if self.compliant else 'basic'
+        status.update(vertical_roll_mode=mode if self.stage == 'vertical_ring' else None,
+                      reference_radius_m=self.core.wrap_radius + self.core.ring_radius_offset)
+        return status

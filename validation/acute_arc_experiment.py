@@ -24,7 +24,7 @@ from validation.vertical_arc_experiment import json_default
 from validation.tro_helix_baseline import TroHelixBaseline, REFERENCE
 
 STRAIGHT_SCENES = ('straight',) + GENERATED_STRAIGHT_SCENES
-VERTICAL_FEATURES = ('variable', 'variable_return', 'round_to_square', 'collar', 'twin')
+VERTICAL_FEATURES = ('variable', 'variable_return', 'round_to_square', 'round_to_ellipse', 'collar', 'twin')
 
 
 def dump(path, value):
@@ -57,6 +57,9 @@ class AcuteReview:
             self.bend_meshes.append(dict(name=model.geom(geom).name, bounds_min_m=points.min(0), bounds_max_m=points.max(0)))
         self.exit_x = None if self.straight else max(float(mesh['bounds_max_m'][0]) for mesh in self.bend_meshes)
         self.entry_z = None if self.straight else min(float(mesh['bounds_min_m'][2]) for mesh in self.bend_meshes)
+        self.continuous_elbow = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, 'pipe_bend_sdf')
+        if self.continuous_elbow >= 0:
+            self.entry_z, self.exit_x = map(float, model.numeric('bend_planes').data)
         self.weight = float(model.body_mass[sim.head:].sum() * abs(model.opt.gravity[2]))
         self.robot = set(np.flatnonzero(model.geom_bodyid >= sim.head))
         self.shells = []
@@ -111,6 +114,13 @@ class AcuteReview:
             if pipe == self.square and min(abs(c.pos[:2])) >= .65 * m.geom_size[pipe, 0]:
                 corners.add((int(c.pos[0] > 0), int(c.pos[1] > 0)))
             key = 'vertical' if self.straight or pipe == self.vertical else 'horizontal' if pipe == self.horizontal else 'elbow'
+            if pipe == self.continuous_elbow:
+                # The swept collider also includes straight sections. The
+                # tangent planes, rather than its mesh bounds, mark the bend.
+                if c.pos[2] < self.entry_z:
+                    key = 'vertical'
+                elif c.pos[0] >= self.exit_x:
+                    key = 'horizontal'
             frame = c.frame.reshape(3, 3)
             normal[key] += force[0]
             up[key] += float(sign * frame[:, 2] @ force[:3])
@@ -195,6 +205,23 @@ class AcuteReview:
                     **row, **ring)
 
 
+def record_self_contacts(sim, episodes):
+    model, data = sim.model, sim.data
+    timestep = model.opt.timestep
+    for contact in data.contact:
+        if contact.dist >= 0.:
+            continue
+        first, second = sorted(int(model.geom_bodyid[geom] - sim.head) for geom in contact.geom)
+        if first < 0 or second - first <= 2:
+            continue
+        intervals = episodes.setdefault((first + 1, second + 1), [])
+        if intervals and data.time - intervals[-1][1] <= 1.01 * timestep:
+            intervals[-1][1] = float(data.time)
+            intervals[-1][2] = max(intervals[-1][2], float(-contact.dist))
+        else:
+            intervals.append([float(data.time), float(data.time), float(-contact.dist)])
+
+
 def summarize(rows, points, statuses, mode, weight):
     ring_mode = mode == 'arc'
     stable_ring = [i for i, r in enumerate(rows) if r['stage'] in ('vertical_ring', 'bend_shift') and r['pre_bend']
@@ -206,12 +233,15 @@ def summarize(rows, points, statuses, mode, weight):
     physical_reference = None
     first_clear = None
     physical_72mm = None
+    physical_72mm_reference = None
     first_exit_72mm = None
     progress = 0.
     passed = None
     gait_clear = None
     full_pass = False
     episode_correct_crossing = episode_correct_continuation = False
+    bend_start = next((i for i, r in enumerate(rows) if r['stage'] == 'bend_shift'), None)
+    audit_from = last_stable if ring_mode else bend_start
 
     def marker_indices(status):
         start = status.get('wrap_start_m', 0.)
@@ -228,9 +258,10 @@ def summarize(rows, points, statuses, mode, weight):
             if first_clear is None:
                 first_clear = i
             episode_correct_continuation = frame_ok
-            episode_correct_crossing = frame_ok and (not ring_mode or (
-                last_stable is not None and last_stable <= i and
-                all(r['ring_shape'] and not r['self_contacts'] for r in rows[last_stable:i + 1])))
+            episode_clean_crossing = (audit_from is not None and audit_from <= i and
+                all(not r['self_contacts'] and r['floor_force_n'] <= .1 for r in rows[audit_from:i + 1]))
+            episode_correct_crossing = frame_ok and episode_clean_crossing and (
+                not ring_mode or all(r['ring_shape'] for r in rows[audit_from:i + 1]))
             if episode_correct_crossing and gait_clear is None:
                 gait_clear = i
         if attached and physical_reference is not None:
@@ -238,6 +269,7 @@ def summarize(rows, points, statuses, mode, weight):
             row['physical_progress_m'] = advance
             if physical_72mm is None and advance >= .072:
                 physical_72mm = i
+                physical_72mm_reference = physical_reference
             episode_correct_continuation &= frame_ok
             if episode_correct_continuation:
                 progress = max(progress, advance)
@@ -258,12 +290,13 @@ def summarize(rows, points, statuses, mode, weight):
                             span_m=[min(r['span_m'] for r in frames), max(r['span_m'] for r in frames)],
                             ring_frames=sum(r['ring_shape'] for r in frames),
                             maximum_curvature_per_m=max(r['maximum_curvature_per_m'] for r in frames))
-    bend_start = next((i for i, r in enumerate(rows) if r['stage'] == 'bend_shift'), None)
     crossing_collisions = (None if bend_start is None or physical_72mm is None else
                            sum(bool(r['self_contacts']) for r in rows[bend_start:physical_72mm + 1]))
     return dict(physically_cleared=first_clear is not None,
                 clear_time_s=None if first_clear is None else rows[first_clear]['time_s'],
                 physical_72mm_time_s=None if physical_72mm is None else rows[physical_72mm]['time_s'],
+                physical_72mm_reference_s=(None if physical_72mm_reference is None else
+                                            rows[physical_72mm_reference]['time_s']),
                 crossing_self_contact_frames_to_physical_72mm=crossing_collisions,
                 physical_progress_m=max((r['physical_progress_m'] for r in rows if r['physical_progress_m'] is not None), default=0.),
                 correct_gait_cleared=gait_clear is not None,
@@ -345,6 +378,11 @@ def summarize_straight(rows, rate, feature_exit, mode, square=False, twin=False)
         shape &= np.array([min(r['twin_turn_deg']) >= 325. for r in ring])
     above = np.array([feature_exit is None or r['last_envelope_z_m'] >= feature_exit for r in ring])
     contact = np.array([bool(r['supporting_links']) for r in ring])
+    sustained_clear_time = None
+    if feature_exit is not None and above[-1] and contact[-1]:
+        interruptions = np.flatnonzero(~(above & contact))
+        clear_index = int(interruptions[-1]) + 1 if len(interruptions) else 0
+        sustained_clear_time = float(times[clear_index])
     collision_free = np.array([not r['self_contacts'] and r['floor_force_n'] <= .1 for r in ring])
     allowed = np.flatnonzero(shape) if feature_exit is None else np.flatnonzero(above)
     continuation = None
@@ -377,27 +415,54 @@ def summarize_straight(rows, rate, feature_exit, mode, square=False, twin=False)
                 minimum_normal_n=min(r['normal_n']['vertical'] for r in ring),
                 maximum_normal_n=max(r['normal_n']['vertical'] for r in ring),
                 end_envelope_z_m=ring[-1]['last_envelope_z_m'],
-                first_clear_time_s=None if clear is None else clear['time_s'], continuation=continuation,
+                first_clear_time_s=None if clear is None else clear['time_s'],
+                sustained_clear_time_s=sustained_clear_time, continuation=continuation,
                 sustained_continuation=sustained)
+
+
+class ReturnSeamTrial(AcuteArcTransition):
+    """Expose the existing wider curve search while the measured ring is enlarged."""
+
+    @classmethod
+    def attach(cls, core):
+        """Keep the controller installed by a paired experiment."""
+        class WiderReturnSeam(type(core)):
+            extra_vertical_tip_choices = cls.extra_vertical_tip_choices
+
+        core.__class__ = WiderReturnSeam
+
+    def extra_vertical_tip_choices(self, vertical):
+        return (vertical and self.tip_gap_m < self.section_ring.shell_diameter and
+                (self.ring_radius_offset < .001 or self.vertical_advance_trim < .001))
 
 
 def run(args):
     root = args.output
     root.mkdir(parents=True, exist_ok=False)
     model_copy = root / 'model.xml'
-    if args.scene in GENERATED_STRAIGHT_SCENES:
+    short_radius = SHORT_BEND_RADIUS if args.short_bend_radius is None else args.short_bend_radius
+    if args.recorded_model is not None:
+        shutil.copyfile(args.recorded_model, model_copy)
+        if args.short_elbow_sdf:
+            shutil.copyfile(args.recorded_model.with_suffix('.obj'), model_copy.with_suffix('.obj'))
+    elif args.scene in GENERATED_STRAIGHT_SCENES:
         build(args.scene, model_copy, taper_length_m=args.taper_length, upper_diameter_m=args.upper_pipe_diameter,
+              lower_diameter_m=args.lower_pipe_diameter,
               outlet_height_m=args.vertical_outlet_height, embed_return_outlet=args.embed_return_outlet)
-    elif args.short_bend_radius is not None:
-        build(args.scene, model_copy, short_bend_radius_m=args.short_bend_radius)
+    elif args.short_bend_radius is not None or args.short_elbow_sdf:
+        build(args.scene, model_copy, short_bend_radius_m=short_radius,
+              short_elbow_sdf=args.short_elbow_sdf)
     sim = VerticalScene(args.scene, recorded_model=model_copy if model_copy.exists() else None)
     model, data = sim.model, sim.data
     review = AcuteReview(sim)
     source = root / 'source'
     source.mkdir()
     for name in ('snake_control/acute_arc_transition.py', 'snake_control/bent_helix_curve.py',
-                 'snake_control/curve_gait.py', 'snake_control/vertical_ring_manual.py', 'snake_control/section_ring_curve.py',
-                 'snake_control/section_geometry.py', 'tools/build_vertical_arc_scene.py', __file__):
+                 'snake_control/curve_gait.py', 'snake_control/vertical_ring_manual.py', 'snake_control/vertical_scene.py',
+                 'snake_control/section_ring_curve.py',
+                 'snake_control/section_geometry.py', 'snake_control/section_reach.py', 'snake_control/phase_balanced_count.py',
+                 'snake_control/section_effort.py',
+                 'tools/build_vertical_arc_scene.py', __file__):
         shutil.copyfile(name, source / Path(name).name)
     if 'tro' in args.modes:
         shutil.copyfile(REFERENCE, source / 'tro_original_pole_compliance.py')
@@ -421,37 +486,61 @@ def run(args):
                       outlet_end_correction=args.outlet_end_correction or args.outlet_use_spare_length,
                       outlet_use_spare_length=args.outlet_use_spare_length,
                       section_feedback_weight=args.section_feedback_weight, section_feedback_gain=args.section_feedback_gain,
+                      section_measured_carrier=args.section_measured_carrier,
+                      section_measured_tightening=args.section_measured_tightening,
+                      section_measured_smoothing_links=args.section_measured_smoothing_links,
+                      section_measured_phase_pair=args.section_measured_phase_pair,
+                      section_measured_end_splice=args.section_measured_end_splice,
+                      section_measured_reach=args.section_measured_reach,
+                      section_bearing_outline_feedback=args.section_bearing_outline_feedback,
+                      section_bearing_outline_phase_balance=args.section_bearing_outline_phase_balance,
+                      section_measured_closed_outline=args.section_measured_closed_outline,
                       vertical_use_spare_length=args.vertical_use_spare_length,
                       vertical_adaptive_material=args.vertical_adaptive_material,
                       vertical_material_radius_gain=args.vertical_material_radius_gain,
                       vertical_material_handoff_m=args.vertical_material_handoff,
                       vertical_material_minimum_wrap_deg=args.vertical_material_minimum_wrap,
                       vertical_material_max_extra_m=args.vertical_material_max_extra,
+                      vertical_material_budget_links=args.vertical_material_budget_links,
+                      vertical_extend_overlap_ramp=args.vertical_extend_overlap_ramp,
+                      vertical_overlap_redistribution_m=args.vertical_overlap_redistribution,
+                      vertical_phase_material_handoff=args.vertical_phase_material_handoff,
                       vertical_material_wrap_only=args.vertical_material_wrap_only,
                       vertical_material_return_phase_rad=args.vertical_material_return_phase,
                       vertical_return_advance_m=args.vertical_return_advance,
+                      vertical_return_overlap_trim_m=args.vertical_return_overlap_trim,
+                      vertical_return_crown_m=args.vertical_return_crown,
                       section_bearing_advance_m=args.section_bearing_advance,
                       section_flat_advance_weight=args.section_flat_advance_weight,
                       vertical_end_clearance=args.vertical_end_clearance,
+                      section_overlap_clearance=args.section_overlap_clearance,
+                      section_head_transition_links=args.section_head_transition,
                       section_feedback_during_release=args.section_feedback_during_release,
                       section_preserve_mean_turn=args.section_preserve_mean_turn,
                       section_local_handoff=args.section_local_handoff,
                       bend_section_radius_trim_m=args.bend_section_radius_trim)
+    recorded_options = getattr(args, 'recorded_options', None)
+    if recorded_options is not None:
+        saved = json.loads(recorded_options.read_text(encoding='utf-8'))
+        options = AcuteOptions(**saved['options'])
     if not model_copy.exists():
         shutil.copyfile(sim.model_path, model_copy)
     route = model.numeric('pipe_centerline').data.reshape(-1, 4)
     feature_exit = float(route[-2, 2]) if args.scene in VERTICAL_FEATURES else None
+    ellipse_axes = model.numeric('pipe_ellipse_semiaxes').data.copy() if args.scene == 'round_to_ellipse' else None
     pipe = review.vertical if review.straight else review.horizontal
     dump(root / 'hypothesis.json', dict(case='straight' if review.straight else 'acute', scene=args.scene,
          hypothesis=('The measured section maintains ring shape and vertical grip through the vertical course' if review.straight
                      else 'The selected curve can carry the whole robot through the elbow and keep its gait on the outlet'),
          diameter_m=2 * route[0, 3] if review.square != pipe else None,
          square_side_m=None if review.square is None else 2 * model.geom_size[review.square, 0],
+         ellipse_diameters_m=None if ellipse_axes is None else 2 * ellipse_axes,
          twin_diameters_m=[2. * model.geom_size[i, 0] for i in review.twin], twin_centers_m=review.twin_centers,
          route_radii_m=np.unique(route[:, 3]), feature_exit_z_m=feature_exit,
          vertical_outlet_height_m=float(route[-1, 2]) if review.straight else None,
          embed_return_outlet=args.embed_return_outlet,
-         short_bend_radius_m=(args.short_bend_radius or SHORT_BEND_RADIUS) if args.scene == 'short' else None,
+         short_bend_radius_m=short_radius if args.scene == 'short' else None,
+         short_elbow_sdf=args.short_elbow_sdf,
          start_head_height_m=args.start_head_height,
          vertical_axis=[0, 0, 1], horizontal_axis=[1, 0, 0],
          corner_z_m=review.corner_z, entry_z_m=review.entry_z, exit_x_m=review.exit_x,
@@ -459,6 +548,7 @@ def run(args):
          friction=model.geom_friction[pipe], mass_kg=model.body_mass[sim.head:].sum(),
          phase_rad=args.phase, initial_helix_radius_m=args.initial_helix_radius, options=options.__dict__,
          manual_takeover=args.manual_takeover,
+         return_seam_trial=args.return_seam_trial,
          acceptance=('positive net ascent and a supported intact ring for one rolling period after formation/feature exit'
                      if review.straight else
                      'actual last shell clears and supported by horizontal pipe; 72 mm after exit with correct shape'),
@@ -472,6 +562,8 @@ def run(args):
     state = mujoco.mjtState.mjSTATE_INTEGRATION
     saved = np.empty(mujoco.mj_stateSize(model, state))
     common_records = ([], [], [], [], [], [], [], [])
+    inspect_contacts = getattr(args, 'audit_self_contacts', False)
+    contact_ranges = {}
 
     def sample(core, target, mask, records):
         rows, states, speeds, targets, masks, forces, statuses, points = records
@@ -493,15 +585,23 @@ def run(args):
             q, mask = core.step(.02, measured)
         sim.drive.apply_targets(data, q, mask)
         mujoco.mj_step(model, data)
+        if inspect_contacts:
+            record_self_contacts(sim, contact_ranges)
         common_work += timestep * float(np.maximum(0., data.actuator_force * data.qvel[sim.drive.vadr]).sum())
         if tick % 50 == 0:
             sample(core, q, mask, common_records)
     mujoco.mj_getState(model, data, saved, state)
     np.save(root / 'matched_start.npy', saved)
     common_core, common_q, common_mask = core, q, mask
+    initial_contacts = deepcopy(contact_ranges)
     common_climb = common_records[0][-1]['head_z_m'] - common_records[0][40]['head_z_m']
     print(f'common climb after settle: {common_climb:.3f} m', flush=True)
-    for mode in args.modes:
+    branches = [(mode, effort) for mode in args.modes
+                for effort in (args.section_effort if mode == 'arc' and args.section_effort else (None,))]
+    for mode, effort in branches:
+        contact_ranges = deepcopy(initial_contacts)
+        label = mode if effort is None else f'{mode}_{effort}'
+        branch_options = replace(options, section_effort_mode=effort)
         mujoco.mj_setState(model, data, saved, state)
         mujoco.mj_forward(model, data)
         q, mask = common_q.copy(), common_mask.copy()
@@ -511,7 +611,9 @@ def run(args):
         tro = TroHelixBaseline(sim.lengths) if mode == 'tro' else None
         if args.manual_takeover and mode == 'arc':
             initial_feedback = np.degrees(data.qpos[sim.drive.qadr])
-            manual = VerticalRingManual(initial_feedback, sim.lengths, options, helix_targets_deg=np.degrees(q))
+            manual = VerticalRingManual(initial_feedback, sim.lengths, branch_options, helix_targets_deg=np.degrees(q))
+            if args.return_seam_trial:
+                ReturnSeamTrial.attach(manual.core)
             manual.toggle_continuous()
             core = manual.core
             events.append(dict(time_s=float(data.time), command='takeover_and_continuous',
@@ -523,12 +625,20 @@ def run(args):
         previous = None
         low_since = None
         feedback_time = float(data.time)
+        motor_effort = None
+        effort_sum = np.zeros(model.nu)
+        effort_samples = np.zeros(model.nu, dtype=int)
         branch_work = 0.
         control_us = []
         for tick in range(round(10. / timestep), round(args.duration / timestep)):
             if tick % 200 == 0:
                 measured = data.qpos[sim.drive.qadr].copy()
                 feedback_time = float(data.time)
+                if effort is not None:
+                    motor_effort = np.divide(effort_sum, effort_samples * sim.drive.p.torque_limit_nm,
+                                             out=np.zeros_like(effort_sum), where=effort_samples > 0)
+                    effort_sum.fill(0.)
+                    effort_samples.fill(0)
             if tick % 20 == 0:
                 try:
                     if (not review.straight and tro is None and core.stage in ('vertical_helix', 'vertical_ring') and
@@ -560,17 +670,28 @@ def run(args):
                     elif manual is None:
                         q, mask = core.step(.02, measured, feedback_time)
                     else:
-                        manual.advance(.02, float(data.time), feedback_time, np.degrees(measured))
+                        manual.advance(.02, float(data.time), feedback_time, np.degrees(measured),
+                                       motor_effort=motor_effort)
                         q, mask = np.radians(manual.targets), manual.enabled
                     control_us.append((perf_counter() - control_start) * 1.e6)
                 except (ValueError, FloatingPointError, np.linalg.LinAlgError) as exc:
                     failure = str(exc)
                     break
                 if core.stage != previous:
-                    print(mode, round(data.time, 2), core.stage, np.round(data.site('s_head').xpos, 3), flush=True)
+                    print(label, round(data.time, 2), core.stage, np.round(data.site('s_head').xpos, 3), flush=True)
                     previous = core.stage
             sim.drive.apply_targets(data, q, mask)
-            mujoco.mj_step(model, data)
+            try:
+                mujoco.mj_step(model, data)
+            except mujoco.FatalError as exc:
+                failure = f'physics_error: {exc}'
+                events.append(dict(time_s=float(data.time), command='physics_failure', reason=str(exc)))
+                break
+            if inspect_contacts:
+                record_self_contacts(sim, contact_ranges)
+            if effort is not None:
+                effort_sum[mask] += abs(data.actuator_force[mask])
+                effort_samples += mask
             branch_work += timestep * float(np.maximum(0., data.actuator_force * data.qvel[sim.drive.vadr]).sum())
             if tick % 50 == 0:
                 sample(core, q, mask, records)
@@ -586,7 +707,7 @@ def run(args):
                 else:
                     low_since = None
         rows, states, speeds, targets, masks, forces, statuses, points = records
-        out = root / mode
+        out = root / label
         out.mkdir()
         summary = summarize(rows, points, statuses, mode, review.weight)
         if review.straight:
@@ -600,18 +721,32 @@ def run(args):
         dump(out / 'run.json', dict(summary=summary, samples=rows))
         dump(out / 'controller.json', statuses)
         dump(out / 'operator.json', events)
+        if inspect_contacts:
+            dump(out / 'self_contact_episodes.json',
+                 [dict(links=links, intervals_s_depth_m=intervals)
+                  for links, intervals in sorted(contact_ranges.items())])
         if options.progressive_tail_release and mode == 'arc':
             dump(out / 'tail_release.json', [event for event in core.events if 'released_joint' in event])
         shutil.copyfile(root / 'model.xml', out / 'model.xml')
-        shutil.copyfile(root / 'hypothesis.json', out / 'hypothesis.json')
+        if args.short_elbow_sdf:
+            shutil.copyfile(root / 'model.obj', out / 'model.obj')
+        if effort is None:
+            shutil.copyfile(root / 'hypothesis.json', out / 'hypothesis.json')
+        else:
+            meta = json.loads((root / 'hypothesis.json').read_text(encoding='utf-8'))
+            meta['options'] = branch_options.__dict__
+            meta['simulated_effort'] = 'mean abs actuator torque over preceding 200 ms of enabled samples, divided by torque limit'
+            dump(out / 'hypothesis.json', meta)
         np.savez_compressed(out / 'trace.npz', qpos=states, qvel=speeds, targets=targets, masks=masks,
                             forces=forces, time=[r['time_s'] for r in rows], points=points)
-        print(mode, json.dumps(summary, default=json_default), flush=True)
+        print(label, json.dumps(summary, default=json_default), flush=True)
 
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', type=Path)
+    p.add_argument('--recorded-model', type=Path, help='Reuse the exact collision XML from a prior trial')
+    p.add_argument('--audit-self-contacts', action='store_true')
     p.add_argument('--review', nargs='+', type=Path)
     p.add_argument('--scene', choices=('acute', 'short') + STRAIGHT_SCENES, default='acute')
     p.add_argument('--duration', type=float, default=185.)
@@ -619,10 +754,16 @@ if __name__ == '__main__':
     p.add_argument('--initial-helix-radius', type=float, default=.094)
     p.add_argument('--start-head-height', type=float, default=1.,
                    help='Starting height of the placed vertical Helix head, in metres')
+    p.add_argument('--recorded-options', type=Path,
+                   help='Reuse the complete AcuteOptions from a saved hypothesis.json')
     p.add_argument('--taper-length', type=float, default=.15)
     p.add_argument('--upper-pipe-diameter', type=float, default=.140)
+    p.add_argument('--lower-pipe-diameter', type=float, default=.110,
+                   help='Inlet diameter of a tapered vertical pipe in metres')
     p.add_argument('--short-bend-radius', type=float,
                    help='Generate a 90-degree short elbow with this centreline radius in metres')
+    p.add_argument('--short-elbow-sdf', action='store_true',
+                   help='Use one continuous collision surface across the tight elbow and its tangent joins')
     p.add_argument('--vertical-outlet-height', type=float, default=4.,
                    help='Top of the straight outlet above a variable-diameter transition, in metres')
     p.add_argument('--embed-return-outlet', action='store_true',
@@ -655,31 +796,74 @@ if __name__ == '__main__':
     p.add_argument('--outlet-use-spare-length', action='store_true')
     p.add_argument('--section-feedback-weight', type=float, default=0.)
     p.add_argument('--section-feedback-gain', type=float, default=.02)
+    p.add_argument('--section-measured-carrier', action='store_true',
+                   help='Reconstruct the spatial carrier from the measured planar section')
+    p.add_argument('--section-measured-tightening', type=float, default=AcuteOptions.section_measured_tightening,
+                   help='Fractional turn increase after normalizing the measured carrier winding')
+    p.add_argument('--section-measured-smoothing-links', type=float, default=0.,
+                   help='Measured turn averaging width in nominal joint spacings')
+    p.add_argument('--section-measured-phase-pair', action='store_true',
+                   help='Compensate alternating-axis projection bias with quadrature reference profiles')
+    p.add_argument('--section-measured-end-splice', action='store_true',
+                   help='Join measured curvature to the axial transfer geometry near each end')
+    p.add_argument('--section-measured-reach', action='store_true',
+                   help='Allocate measured ring curvature and material within the joint travel available')
+    p.add_argument('--section-bearing-outline-feedback', action='store_true',
+                   help='Deform the existing bearing outline with matched encoder feedback')
+    p.add_argument('--section-bearing-outline-phase-balance', action='store_true',
+                   help='Fit the persistent outline separately from roll harmonics')
+    p.add_argument('--section-measured-closed-outline', action='store_true',
+                   help='Rebuild a periodic measured outline with radial preload')
+    p.add_argument('--section-effort', nargs='+', choices=('local', 'global', 'fused'),
+                   help='Compare optional torque-proxy feedback modes on the same vertical ARC start')
     p.add_argument('--vertical-use-spare-length', action='store_true')
     p.add_argument('--vertical-adaptive-material', action='store_true')
     p.add_argument('--vertical-material-radius-gain', type=float, default=AcuteOptions.vertical_material_radius_gain)
     p.add_argument('--vertical-material-handoff', type=float, default=0.)
     p.add_argument('--vertical-material-minimum-wrap', type=float, default=0.)
     p.add_argument('--vertical-material-max-extra', type=float, default=AcuteOptions.vertical_material_max_extra_m)
+    p.add_argument('--vertical-material-budget-links', type=float, default=AcuteOptions.vertical_material_budget_links)
+    p.add_argument('--vertical-extend-overlap-ramp', action='store_true')
+    p.add_argument('--vertical-overlap-redistribution', type=float, default=0.,
+                   help='Maximum radius change in metres when trading overlap for circumference')
+    p.add_argument('--vertical-phase-material-handoff', action='store_true')
     p.add_argument('--vertical-material-wrap-only', action='store_true')
     p.add_argument('--vertical-material-return-phase', type=float, default=0.)
     p.add_argument('--vertical-return-advance', type=float)
+    p.add_argument('--vertical-return-overlap-trim', type=float, default=0.,
+                   help='Shorten the material overlap in metres as the adaptive ring returns to the smaller section')
+    p.add_argument('--vertical-return-crown', type=float, default=0.,
+                   help='Lower the ring body by this many metres at the return roll phase with maximum span')
     p.add_argument('--section-bearing-advance', type=float)
     p.add_argument('--section-flat-advance-weight', type=float, default=0.)
     p.add_argument('--vertical-end-clearance', action='store_true')
+    p.add_argument('--section-overlap-clearance', action='store_true',
+                   help='Compare local end-curve candidates when measured overlapping spans approach')
+    p.add_argument('--section-head-transition', type=float, default=AcuteOptions.section_head_transition_links,
+                   help='Length of the head end ramp in link spacings')
     p.add_argument('--section-feedback-during-release', action='store_true')
     p.add_argument('--section-preserve-mean-turn', action='store_true')
     p.add_argument('--section-local-handoff', action='store_true')
     p.add_argument('--bend-section-radius-trim', type=float, default=0.)
     p.add_argument('--manual-takeover', action='store_true')
+    p.add_argument('--return-seam-trial', action='store_true',
+                   help='Try the wider local curve candidates before the return to the smaller tube')
     p.add_argument('--modes', nargs='+', choices=['helix', 'arc', 'tro'], default=['helix', 'arc'])
     args = p.parse_args()
+    if args.section_measured_carrier and (not args.section_feedback_weight or args.section_effort):
+        p.error('--section-measured-carrier requires angle feedback without a motor effort trial')
+    if args.section_effort and (len(set(args.section_effort)) != len(args.section_effort) or
+                                not (args.manual_takeover and args.vertical_adaptive_material and 'arc' in args.modes)):
+        p.error('--section-effort requires distinct modes, manual takeover, adaptive ring material and ARC')
+    if args.return_seam_trial and not (args.manual_takeover and args.scene == 'variable_return' and
+                                       args.section_overlap_clearance and args.vertical_return_advance is not None):
+        p.error('--return-seam-trial requires a measured overlap and material-return run')
     if not np.isfinite(args.start_head_height) or args.start_head_height <= 0.:
         p.error('--start-head-height must be finite and positive')
-    if args.short_bend_radius is not None and args.scene != 'short':
-        p.error('--short-bend-radius requires --scene short')
-    if args.vertical_outlet_height != 4. and args.scene not in ('variable', 'variable_return'):
-        p.error('--vertical-outlet-height requires --scene variable or variable_return')
+    if (args.short_bend_radius is not None or args.short_elbow_sdf) and args.scene != 'short':
+        p.error('--short-bend-radius and --short-elbow-sdf require --scene short')
+    if args.vertical_outlet_height != 4. and args.scene not in ('variable', 'variable_return', 'round_to_ellipse'):
+        p.error('--vertical-outlet-height requires a variable-diameter or circle-to-ellipse scene')
     if not np.isfinite(args.vertical_outlet_height):
         p.error('--vertical-outlet-height must be finite')
     if args.embed_return_outlet and args.scene != 'variable_return':
@@ -688,8 +872,10 @@ if __name__ == '__main__':
                             else args.vertical_outlet_height - 1.9)
     if not 0. < args.taper_length < maximum_taper_length:
         p.error('--taper-length must fit between the taper start and pipe top')
-    if not args.upper_pipe_diameter > .110:
-        p.error('--upper-pipe-diameter must exceed the lower pipe diameter of .110 m')
+    if args.lower_pipe_diameter != .110 and args.scene not in ('variable', 'variable_return'):
+        p.error('--lower-pipe-diameter requires --scene variable or variable_return')
+    if not 0. < args.lower_pipe_diameter < args.upper_pipe_diameter < np.inf:
+        p.error('The upper and lower pipe diameters must be positive and finite, with the upper larger')
     if args.section_before_bend and not (args.progressive_tail_release and args.section_shell_diameter):
         p.error('--section-before-bend requires --progressive-tail-release and --section-shell-diameter')
     if args.review:

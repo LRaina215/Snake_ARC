@@ -29,10 +29,21 @@ def main():
                '        super().__init__(angles_rad, lengths, options)\n'
                '        self.curve = VerticalSampledCurveGait(self.n, self.l, lengths=self.lengths)\n\n'
                + method(source / 'helix_arc_transition.py', 'HelixArcTransition', 'apply_reference'))
-    core = declaration(source / 'acute_arc_transition.py').replace(
-        'class AcuteArcTransition(HelixArcTransition):', 'class AcuteArcTransition(VerticalRingReference):')
+    core = (declaration(source / 'acute_arc_transition.py')
+            .replace('class AcuteArcTransition(HelixArcTransition):',
+                     'class AcuteArcTransition(VerticalRingReference):')
+            .replace('local_section(', 'vertical_local_section(')
+            .replace('        from .section_reach import fit_section_turn\n', ''))
+    # The horizontal entry retains its current section API. The vertical fit
+    # also accepts a restricted material interval and a projection direction.
+    section_geometry = declaration(source / 'section_geometry.py', {
+        'local_section', 'section_circle', 'section_curvature_field', 'section_integral', 'section_outline',
+    }).replace('def local_section(', 'def vertical_local_section(')
     parts = [declaration(source / 'curve_gait.py', {'helix_turn_length'}),
              declaration(source / 'bent_helix_curve.py'),
+             section_geometry,
+             declaration(source / 'section_effort.py'),
+             declaration(source / 'section_reach.py'),
              declaration(source / 'section_ring_curve.py'),
              adapter, core,
              declaration(source / 'vertical_ring_manual.py')]

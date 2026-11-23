@@ -49,11 +49,18 @@ class BentHelixCurve:
         p=np.column_stack([np.interp(s,material,p[:,j]) for j in range(3)])
         return self.material_field(s,p)
 
-    def material_field(self,s,p):
+    def material_field(self,s,p,*,section_axis=None):
         """Bishop curvature of a backbone already sampled in material length."""
         t=np.gradient(p,s,axis=0,edge_order=2);t/=np.linalg.norm(t,axis=1)[:,None]
         kvec=np.gradient(t,s,axis=0,edge_order=2);kvec-=t*(kvec*t).sum(1)[:,None]
-        kappa=np.linalg.norm(kvec,axis=1);norm=kvec/np.maximum(kappa[:,None],1e-10)
+        kappa=np.linalg.norm(kvec,axis=1)
+        if section_axis is None:
+            norm=kvec/np.maximum(kappa[:,None],1e-10)
+        else:
+            # The projected section axis defines a normal even on a straight
+            # portion. A curvature normal is undefined there.
+            norm=section_axis-(t@section_axis)[:,None]*t
+            norm/=np.linalg.norm(norm,axis=1)[:,None]
         transported=transport(norm[:-1],t[:-1],t[1:])
         delta=np.arctan2((np.cross(transported,norm[1:])*t[1:]).sum(1),(transported*norm[1:]).sum(1))
         psi=np.r_[0.,np.cumsum(delta)]
@@ -64,5 +71,13 @@ class BentHelixCurve:
         gamma=math.atan2(np.cross(self.reference_normal,norm[0])@t[0],self.reference_normal@norm[0])
         self.gamma+=math.atan2(math.sin(gamma-self.gamma),math.cos(gamma-self.gamma))
         psi+=self.gamma
-        components=np.column_stack([kappa*np.cos(psi),kappa*np.sin(psi)])
-        return s,(components[:-1]+components[1:])/2,float(psi[-1])
+        if section_axis is None:
+            components=np.column_stack([kappa*np.cos(psi),kappa*np.sin(psi)])
+            end_phase=psi[-1]
+        else:
+            along=np.sum(kvec*norm,axis=1)
+            across=np.sum(kvec*np.cross(t,norm),axis=1)
+            c,sine=np.cos(psi),np.sin(psi)
+            components=np.column_stack([c*along-sine*across,sine*along+c*across])
+            end_phase=psi[-1]+math.atan2(across[-1],along[-1])
+        return s,(components[:-1]+components[1:])/2,float(end_phase)

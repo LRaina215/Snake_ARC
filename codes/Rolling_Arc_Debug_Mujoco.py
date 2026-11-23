@@ -28,8 +28,8 @@ MotorFeedbackSliding = real.MotorFeedbackSliding
 
 
 # ==================== 1. 手动测试参数 ====================
-SCENE = 'straight'              # straight / bend90 / elbow90 / taper_true90 / elbow90_taper110_210 / length_taper_return / tee_up60
-VERTICAL_INITIAL_PHASE_RAD = .4  # SCENE='vertical_short' 时使用；复测另一已有起态用1.15
+SCENE = 'straight'              # 竖直调试：vertical_straight / vertical_taper_return / vertical_short
+VERTICAL_INITIAL_PHASE_RAD = .4  # 复测另一已有起态用1.15
 START_X_M = -.5                 # 弯管常用-.35，急弯常用-.25
 SIM_FIRST_JOINT = real.FIRST_JOINT  # 本轮偏置搭管实验设5 / 10，不修改实机文件
 SIM_LAST_JOINT = real.LAST_JOINT
@@ -44,10 +44,13 @@ PUSH_FORCE_N = 8.0              # Ctrl+A/D按住拉动左/右悬垂端、松开�
 PUSH_FORCE_STEP_N = 2.0         # Ctrl+[ / ] 调整扰动力；不会直接移动窗口或qpos
 PUSH_WORLD_DIRECTION = np.array([0., 1., 0.])
 PUSH_DOWNWARD_RATIO = 1.0        # 水平向外+向下拉；0时只水平拉，均归一化为上面的总力
+VERTICAL_SCENES = {'vertical_straight': 'straight', 'vertical_taper_return': 'variable_return',
+                   'vertical_short': 'short'}
 
 SIM_HELP = '''MuJoCo新增操作：
   Ctrl+1 / 2 / 3：基础圆弧 / 固定截面顺应 / 滑动窗口截面顺应
-  SCENE='vertical_short'：Ctrl+8接管预置竖直Helix，Ctrl+G连续，Ctrl+L确认入弯和水平接管
+  竖直场景：Ctrl+8接管预置Helix，Ctrl+H连续/暂停，Ctrl+J单步；退尾后Ctrl+1普通上滚，Ctrl+3圆形参考顺应
+  竖直短弯仍用Ctrl+L确认入弯和水平接管
   Ctrl+A / D：按住拉动左(-Y) / 右(+Y)悬垂端；松开字母或Ctrl即停止
   Ctrl+[ / ]：扰动总力减小 / 增大；Ctrl+W：自动移窗与扩缩开/关（仅滑动模式）
   Ctrl+R：明确结束当前试验，重建初始预览；不是连续运动中的位姿修正
@@ -462,10 +465,20 @@ def load_manual_arc_model(scene, joints):
 
 
 def make_manual_simulation(scene, start_x):
-    if scene == 'vertical_short':
+    if scene in VERTICAL_SCENES:
         if real.NUM_JOINTS != 18:
-            raise ValueError('竖直短弯手调模型需要18关节')
-        sim = VerticalScene('short')
+            raise ValueError('竖直手调模型需要18关节')
+        pipe_scene = VERTICAL_SCENES[scene]
+        if pipe_scene == 'variable_return':
+            from tempfile import TemporaryDirectory
+            from tools.build_vertical_arc_scene import build
+            with TemporaryDirectory() as folder:
+                model = Path(folder) / 'model.xml'
+                build(pipe_scene, model, upper_diameter_m=.14, taper_length_m=.45,
+                      outlet_height_m=5.7, embed_return_outlet=True)
+                sim = VerticalScene(pipe_scene, model)
+        else:
+            sim = VerticalScene(pipe_scene)
         sim.scene = scene
         sim.robot_geoms = set(np.flatnonzero(sim.model.geom_bodyid >= sim.head))
         gait = real.CurveGait(18, lengths=sim.lengths)
@@ -742,6 +755,10 @@ class DebugViewer:
             status = c.vertical_ring_transition.status()
             cycle = status['stage']
             handover = f"Tail released: {status['released_tail_count']}; outlet blend: {100*status['outlet_weight']:.0f}%"
+            roll = status.get('vertical_roll_mode')
+            if roll:
+                gait = 'Vertical ARC | circular compliance' if roll == 'compliant' else 'Vertical ARC | basic roll'
+                handover = f"Reference radius: {1000*status['reference_radius_m']:.1f} mm | Tail released: {status['released_tail_count']}"
         pull = 'off'
         if len(self.session.push_keys) == 1:
             sign = next(iter(self.session.push_keys))
@@ -752,15 +769,20 @@ class DebugViewer:
         right = (f'{gait}{" -> "+c.pending_gait if c.pending_gait else ""}\n{c.mode}'
                  f'\nJ{c.first}-J{c.last} ({sum(c.enabled)} enabled)\nHead:{c.first-1}  Tail:{real.NUM_JOINTS-c.last}'
                  f'\n{c.phase:.3f} rad'
-                 f'\n{"running" if self.session.physics_started else "initial preview; Ctrl+U"}'
+                 f'\n{"running" if self.session.physics_started else "initial preview"}'
                  f'\n{sim.data.time:.2f} s'
                  f'\n{pull}\n{float(delta @ self.session.push_direction):+.3f} m'
                  f'\n{cycle}\n{handover}')
         mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPLEFT,
                           viewport, left, right, self.context)
+        if self.session.scene_key in VERTICAL_SCENES:
+            keys = 'Ctrl+8: Helix to ring | Ctrl+H: run/pause\nAfter tail release: Ctrl+1 basic | Ctrl+3 circular compliance'
+            more = 'Ctrl+J: single step | Ctrl+L: confirm bend/outlet\nCtrl+R: reset | Ctrl+X: release | Ctrl+Q: quit'
+        else:
+            keys = 'Ctrl+1/2/3/4: modes | Ctrl+U: form | Ctrl+G: run/pause\nHold Ctrl+A/D: pull left/right | Ctrl+[ / ]: force\nCtrl+W: auto window | Ctrl+R: reset preview'
+            more = 'Ctrl+J/H: step / one feed segment (hold at goal) | Ctrl+Y: return\nCtrl+L: feed frame | Ctrl+Space: pause\nCtrl+X: release | Ctrl+Q: quit'
         mujoco.mjr_overlay(mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT,
-                          viewport, 'Ctrl+1/2/3/4: modes | Ctrl+U: form | Ctrl+G: run/pause\nHold Ctrl+A/D: pull left/right | Ctrl+[ / ]: force\nCtrl+W: auto window | Ctrl+R: reset preview',
-                          'Ctrl+J/H: step / one feed segment (hold at goal) | Ctrl+Y: return\nCtrl+L: feed frame | Ctrl+Space: pause\nCtrl+X: release | Ctrl+Q: quit', self.context)
+                          viewport, keys, more, self.context)
         self.glfw.swap_buffers(self.window)
         self.glfw.poll_events()
 

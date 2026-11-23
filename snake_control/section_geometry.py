@@ -196,7 +196,24 @@ def section_circle(points):
     return float(np.sqrt(max(0., intercept + u*u + v*v))), float(np.std(radial)), np.array([u, v])
 
 
-def local_section(q,lengths,first,last,previous=None, method='plane', fit_interval_m=None):
+def section_outline(geometry):
+    """Dimensionless closed radial profile relative to the first bearing link."""
+    points = geometry['fit_projected']
+    _, _, center = section_circle(points)
+    path = geometry['projected'] - center
+    xy = points - center
+    angle = np.unwrap(np.arctan2(xy[:, 1], xy[:, 0]))
+    direction = math.copysign(1., angle[-1] - angle[0])
+    head_angle = math.atan2(path[0, 1], path[0, 0])
+    material_angle = direction * (angle - head_angle)
+    terms = material_angle[:, None] * np.array([2., 3., 4.])
+    modes = np.column_stack((np.ones(len(angle)), np.cos(terms), np.sin(terms)))
+    coeff = np.linalg.lstsq(modes, np.linalg.norm(xy, axis=1), rcond=None)[0]
+    return coeff[1:] / coeff[0]
+
+
+def local_section(q,lengths,first,last,previous=None, method='plane', fit_interval_m=None,
+                  *, projection_direction=None):
     points=forward(q,lengths)[first-1:last+3]  # one entering/exiting boundary link
     fitting=points[1:-1]
     if method=='paper': axis=paper_axis(points)
@@ -213,6 +230,10 @@ def local_section(q,lengths,first,last,previous=None, method='plane', fit_interv
         distances=(fitting-center)@direction
         axis=dict(point=center,direction=direction,confidence=float(np.clip(1-np.std(distances)/.03,0,1)),
                   variance=float(np.mean(distances**2)))
+    if projection_direction is not None:
+        # Keep the plane-fit residual for judging the observed carrier shape.
+        # Only the projection uses the shared direction of the straight pipe.
+        axis['direction'] = unit(np.asarray(projection_direction, dtype=float))
     if previous is not None and axis['direction']@previous['direction']<0: axis['direction']*=-1
     basis=projection_basis(axis['direction'],None if previous is None else previous['basis'][:,0])
     axis['basis']=basis

@@ -1,6 +1,7 @@
 """New reference integrator, near-vertical frames, shared adapter handover."""
 import unittest,math
 from dataclasses import replace
+from unittest.mock import Mock, call
 import numpy as np
 from snake_control.curve_gait import CurveGait,helix
 from snake_control.bent_helix_curve import BentHelixCurve
@@ -66,6 +67,63 @@ class VerticalArcTests(unittest.TestCase):
             np.testing.assert_allclose(shared.targets, standalone.targets, rtol=0., atol=1e-9)
             np.testing.assert_array_equal(shared.enabled, standalone.enabled)
 
+    def test_vertical_hotkeys_keep_the_carrier_and_leave_horizontal_back_as_a_step(self):
+        from codes import Rolling_Arc_Real as real
+
+        angles = np.degrees(self.g.targets([helix(self.g.body_length, .094, .13)], .4))
+        controller = real.RollingArcController(real.FeetechBus(real.DryRunSerial()))
+
+        def press(key):
+            controller.command(real.decode_hotkey(ord(key), True))
+
+        controller.mode = 'hold'
+        press('H')
+        self.assertEqual(controller.mode, 'step')
+        self.assertLess(controller.pending_phase, 0.)
+
+        manual = real.VerticalRollManual(angles, self.lengths, real.vertical_roll_options())
+        controller.vertical_ring_transition = manual
+        controller.mode, controller.pending_phase = 'hold', 0.
+        with self.assertRaises(ValueError):
+            press('3')
+        press('H')
+        self.assertTrue(manual.running)
+        press('H')
+        self.assertFalse(manual.running)
+        press('J')
+        self.assertEqual(manual.step_remaining_s, manual.step_s)
+
+        manual.core.enter('vertical_ring')
+        press('H')
+        phase, target, enabled = manual.core.phase, manual.targets, manual.enabled
+        for key, expected in [('3', 'compliant'), ('1', 'basic')]:
+            press(key)
+            self.assertIs(controller.vertical_ring_transition, manual)
+            self.assertTrue(manual.running)
+            self.assertEqual(manual.status()['vertical_roll_mode'], expected)
+            self.assertEqual(manual.core.phase, phase)
+            np.testing.assert_array_equal(manual.targets, target)
+            np.testing.assert_array_equal(manual.enabled, enabled)
+
+    def test_real_vertical_roll_preloads_only_the_joining_joint_before_sending_targets(self):
+        from codes import Rolling_Arc_Real as real
+
+        bus = Mock()
+        controller = real.RollingArcController(bus)
+        controller.enabled = [True] * 9 + [False] * 9
+        measured = [4.] * 18
+        target = np.array([5.] * 18)
+        enabled = [True] * 10 + [False] * 8
+        controller.measured_angles = Mock(return_value=measured)
+        controller.motor_sample_clock = Mock(return_value=(1., 1.))
+        controller.vertical_ring_transition = Mock(stage='vertical_ring', targets=target,
+                                                   enabled=np.array(enabled), running=True)
+        controller.tick_vertical_ring(.02)
+        self.assertEqual(bus.method_calls, [
+            call.prepare_enabled(measured, enabled, configure_mask=[False] * 9 + [True] + [False] * 8),
+            call.send_targets(target.tolist(), enabled),
+        ])
+
     def test_frame_finite_and_continuous_across_vertical_bend_and_horizontal(self):
         b=BentHelixCurve(.094,.13);gammas=[]
         for u in np.linspace(-.05,.75,41):
@@ -130,9 +188,13 @@ class VerticalArcTests(unittest.TestCase):
                      normal_n={'vertical': 20.}) for i in range(20)]
         result = summarize_straight(rows, 2.*math.pi, 1., 'arc')
         self.assertAlmostEqual(result['first_clear_time_s'], .1)
+        self.assertAlmostEqual(result['sustained_clear_time_s'], .5)
         self.assertFalse(result['continuation']['above_feature_all'])
         self.assertAlmostEqual(result['sustained_continuation']['time_s'][0], .5)
         self.assertTrue(result['sustained_continuation']['above_feature_all'])
+        rows[-1]['supporting_links'] = []
+        result = summarize_straight(rows, 2.*math.pi, 1., 'arc')
+        self.assertIsNone(result['sustained_clear_time_s'])
 
     def test_twin_review_requires_enclosure_and_contact_on_both_pipes(self):
         rows = [dict(stage='vertical_ring', time_s=i*.1, ring_center_m=[0.,0.,1.+i*.01],

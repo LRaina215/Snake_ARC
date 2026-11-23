@@ -69,6 +69,8 @@ class HelixArcOptions:
     lead_s: float=1.5
     flatten_s: float=6.
     roll_rate_rad_s: float=.35
+    keep_unwrapped_tail: bool=False
+    flatten_pitch_reserve: float=0.
 
 
 class HelixArcTransition:
@@ -199,19 +201,26 @@ class HelixArcTransition:
                     self.flatten_mask=self.enabled.copy()
                     scores=[]
                     for sign in (-1.,1.):
-                        segments,phase=self.flatten_segments(.5,sign)
-                        predicted=self.measured.copy();predicted[self.flatten_mask]=self.curve.targets(segments,phase)[self.flatten_mask]
-                        pts=forward(predicted,self.lengths)
-                        head_end=np.searchsorted(self.curve.s,self.crown-self.arc_length/2,side='right')
-                        tail_start=np.searchsorted(self.curve.s,self.helix_length,side='right')+1
-                        head=pts[:max(2,head_end)]
-                        tail=pts[tail_start:]
-                        scores.append((float(np.linalg.norm(head[:,None]-tail[None,:],axis=2).min()),sign))
+                        clearances = []
+                        for progress in ((.2, .4, .6, .8) if self.o.keep_unwrapped_tail else (.5,)):
+                            segments,phase=self.flatten_segments(progress,sign)
+                            predicted=self.measured.copy()
+                            predicted[self.flatten_mask]=self.curve.targets(segments,phase)[self.flatten_mask]
+                            pts=forward(predicted,self.lengths)
+                            head_end=np.searchsorted(self.curve.s,self.crown-self.arc_length/2,side='right')
+                            tail_start=np.searchsorted(self.curve.s,self.helix_length,side='right')
+                            if not self.o.keep_unwrapped_tail:
+                                tail_start += 1
+                            head=pts[:max(2,head_end)]
+                            tail=pts[tail_start:]
+                            clearances.append(float(np.linalg.norm(head[:,None]-tail[None,:],axis=2).min()))
+                        scores.append((min(clearances),sign))
                     self.clearance_sign=max(scores)[1];self.enter('flatten')
                 else:
                     self.phase+=self.align_sign*.20*motion_dt
             else:self.phase+=self.align_sign*.20*motion_dt
-            self.set_curve(self.reverse_segments(self.lead),self.phase,dt)
+            retained_mask = self.enabled.copy() if self.o.keep_unwrapped_tail else None
+            self.set_curve(self.reverse_segments(self.lead),self.phase,dt,mask=retained_mask)
         elif self.stage=='flatten':
             w=smooth(self.elapsed*self.o.speed_scale/self.o.flatten_s)
             segments,phase=self.flatten_segments(w,self.clearance_sign)
@@ -271,7 +280,10 @@ class HelixArcTransition:
     def flatten_segments(self,w,sign):
         start=w*(self.crown-self.arc_length/2)
         end=(1-w)*self.helix_length+w*(self.crown+self.arc_length/2)
-        tau=(1-w)*self.tau;kappa=(1-w)*self.kappa+w/self.radius
+        # Keep axial space at the seam while the outgoing head passes the ring.
+        # The extra torsion vanishes at both ends of the transition.
+        reserve=self.o.flatten_pitch_reserve*math.sin(math.pi*w)**2
+        tau=(1-w+reserve)*self.tau;kappa=(1-w)*self.kappa+w/self.radius
         phase=self.start_phase+self.tau*self.crown-tau*(self.crown-start)
         bow=sign*self.o.head_clearance_rad*math.sin(math.pi*w)
         head_phase=phase+math.pi/2
